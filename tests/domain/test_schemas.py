@@ -129,3 +129,67 @@ def test_validate_plan_violaciones() -> None:
 def test_validate_plan_sin_presupuesto_en_brief() -> None:
     plan = _plan(10**6, ["No prometer resultados"])
     assert validate_plan_against_brief(plan, brief(presupuesto_anual_eur=None)) == []
+
+
+def _proposal(finding_ids: list[str]) -> dict[str, object]:
+    from datetime import datetime
+
+    from tests.domain.test_findings import metrics
+
+    finding = {
+        "titulo": "t",
+        "descripcion": "d",
+        "impacto": "M",
+        "confianza": 0.6,
+        "cifra": 0.1,
+        "origen_cifra": "visibilidad",
+        "evaluation_ids": ["EJ-1:alborada"],
+    }
+    return {
+        "resumen_ejecutivo": "Resumen",
+        "contexto": {
+            "marca": "Clínica Alborada Visión",
+            "sector": "Oftalmología",
+            "motores": ["ChatGPT"],
+            "fecha": datetime(2026, 10, 20),
+            "origen_datos": "kit",
+            "datos_sinteticos": True,
+            "limitaciones": ["Datos sintéticos"],
+        },
+        "diagnostico": {"texto": "d", "metrics": metrics()},
+        "competencia": {"texto": "c", "ranking": ["lider", "alborada"]},
+        "hallazgos": [finding | {"id": f"F{i}"} for i in range(1, 4)],
+        "estrategia": {"texto": "e", "objetivos": [], "prioridades": []},
+        "plan": _plan(20000, ["No prometer resultados"]).model_copy(
+            update={
+                "fases": [
+                    Phase(
+                        nombre="Fase 0",
+                        semanas=4,
+                        objetivo="o",
+                        acciones=[action(finding_ids=finding_ids)],
+                    )
+                ]
+            }
+        ),
+        "medicion": {"kpis": ["visibilidad espontánea"], "metodologia": "m", "cadencia": "mensual"},
+        "riesgos": [{"riesgo": "r", "mitigacion": "m"}],
+        "hoja_ruta": {
+            "hitos": [],
+            "responsabilidades": {},
+            "presupuesto_eur": 20000,
+            "seguimiento": "s",
+        },
+    }
+
+
+def test_proposal_acciones_enlazadas_a_hallazgos() -> None:
+    from posiq.domain.schemas import Proposal
+
+    assert Proposal.model_validate(_proposal(["F1"])).hallazgos[0].id == "F1"
+    with pytest.raises(ValidationError, match="hallazgos inexistentes"):
+        Proposal.model_validate(_proposal(["F9"]))
+    sin_limitaciones = _proposal(["F1"])
+    sin_limitaciones["contexto"] = sin_limitaciones["contexto"] | {"limitaciones": []}  # type: ignore[operator]
+    with pytest.raises(ValidationError):
+        Proposal.model_validate(sin_limitaciones)
