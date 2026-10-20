@@ -23,7 +23,7 @@ uno solo implementa la llamada a su SDK con la búsqueda activada.
 | ChatGPT | `openai.py` · `openai` (Responses API) | `tools=[{"type": "web_search"}]` | Anotaciones `url_citation` de los bloques `message`. Cada `web_search_call` cuenta como una búsqueda | `gpt-5-mini`: 0,25 / 2,00 por M · 0,01 por búsqueda |
 | Gemini | `gemini.py` · `google-genai` | `GenerateContentConfig(tools=[Tool(google_search=GoogleSearch())])` | `candidates[0].grounding_metadata.grounding_chunks[].web`. El dominio sale de `domain`, o de `title` si la `uri` es una redirección de `vertexaisearch` | `gemini-2.5-flash`: 0,30 / 2,50 por M · 0,035 por petición con búsqueda |
 | Perplexity | `perplexity.py` · `openai` con `base_url` de Perplexity | Sonar busca por defecto en todas las peticiones | `citations` y, si faltan, `search_results[].url` | `sonar`: 1,00 / 1,00 por M · 0,005 por petición |
-| Claude | `anthropic.py` · `anthropic` (Messages API) | Herramienta de servidor `web_search_20260209` (`web_search_20250305` en Haiku) con `max_uses=5` | `url` de cada `web_search_result` dentro de los bloques `web_search_tool_result`. Las búsquedas salen de `usage.server_tool_use.web_search_requests` | `claude-opus-5-5`: 4,00 / 20,00 por M · 0,01 por búsqueda |
+| Claude | `anthropic.py` · `anthropic` (Messages API) | Herramienta de servidor `web_search_20260209` (`web_search_20250305` en Haiku) con `max_uses=5` | Solo las citadas: `citations` de tipo `web_search_result_location` en los bloques `text` (no todos los `web_search_tool_result`). Las búsquedas salen de `usage.server_tool_use.web_search_requests` | `claude-opus-5-5`: 4,00 / 20,00 por M · 0,01 por búsqueda |
 
 - **Los precios son provisionales.** Hay que contrastarlos con la página oficial antes del primer
   estudio. Son claves de `settings.py` (`PRICING_<MOTOR>_IN/OUT/SEARCH`), así que se ajustan en
@@ -35,8 +35,14 @@ uno solo implementa la llamada a su SDK con la búsqueda activada.
 - **Fuentes:** dominio en minúsculas y sin `www.`, sin repetir. Su tipo se resuelve contra
   `fuentes_catalogo.csv`, y un subdominio hereda el de su dominio padre (`es.wikipedia.org` →
   `wikipedia.org`). Si el dominio no está en el catálogo, `tipo` y `calidad` quedan en `None`.
+- **Solo fuentes citadas, en los cuatro motores.** El Score de Citación compara motores entre sí, y
+  ChatGPT, Gemini y Perplexity solo devuelven lo que citan. Si contáramos todo lo que Claude vio en
+  `web_search_tool_result`, la calidad de fuentes saldría sesgada a su favor. Por eso en Claude solo
+  cuentan las `citations` de los bloques de texto.
 - **Sin búsqueda no es un error.** Si no hay fuentes, se escribe un INFO en el log y la `Run` sale
-  con `fuentes=[]`, igual que `Fuentes citadas` vacío en el kit.
+  con `fuentes=[]`, igual que `Fuentes citadas` vacío en el kit. Si Claude buscó pero no citó nada,
+  se registra `busco_sin_citar=True` en el log. `Run` no tiene campo de metadatos, y añadirlo sería
+  un `contract-change`.
 - **Reintentos:** los clientes se crean con `max_retries=0` y reintenta `RealEngine._retry`, para
   que las esperas no se multipliquen. Reintenta ante 408, 409, 429, 5xx y errores de red, con espera
   exponencial y jitter (`ENGINE_MAX_RETRIES`, `ENGINE_BACKOFF_BASE_S`, máximo 30 s). Un 400 falla
@@ -52,9 +58,11 @@ uno solo implementa la llamada a su SDK con la búsqueda activada.
   ninguna llamada más.
 - **Claude, búsquedas largas:** con `stop_reason == "pause_turn"` se reenvía el turno del asistente
   tal cual, sin añadir un «continúa», y el servidor sigue. Se hacen como mucho 5 continuaciones y el
-  texto y las fuentes de todos los tramos se concatenan. En modelos que no son Haiku se activa el
-  fallback de servidor (`fallbacks="default"`) para rechazos de seguridad, y `Run.modelo` registra
-  el modelo que respondió de verdad.
+  texto y las fuentes de todos los tramos se concatenan.
+- **Claude, fallback de modelo: opt-in.** Viene desactivado (`ANTHROPIC_ENGINE_FALLBACK=false`):
+  si respondiera otro modelo, las repeticiones dejarían de ser comparables. Con el fallback activo
+  (no disponible en Haiku), se envía `fallbacks="default"` y, si responde otro modelo, `Run.modelo`
+  lo registra y el log lo avisa.
 - **Claves:** `OPENAI_API_KEY`, `GEMINI_API_KEY`, `PERPLEXITY_API_KEY` y `ANTHROPIC_API_KEY`. Sin
   clave, el motor se construye y falla al llamar con `MissingCredentialError`, que nombra la
   variable. `build_engines(settings, "real", marcas)` devuelve solo los motores con clave y avisa en
@@ -75,6 +83,6 @@ uno solo implementa la llamada a su SDK con la búsqueda activada.
   (0,10 / 0,50 por M) lo abarata para desarrollar, pero entonces hay que ajustar también
   `PRICING_CLAUDE_IN/OUT`.
 - **Dependencias nuevas:** `google-genai` y `anthropic`.
-- **Fuentes de Claude:** son todos los resultados que devolvió la búsqueda, no solo los citados en
-  el texto. Si la medición necesita solo las citas, hay que leer las `citations` de los bloques de
-  texto.
+- **Los resultados que Claude vio y no citó se descartan:** no se guardan ni en la `Run` ni en la
+  caché. Si en el futuro interesan, hay que guardarlos aparte, sin mezclarlos con las fuentes
+  citadas.

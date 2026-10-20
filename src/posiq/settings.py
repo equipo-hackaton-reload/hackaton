@@ -64,6 +64,8 @@ class Settings(BaseSettings):
     anthropic_engine_model: str = "claude-opus-5-5"
     anthropic_engine_max_searches: int = 5
     anthropic_engine_max_tokens: int = 16000
+    # Fallback de servidor a otro modelo ante rechazos: opt-in, rompe la comparabilidad.
+    anthropic_engine_fallback: bool = False
     pricing_claude_in: float = 4.00
     pricing_claude_out: float = 20.00
     pricing_claude_search: float = 0.01

@@ -130,17 +130,27 @@ def perplexity_response(urls: list[str]) -> Any:
     )
 
 
-def anthropic_response(urls: list[str], stop_reason: str = "end_turn", texto: str = TEXTO) -> Any:
+def anthropic_response(
+    urls: list[str],
+    stop_reason: str = "end_turn",
+    texto: str = TEXTO,
+    vistas: list[str] | None = None,
+) -> Any:
+    """Respuesta de Claude que cita `urls`; `vistas` son resultados de búsqueda extra sin citar."""
+    resultados = urls + (vistas or [])
     content: list[Any] = []
-    if urls:
+    if resultados:
         content += [
             NS(type="server_tool_use", name="web_search"),
             NS(
                 type="web_search_tool_result",
-                content=[NS(type="web_search_result", url=u, title="t") for u in urls],
+                content=[NS(type="web_search_result", url=u, title="t") for u in resultados],
             ),
         ]
-    content.append(NS(type="text", text=texto))
+    citations = [
+        NS(type="web_search_result_location", url=u, title="t", cited_text="…") for u in urls
+    ]
+    content.append(NS(type="text", text=texto, citations=citations or None))
     return NS(
         content=content,
         stop_reason=stop_reason,
@@ -148,7 +158,7 @@ def anthropic_response(urls: list[str], stop_reason: str = "end_turn", texto: st
         usage=NS(
             input_tokens=1000,
             output_tokens=500,
-            server_tool_use=NS(web_search_requests=1 if urls else 0),
+            server_tool_use=NS(web_search_requests=1 if resultados else 0),
         ),
     )
 
@@ -419,6 +429,52 @@ def test_claude_declara_web_search_y_error_de_herramienta(
 def test_claude_haiku_usa_web_search_basico(settings: Settings) -> None:
     haiku = settings.model_copy(update={"anthropic_engine_model": "claude-haiku-5-5"})
     assert AnthropicEngine(haiku, MARCAS).tool["type"] == "web_search_20250305"
+
+
+def test_claude_solo_cuenta_fuentes_citadas(settings: Settings, prompt: PromptInstance) -> None:
+    response = anthropic_response(URLS[:1], vistas=["https://reddit.com/r/x", URLS[2]])
+    response.content[-1].citations.append(NS(type="char_location", cited_text="x"))
+    run = make("Claude", settings, Scripted(response)).ask(prompt, repeticion=1, study_id="S-1")
+    assert [s.dominio for s in run.fuentes] == ["diariosalud.example"]
+
+
+def test_claude_busco_sin_citar(
+    settings: Settings, prompt: PromptInstance, caplog: pytest.LogCaptureFixture
+) -> None:
+    response = anthropic_response([], vistas=URLS)
+    with caplog.at_level(logging.INFO):
+        run = make("Claude", settings, Scripted(response)).ask(prompt, repeticion=1, study_id="S")
+    assert run.fuentes == []
+    assert "busco_sin_citar=True" in caplog.text
+    assert run.coste_eur == pytest.approx(1000 * 4.0 / 1e6 + 500 * 20.0 / 1e6 + 0.01)
+
+
+def test_claude_sin_fallback_por_defecto(settings: Settings, prompt: PromptInstance) -> None:
+    assert settings.anthropic_engine_fallback is False
+    create = Scripted(anthropic_response(URLS))
+    make("Claude", settings, create).ask(prompt, repeticion=1, study_id="S-1")
+    assert "fallbacks" not in create.calls[0] and "betas" not in create.calls[0]
+
+
+def test_claude_fallback_opt_in_registra_el_modelo(
+    settings: Settings, prompt: PromptInstance, caplog: pytest.LogCaptureFixture
+) -> None:
+    con_fallback = settings.model_copy(update={"anthropic_engine_fallback": True})
+    response = anthropic_response(URLS)
+    response.model = "claude-opus-4-8"
+    create = Scripted(response)
+    with caplog.at_level(logging.WARNING):
+        run = make("Claude", con_fallback, create).ask(prompt, repeticion=1, study_id="S-1")
+    assert create.calls[0]["fallbacks"] == "default"
+    assert create.calls[0]["betas"] == ["server-side-fallback-2026-07-01"]
+    assert run.modelo == "claude-opus-4-8" and "fallback" in caplog.text
+
+
+def test_claude_haiku_ignora_el_fallback(settings: Settings) -> None:
+    haiku = settings.model_copy(
+        update={"anthropic_engine_model": "claude-haiku-5-5", "anthropic_engine_fallback": True}
+    )
+    assert AnthropicEngine(haiku, MARCAS).fallback is False
 
 
 # --- Fuentes --------------------------------------------------------------------------------------

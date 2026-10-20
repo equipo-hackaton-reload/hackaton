@@ -1,10 +1,18 @@
 """Claude: Messages API de Anthropic con la herramienta de servidor `web_search`.
 
-Fuentes: bloques `web_search_tool_result` del contenido (su `content` es una lista de
-`web_search_result` con `url`; si es un objeto, es un error de la herramienta y se registra). Si el
-bucle de búsqueda del servidor se pausa (`stop_reason == "pause_turn"`), se reenvía el turno del
-asistente tal cual para que continúe, hasta `MAX_CONTINUATIONS` veces. Las búsquedas se cuentan con
-`usage.server_tool_use.web_search_requests`.
+Fuentes: solo las CITADAS en el texto, es decir, las `citations` de tipo
+`web_search_result_location` de los bloques `text`. No se cuentan todos los resultados de
+`web_search_tool_result`: los otros tres motores solo devuelven fuentes citadas y contar todo lo que
+Claude vio sesgaría la calidad de fuentes a su favor. Si buscó pero no citó nada, las fuentes quedan
+vacías y se registra `busco_sin_citar=True` en el log (`Run` no tiene campo de metadatos).
+
+Si el bucle de búsqueda del servidor se pausa (`stop_reason == "pause_turn"`), se reenvía el turno
+del asistente tal cual para que continúe, hasta `MAX_CONTINUATIONS` veces. Las búsquedas se cuentan
+con `usage.server_tool_use.web_search_requests`.
+
+El fallback de servidor a otro modelo ante rechazos es opt-in (`ANTHROPIC_ENGINE_FALLBACK`): si
+responde otro modelo, las repeticiones dejan de ser comparables. Activo, `Run.modelo` registra el
+modelo que respondió.
 """
 
 import logging
@@ -53,6 +61,13 @@ class AnthropicEngine(RealEngine):
             "max_uses": self._settings.anthropic_engine_max_searches,
         }
 
+    @property
+    def fallback(self) -> bool:
+        """Fallback de servidor activado en settings (Haiku no lo admite)."""
+        return self._settings.anthropic_engine_fallback and not self.model.startswith(
+            "claude-haiku"
+        )
+
     def _create(self, messages: list[dict[str, Any]]) -> Any:
         kwargs: dict[str, Any] = {
             "model": self.model,
@@ -60,7 +75,7 @@ class AnthropicEngine(RealEngine):
             "messages": messages,
             "tools": [self.tool],
         }
-        if self.model.startswith("claude-haiku"):
+        if not self.fallback:
             return self.client.messages.create(**kwargs)
         # Si el modelo rechaza por seguridad, la API reintenta con otro y `response.model` lo dice.
         return self.client.beta.messages.create(
@@ -84,10 +99,13 @@ class AnthropicEngine(RealEngine):
             for block in response.content:
                 if block.type == "text":
                     partes.append(block.text)
+                    urls += [
+                        c.url
+                        for c in getattr(block, "citations", None) or []
+                        if c.type == "web_search_result_location" and getattr(c, "url", None)
+                    ]
                 elif block.type == "web_search_tool_result":
-                    if isinstance(block.content, list):
-                        urls += [r.url for r in block.content if getattr(r, "url", None)]
-                    else:
+                    if not isinstance(block.content, list):
                         logger.warning(
                             "Claude: error de web_search: %s",
                             getattr(block.content, "error_code", block.content),
@@ -100,6 +118,10 @@ class AnthropicEngine(RealEngine):
             messages = [*messages, {"role": "assistant", "content": response.content}]
         else:
             logger.warning("Claude: sigue en pause_turn tras %d continuaciones", MAX_CONTINUATIONS)
+        if busquedas and not urls:
+            logger.info("Claude: busco_sin_citar=True (%d búsquedas, ninguna cita)", busquedas)
+        if modelo != self.model:
+            logger.warning("Claude: respondió %s en lugar de %s (fallback)", modelo, self.model)
         return EngineReply(
             texto="".join(partes),
             urls=urls,
