@@ -1,7 +1,7 @@
 import pytest
 
-from posiq.domain.metrics import compute_metrics, resolve_brand
-from posiq.domain.schemas import Market
+from posiq.domain.metrics import compute_metrics, diff_metrics, resolve_brand
+from posiq.domain.schemas import Market, Metrics
 from tests.domain.factories import brand, brief, evaluation, prompt, run, source
 
 FOCO = brand(aliases=["Alborada"])
@@ -50,7 +50,7 @@ EVALS = [
 
 @pytest.fixture(scope="module")
 def metrics():  # type: ignore[no-untyped-def]
-    return compute_metrics(brief(), MARKET, PROMPTS, RUNS, EVALS, [RANKING, MEDIO])
+    return compute_metrics(brief(), MARKET, PROMPTS, RUNS, EVALS, [RANKING, MEDIO], study_id="S-1")
 
 
 def test_foco_lider_y_ranking(metrics) -> None:  # type: ignore[no-untyped-def]
@@ -108,7 +108,7 @@ def test_fuentes_y_brecha(metrics) -> None:  # type: ignore[no-untyped-def]
 
 def test_sin_lider_no_hay_brecha() -> None:
     market = Market(marcas=[FOCO, OTRA])
-    m = compute_metrics(brief(), market, PROMPTS, RUNS, EVALS, [RANKING])
+    m = compute_metrics(brief(), market, PROMPTS, RUNS, EVALS, [RANKING], study_id="S-1")
     assert m.lider_id is None and m.brecha_fuentes == []
 
 
@@ -119,7 +119,69 @@ def test_marca_del_brief_por_alias_o_ausente() -> None:
 
 
 def test_sin_evaluaciones() -> None:
-    m = compute_metrics(brief(), MARKET, PROMPTS, RUNS, [], [])
+    m = compute_metrics(brief(), MARKET, PROMPTS, RUNS, [], [], study_id="S-1")
     assert m.score_global.score is None
     assert m.ranking == ["alborada", "lider", "otra"]
     assert all(c.tasa is None for c in m.visibilidad)
+
+
+def test_no_mezcla_estudios() -> None:
+    otro = [*EVALS, ev("R1", "alborada", True).model_copy(update={"study_id": "S-2"})]
+    with pytest.raises(ValueError, match="otros estudios"):
+        compute_metrics(brief(), MARKET, PROMPTS, RUNS, otro, [], study_id="S-1")
+
+
+def _remedicion(metrics: Metrics) -> Metrics:
+    """Segunda medición (S-2) en la que la marca foco pasa a aparecer en Madrid (R3)."""
+    evals = [
+        ev("R3", "alborada", True, posicion=2, fuerza=2) if e.id == "R3:alborada" else e
+        for e in EVALS
+    ]
+    return compute_metrics(
+        brief(),
+        MARKET,
+        PROMPTS,
+        [r.model_copy(update={"study_id": "S-2"}) for r in RUNS],
+        [e.model_copy(update={"study_id": "S-2"}) for e in evals],
+        [RANKING, MEDIO],
+        study_id="S-2",
+        comparado_con=metrics.study_id,
+    )
+
+
+def test_diff_metrics(metrics: Metrics) -> None:
+    actual = _remedicion(metrics)
+    delta = diff_metrics(actual, metrics)
+    assert (delta.study_id, delta.comparado_con, delta.comparable) == ("S-2", "S-1", True)
+    assert actual.score_global.score is not None and metrics.score_global.score is not None
+    assert delta.score_delta == round(actual.score_global.score - metrics.score_global.score, 2)
+    assert delta.score_delta > 0
+    madrid = next(
+        d for d in delta.visibilidad_delta if d.valor == "Madrid" and d.tipo == "espontaneo"
+    )
+    assert (madrid.tasa_anterior, madrid.tasa_actual, madrid.delta) == (0.0, 1.0, 1.0)
+    barcelona = next(d for d in delta.visibilidad_delta if d.valor == "Barcelona")
+    assert barcelona.delta is None and barcelona.n_actual == barcelona.n_anterior == 0
+    assert {d.dimension for d in delta.visibilidad_delta} == {"global", "motor", "fase", "ciudad"}
+
+
+def test_diff_metrics_no_comparable(metrics: Metrics) -> None:
+    otra_version = metrics.model_copy(
+        update={"study_id": "S-3", "score_version": "2.0", "comparado_con": "S-9"}
+    )
+    delta = diff_metrics(otra_version, metrics)
+    assert not delta.comparable and len(delta.avisos) == 2
+
+
+def test_diff_metrics_segmento_solo_en_una_medicion(metrics: Metrics) -> None:
+    actual = metrics.model_copy(update={"study_id": "S-2", "visibilidad": metrics.visibilidad[:1]})
+    anterior = metrics.model_copy(update={"visibilidad": []})
+    (d,) = diff_metrics(actual, anterior).visibilidad_delta
+    assert d.tasa_anterior is None and d.n_anterior == 0 and d.delta is None
+    (solo_antes,) = diff_metrics(anterior, actual).visibilidad_delta
+    assert solo_antes.tasa_actual is None and solo_antes.n_actual == 0
+
+
+def test_diff_metrics_otra_marca(metrics: Metrics) -> None:
+    with pytest.raises(ValueError, match="marcas foco distintas"):
+        diff_metrics(metrics.model_copy(update={"marca_foco_id": "lider"}), metrics)

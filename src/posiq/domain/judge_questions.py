@@ -196,6 +196,7 @@ def answers_to_evaluation(
         confianza = conf_mentioned if not mentioned else min(conf_mentioned, 0.5)
         return Evaluation(
             id=f"{run.id}:{brand.id}",
+            study_id=run.study_id,
             run_id=run.id,
             brand_id=brand.id,
             aparece=False,
@@ -229,6 +230,7 @@ def answers_to_evaluation(
 
     return Evaluation(
         id=f"{run.id}:{brand.id}",
+        study_id=run.study_id,
         run_id=run.id,
         brand_id=brand.id,
         aparece=True,

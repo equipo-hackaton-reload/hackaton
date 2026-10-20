@@ -5,13 +5,19 @@ import pytest
 from posiq.domain.findings import detect_findings
 from posiq.domain.metrics import compute_metrics
 from posiq.domain.schemas import BriefSummary, Metrics
-from tests.golden.conftest import Kit
+from tests.golden.conftest import STUDY_ID, Kit
 
 
 @pytest.fixture(scope="module")
 def metrics(kit: Kit, alborada_brief: BriefSummary) -> Metrics:
     return compute_metrics(
-        alborada_brief, kit.market, kit.prompts, kit.runs, kit.evaluations(), kit.sources
+        alborada_brief,
+        kit.market,
+        kit.prompts,
+        kit.runs,
+        kit.evaluations(),
+        kit.sources,
+        study_id=STUDY_ID,
     )
 
 
@@ -45,5 +51,5 @@ def test_hallazgos_con_evidencia_real(
     ids = {e.id for e in kit.evaluations()}
     for f in findings:
         assert f.evaluation_ids and set(f.evaluation_ids) <= ids
-        assert f.origen_cifra
+        assert f.origen_cifra and f.study_id == STUDY_ID
     assert any(f.id == "F-ciudad-barcelona" for f in findings)

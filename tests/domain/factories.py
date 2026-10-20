@@ -21,6 +21,7 @@ def brand(id: str = "alborada", nombre: str = "Clínica Alborada Visión", **kw:
 def run(id: str = "EJ-1", texto: str = "", marcas: list[str] | None = None, **kw: object) -> Run:
     data: dict[str, object] = {
         "id": id,
+        "study_id": "S-1",
         "prompt_id": "P-1",
         "motor": "ChatGPT",
         "repeticion": 1,
@@ -36,6 +37,7 @@ def evaluation(
 ) -> Evaluation:
     data: dict[str, object] = {
         "id": f"{run_id}:{brand_id}",
+        "study_id": "S-1",
         "run_id": run_id,
         "brand_id": brand_id,
         "aparece": aparece,

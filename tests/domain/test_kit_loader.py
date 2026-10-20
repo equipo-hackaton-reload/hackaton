@@ -17,8 +17,8 @@ def kit(kit_dir: Path) -> dict[str, list]:  # type: ignore[type-arg]
         "templates": templates,
         "sources": sources,
         "instances": kl.load_prompt_instances(kit_dir / "ejecuciones.csv", templates, brands),
-        "runs": kl.load_runs(kit_dir / "ejecuciones.csv", brands, sources),
-        "sample": kl.load_evaluated_sample(kit_dir / "muestra_evaluada.csv", brands),
+        "runs": kl.load_runs(kit_dir / "ejecuciones.csv", brands, sources, "S-kit"),
+        "sample": kl.load_evaluated_sample(kit_dir / "muestra_evaluada.csv", brands, "S-kit"),
     }
 
 
@@ -54,6 +54,7 @@ def test_runs(kit: dict[str, list]) -> None:  # type: ignore[type-arg]
     runs = kit["runs"]
     instance_ids = {i.id for i in kit["instances"]}
     assert all(r.prompt_id in instance_ids for r in runs)
+    assert {r.study_id for r in runs} == {"S-kit"}
     assert sum(1 for r in runs if not r.fuentes) == 57
     assert all(s.tipo is not None for r in runs for s in r.fuentes)
     assert sum(len(r.marcas_a_evaluar) for r in runs) == 2928
@@ -62,7 +63,7 @@ def test_runs(kit: dict[str, list]) -> None:  # type: ignore[type-arg]
 def test_muestra(kit: dict[str, list]) -> None:  # type: ignore[type-arg]
     sample = kit["sample"]
     assert len({e.run_id for e in sample}) == 15
-    assert all(e.origen == "humano" for e in sample)
+    assert all(e.origen == "humano" and e.study_id == "S-kit" for e in sample)
     assert sum(e.fuerza == -1 for e in sample) == 15
 
 
@@ -82,7 +83,7 @@ def test_categoria_invalida_indica_fila() -> None:
 def test_marca_desconocida(kit: dict[str, list]) -> None:  # type: ignore[type-arg]
     row = {c: "1" for c in kl.MUESTRA_COLS} | {"Marca": "Clínica Inventada", "Posición": ""}
     with pytest.raises(kl.KitFormatError, match="marca desconocida"):
-        kl.evaluated_sample_from_frame(pd.DataFrame([row]), kit["brands"])
+        kl.evaluated_sample_from_frame(pd.DataFrame([row]), kit["brands"], "S-kit")
 
 
 def test_intencion_desconocida() -> None:

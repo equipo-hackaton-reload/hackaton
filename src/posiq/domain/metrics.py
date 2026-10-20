@@ -24,6 +24,7 @@ from posiq.domain.schemas import (
     Market,
     MentionQuality,
     Metrics,
+    MetricsDelta,
     Motor,
     PromptInstance,
     Run,
@@ -33,6 +34,7 @@ from posiq.domain.schemas import (
     SourceStat,
     TipoVisibilidad,
     VisibilityCell,
+    VisibilityDelta,
 )
 from posiq.domain.scoring import SCORE_VERSION, score_citacion
 from posiq.domain.text import fold
@@ -254,8 +256,17 @@ def compute_metrics(
     runs: list[Run],
     evaluations: list[Evaluation],
     sources: list[Source],
+    study_id: str,
+    comparado_con: str | None = None,
 ) -> Metrics:
-    """Métricas de todas las marcas del mercado, con la marca del brief como foco."""
+    """Métricas de todas las marcas del mercado, con la marca del brief como foco.
+
+    Todas las ejecuciones y evaluaciones deben ser de `study_id`: mezclar estudios es un error.
+    """
+    estudios = {r.study_id for r in runs} | {e.study_id for e in evaluations}
+    ajenos = sorted(estudios - {study_id})
+    if ajenos:
+        raise ValueError(f"ejecuciones o evaluaciones de otros estudios: {ajenos}")
     foco = resolve_brand(brief.marca, market)
     lider = next((b.id for b in market.marcas if b.rol == "lider"), None)
     brand_ids = [b.id for b in market.marcas]
@@ -271,6 +282,8 @@ def compute_metrics(
     tipos_run = Counter(tipo_por_prompt.get(r.prompt_id, "sin_prompt") for r in runs)
 
     return Metrics(
+        study_id=study_id,
+        comparado_con=comparado_con,
         score_version=SCORE_VERSION,
         marca_foco_id=foco.id,
         lider_id=lider,
@@ -283,4 +296,71 @@ def compute_metrics(
         top_fuentes=_top_sources(df, brand_ids, runs, catalog),
         brecha_fuentes=_source_gap(df, foco.id, lider, runs, catalog),
         n_ejecuciones={"total": len(runs), **tipos_run, "evaluaciones": len(df)},
+    )
+
+
+DELTA_DIMENSIONES: Final[tuple[Dimension, ...]] = ("global", "motor", "fase", "ciudad")
+
+
+def _delta(a: float | None, b: float | None, digits: int) -> float | None:
+    return round(a - b, digits) if a is not None and b is not None else None
+
+
+def diff_metrics(actual: Metrics, anterior: Metrics) -> MetricsDelta:
+    """Cambio de la marca foco entre dos mediciones: score y tasas por motor, fase y ciudad.
+
+    Solo compara la misma marca foco. Si cambia la versión del score, o `actual.comparado_con`
+    apunta a otro estudio, el resultado se marca como no comparable y se explica en `avisos`.
+    Un segmento presente solo en una medición aparece con el otro lado a None (sin datos).
+    """
+    if actual.marca_foco_id != anterior.marca_foco_id:
+        raise ValueError(
+            f"marcas foco distintas: {actual.marca_foco_id} frente a {anterior.marca_foco_id}"
+        )
+    avisos: list[str] = []
+    if actual.score_version != anterior.score_version:
+        avisos.append(
+            f"versión del score distinta ({actual.score_version} frente a "
+            f"{anterior.score_version}): las cifras no son comparables"
+        )
+    if actual.comparado_con not in (None, anterior.study_id):
+        avisos.append(
+            f"la medición actual declara compararse con {actual.comparado_con}, "
+            f"no con {anterior.study_id}"
+        )
+
+    foco = actual.marca_foco_id
+    deltas: list[VisibilityDelta] = []
+    for tipo in TIPOS:
+        for dimension in DELTA_DIMENSIONES:
+            ahora = {c.valor: c for c in actual.cells(foco, tipo, dimension)}
+            antes = {c.valor: c for c in anterior.cells(foco, tipo, dimension)}
+            for valor in [*ahora, *(v for v in antes if v not in ahora)]:
+                a, b = ahora.get(valor), antes.get(valor)
+                tasa_a = a.tasa if a else None
+                tasa_b = b.tasa if b else None
+                deltas.append(
+                    VisibilityDelta(
+                        brand_id=foco,
+                        tipo=tipo,
+                        dimension=dimension,
+                        valor=valor,
+                        tasa_actual=tasa_a,
+                        tasa_anterior=tasa_b,
+                        delta=_delta(tasa_a, tasa_b, 4),
+                        n_actual=a.n if a else 0,
+                        n_anterior=b.n if b else 0,
+                    )
+                )
+
+    return MetricsDelta(
+        study_id=actual.study_id,
+        comparado_con=anterior.study_id,
+        marca_foco_id=foco,
+        score_actual=actual.score_global.score,
+        score_anterior=anterior.score_global.score,
+        score_delta=_delta(actual.score_global.score, anterior.score_global.score, 2),
+        visibilidad_delta=deltas,
+        comparable=not avisos,
+        avisos=avisos,
     )

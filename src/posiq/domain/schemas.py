@@ -42,6 +42,13 @@ TipoFuenteCatalogo = Literal[
 TipoFuente = TipoFuenteCatalogo | Literal["Sin fuente"]
 OrigenEvaluacion = Literal["jev", "fallback", "humano"]
 OrigenDatos = Literal["kit", "api"]
+ModoEstudio = Literal["kit", "real"]
+EstadoEstudio = Literal[
+    "en_curso",
+    "esperando_revision_competidores",
+    "esperando_revision_plan",
+    "completado",
+]
 Talla = Literal["S", "M", "L"]
 Palanca = Literal[
     "autoridad_terceros",
@@ -116,6 +123,19 @@ class Market(_Model):
         return self
 
 
+class Study(_Model):
+    """Un estudio: una medición de una marca en una fecha. Todo resultado lleva su `study_id`."""
+
+    id: str
+    brand_id: str
+    brief: BriefSummary
+    modo: ModoEstudio
+    creado_en: datetime
+    version_metodologia: str
+    score_version: str
+    estado: EstadoEstudio = "en_curso"
+
+
 # --- Prompts, fuentes y ejecuciones ---------------------------------------------------------------
 
 
@@ -167,6 +187,7 @@ class Run(_Model):
     """Un prompt lanzado a un motor en una repetición. `fuentes` vacía = sin búsqueda web."""
 
     id: str
+    study_id: str
     prompt_id: str
     motor: Motor
     modelo: str | None = None
@@ -209,6 +230,7 @@ class Evaluation(_Model):
     """
 
     id: str
+    study_id: str
     run_id: str
     brand_id: str
     aparece: bool
@@ -324,8 +346,13 @@ class SourceGap(_Model):
 
 
 class Metrics(_Model):
-    """Métricas del estudio. La visibilidad espontánea y la asistida van SIEMPRE separadas."""
+    """Métricas del estudio. La visibilidad espontánea y la asistida van SIEMPRE separadas.
 
+    `comparado_con` es el `study_id` de una medición anterior con la que se compara, si la hay.
+    """
+
+    study_id: str
+    comparado_con: str | None = None
     score_version: str
     marca_foco_id: str
     lider_id: str | None
@@ -360,11 +387,43 @@ class Metrics(_Model):
         return next((s for s in self.scores if s.brand_id == brand_id), None)
 
 
+class VisibilityDelta(_Model):
+    """Cambio de la tasa de un segmento entre dos mediciones. `delta` None si falta un lado."""
+
+    brand_id: str
+    tipo: TipoVisibilidad
+    dimension: Dimension
+    valor: str
+    tasa_actual: float | None
+    tasa_anterior: float | None
+    delta: float | None
+    n_actual: int = Field(ge=0)
+    n_anterior: int = Field(ge=0)
+
+
+class MetricsDelta(_Model):
+    """Diferencia entre dos mediciones de la misma marca (base de la re-medición).
+
+    `comparable` es False si cambia la versión del score; `avisos` explica cada incompatibilidad.
+    """
+
+    study_id: str
+    comparado_con: str
+    marca_foco_id: str
+    score_actual: float | None
+    score_anterior: float | None
+    score_delta: float | None
+    visibilidad_delta: list[VisibilityDelta]
+    comparable: bool
+    avisos: list[str] = []
+
+
 # --- Hallazgos, plan y propuesta ------------------------------------------------------------------
 
 
 class Finding(_Model):
     id: str
+    study_id: str
     titulo: str
     descripcion: str
     fase_embudo: FaseEmbudo | None = None
@@ -409,6 +468,9 @@ class Phase(_Model):
 
 
 class Plan(_Model):
+    """Plan por fases. Sus acciones pertenecen al estudio del plan (`study_id`)."""
+
+    study_id: str
     objetivos: list[Objective]
     fases: list[Phase]
     presupuesto_estimado_eur: float = Field(ge=0)
@@ -494,8 +556,9 @@ class HojaRuta(_Model):
 
 
 class Proposal(_Model):
-    """Las 10 secciones del formato del entregable (doc 06)."""
+    """Las 10 secciones del formato del entregable (doc 06), todas del mismo estudio."""
 
+    study_id: str
     resumen_ejecutivo: str
     contexto: Contexto
     diagnostico: Diagnostico
@@ -506,6 +569,17 @@ class Proposal(_Model):
     medicion: Medicion
     riesgos: list[Riesgo] = Field(min_length=1)
     hoja_ruta: HojaRuta
+
+    @model_validator(mode="after")
+    def _mismo_estudio(self) -> Self:
+        ajenos = [f.id for f in self.hallazgos if f.study_id != self.study_id]
+        if ajenos:
+            raise ValueError(f"hallazgos de otro estudio: {ajenos}")
+        if self.plan.study_id != self.study_id:
+            raise ValueError("el plan (y sus acciones) es de otro estudio")
+        if self.diagnostico.metrics.study_id != self.study_id:
+            raise ValueError("las métricas del diagnóstico son de otro estudio")
+        return self
 
     @model_validator(mode="after")
     def _acciones_enlazadas(self) -> Self:
@@ -523,6 +597,7 @@ class Proposal(_Model):
 
 
 class Trace(_Model):
+    study_id: str
     nodo: str
     modelo: str
     prompt_version: str

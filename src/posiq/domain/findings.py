@@ -73,6 +73,7 @@ def _caida_embudo(m: Metrics, brief: BriefSummary) -> list[Finding]:
     return [
         Finding(
             id="F-caida-embudo",
+            study_id=m.study_id,
             titulo=f"La visibilidad espontánea cae de {desde} a {hasta}",
             descripcion=(
                 f"La marca aparece en el {_pct(cells[desde].tasa or 0)} de las respuestas "
@@ -105,6 +106,7 @@ def _motor_debil(m: Metrics, brief: BriefSummary) -> list[Finding]:
     return [
         Finding(
             id="F-motor-debil",
+            study_id=m.study_id,
             titulo=f"{debil.valor} apenas la menciona mientras {fuerte.valor} sí",
             descripcion=(
                 f"Visibilidad espontánea del {_pct(debil.tasa or 0)} en {debil.valor} frente al "
@@ -127,6 +129,7 @@ def _fuente_lider(m: Metrics, brief: BriefSummary) -> list[Finding]:
     return [
         Finding(
             id="F-fuente-lider",
+            study_id=m.study_id,
             titulo=f"{gap.dominio} alimenta al líder y no a la marca",
             descripcion=(
                 f"{gap.dominio} ({gap.tipo or 'tipo sin catalogar'}) se cita en "
@@ -159,6 +162,7 @@ def _ciudad_baja(m: Metrics, brief: BriefSummary) -> list[Finding]:
         out.append(
             Finding(
                 id=f"F-ciudad-{ciudad.lower()}",
+                study_id=m.study_id,
                 titulo=f"Baja visibilidad en {ciudad}, ciudad prioritaria del brief",
                 descripcion=(
                     f"Ante preguntas que nombran {ciudad}, la marca aparece en el "
@@ -192,6 +196,7 @@ def _brecha_lider(m: Metrics, brief: BriefSummary) -> list[Finding]:
     return [
         Finding(
             id="F-brecha-lider",
+            study_id=m.study_id,
             titulo=f"{gap:.0f} puntos de Score de Citación por detrás del líder",
             descripcion=(
                 f"Score de Citación espontáneo de {foco.score:.1f} frente a {lider.score:.1f} del "
@@ -217,6 +222,7 @@ def _asistida_vs_espontanea(m: Metrics, brief: BriefSummary) -> list[Finding]:
     return [
         Finding(
             id="F-asistida-vs-espontanea",
+            study_id=m.study_id,
             titulo="Los motores la conocen, pero no la proponen por iniciativa propia",
             descripcion=(
                 f"Aparece en el {_pct(asi.tasa)} de las respuestas cuando la pregunta la nombra, "
@@ -252,6 +258,7 @@ def _recomendacion_debil(m: Metrics, brief: BriefSummary) -> list[Finding]:
     return [
         Finding(
             id="F-recomendacion-debil",
+            study_id=m.study_id,
             titulo="Aparece, pero casi nunca como recomendación",
             descripcion=(
                 f"Fuerza de recomendación media de {q.fuerza_media:.2f} (escala −1 a 3) en sus "
@@ -277,6 +284,7 @@ def _menciones_negativas(m: Metrics, brief: BriefSummary) -> list[Finding]:
     return [
         Finding(
             id="F-menciones-negativas",
+            study_id=m.study_id,
             titulo="Menciones con advertencias o por desconocimiento",
             descripcion=(
                 f"{negativas} menciones con advertencia o percepción negativa y {desconocimiento} "

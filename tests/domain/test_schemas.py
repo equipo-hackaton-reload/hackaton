@@ -22,6 +22,7 @@ def test_finding_sin_evaluation_ids_falla() -> None:
     with pytest.raises(ValidationError):
         Finding(
             id="F1",
+            study_id="S-1",
             titulo="t",
             descripcion="d",
             impacto="L",
@@ -108,6 +109,7 @@ def _plan(presupuesto: float, revisadas: list[str], respeta: bool = True) -> Pla
         acciones=[action(restricciones_revisadas=revisadas)],
     )
     return Plan(
+        study_id="S-1",
         objetivos=[],
         fases=[fase],
         presupuesto_estimado_eur=presupuesto,
@@ -144,8 +146,10 @@ def _proposal(finding_ids: list[str]) -> dict[str, object]:
         "cifra": 0.1,
         "origen_cifra": "visibilidad",
         "evaluation_ids": ["EJ-1:alborada"],
+        "study_id": "S-1",
     }
     return {
+        "study_id": "S-1",
         "resumen_ejecutivo": "Resumen",
         "contexto": {
             "marca": "Clínica Alborada Visión",
@@ -193,3 +197,43 @@ def test_proposal_acciones_enlazadas_a_hallazgos() -> None:
     sin_limitaciones["contexto"] = sin_limitaciones["contexto"] | {"limitaciones": []}  # type: ignore[operator]
     with pytest.raises(ValidationError):
         Proposal.model_validate(sin_limitaciones)
+
+
+def test_proposal_de_un_solo_estudio() -> None:
+    from posiq.domain.schemas import Proposal
+
+    base = Proposal.model_validate(_proposal(["F1"]))
+    hallazgo_ajeno = base.hallazgos[0].model_copy(update={"study_id": "S-2"})
+    casos = {
+        "hallazgos de otro estudio": {"hallazgos": [hallazgo_ajeno, *base.hallazgos[1:]]},
+        "el plan": {"plan": base.plan.model_copy(update={"study_id": "S-2"})},
+        "las métricas": {
+            "diagnostico": base.diagnostico.model_copy(
+                update={"metrics": base.diagnostico.metrics.model_copy(update={"study_id": "S-2"})}
+            )
+        },
+    }
+    for mensaje, cambio in casos.items():
+        with pytest.raises(ValidationError, match=mensaje):
+            Proposal.model_validate(base.model_dump() | cambio)
+
+
+def test_study() -> None:
+    from datetime import datetime
+
+    from posiq.domain.schemas import Study
+
+    study = Study(
+        id="S-1",
+        brand_id="clinica-alborada-vision",
+        brief=brief(),
+        modo="kit",
+        creado_en=datetime(2026, 10, 20),
+        version_metodologia="reload-geo-2026",
+        score_version="1.0",
+    )
+    assert study.estado == "en_curso"
+    with pytest.raises(ValidationError):
+        Study.model_validate(study.model_dump() | {"modo": "sintetico"})
+    with pytest.raises(ValidationError):
+        Study.model_validate(study.model_dump() | {"estado": "pausado"})

@@ -52,6 +52,7 @@ def metrics(
 ) -> Metrics:
     s = [score(FOCO, scores[0]), score(LIDER, scores[1])]
     return Metrics(
+        study_id="S-1",
         score_version="1.0",
         marca_foco_id=FOCO,
         lider_id=lider,
@@ -86,6 +87,7 @@ def test_caida_embudo() -> None:
     (f,) = detect_findings(metrics(fases), brief())
     assert f.id == "F-caida-embudo" and f.fase_embudo == "decision" and f.impacto == "L"
     assert f.cifra == 0.4 and f.evaluation_ids[0].startswith("EJ-fase-decision")
+    assert f.study_id == "S-1"
     plana = [
         cell("espontaneo", "fase", "descubrimiento", 0.5),
         cell("espontaneo", "fase", "decision", 0.45),

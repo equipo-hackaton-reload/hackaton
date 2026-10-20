@@ -17,6 +17,8 @@ from posiq.domain.schemas import (
     Source,
 )
 
+STUDY_ID = "S-kit-alborada"
+
 
 @dataclass(frozen=True)
 class Kit:
@@ -53,9 +55,9 @@ def kit(kit_dir: Path) -> Kit:
     return Kit(
         brands=brands,
         prompts=kl.load_prompt_instances(kit_dir / "ejecuciones.csv", templates, brands),
-        runs=kl.load_runs(kit_dir / "ejecuciones.csv", brands, sources),
+        runs=kl.load_runs(kit_dir / "ejecuciones.csv", brands, sources, STUDY_ID),
         sources=sources,
-        sample=kl.load_evaluated_sample(kit_dir / "muestra_evaluada.csv", brands),
+        sample=kl.load_evaluated_sample(kit_dir / "muestra_evaluada.csv", brands, STUDY_ID),
     )
 
 

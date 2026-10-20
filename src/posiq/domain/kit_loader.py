@@ -277,7 +277,9 @@ def prompt_instances_from_frame(
     return instances
 
 
-def runs_from_frame(df: pd.DataFrame, brands: list[Brand], sources: list[Source]) -> list[Run]:
+def runs_from_frame(
+    df: pd.DataFrame, brands: list[Brand], sources: list[Source], study_id: str
+) -> list[Run]:
     """Una `Run` por fila. Un dominio fuera del catálogo se conserva con tipo y calidad None."""
     _require(df, EJECUCIONES_COLS, "ejecuciones.csv")
     index = _brand_index(brands)
@@ -291,6 +293,7 @@ def runs_from_frame(df: pd.DataFrame, brands: list[Brand], sources: list[Source]
                 Run,
                 {
                     "id": r["Ejecucion_ID"].strip(),
+                    "study_id": study_id,
                     "prompt_id": instance_ids[
                         (r["Prompt_ID"].strip(), r["Prompt ejecutado"].strip())
                     ],
@@ -317,14 +320,18 @@ def load_prompt_instances(
     return prompt_instances_from_frame(read_kit_csv(path), templates, brands)
 
 
-def load_runs(path: str | Path, brands: list[Brand], sources: list[Source]) -> list[Run]:
-    return runs_from_frame(read_kit_csv(path), brands, sources)
+def load_runs(
+    path: str | Path, brands: list[Brand], sources: list[Source], study_id: str
+) -> list[Run]:
+    return runs_from_frame(read_kit_csv(path), brands, sources, study_id)
 
 
 # --- muestra_evaluada.csv -------------------------------------------------------------------------
 
 
-def evaluated_sample_from_frame(df: pd.DataFrame, brands: list[Brand]) -> list[Evaluation]:
+def evaluated_sample_from_frame(
+    df: pd.DataFrame, brands: list[Brand], study_id: str
+) -> list[Evaluation]:
     """Etiquetas humanas de la muestra como `Evaluation` (origen `humano`, confianza 1)."""
     _require(df, MUESTRA_COLS, "muestra_evaluada.csv")
     index = _brand_index(brands)
@@ -338,6 +345,7 @@ def evaluated_sample_from_frame(df: pd.DataFrame, brands: list[Brand]) -> list[E
                 Evaluation,
                 {
                     "id": f"{run_id}:{brand_id}",
+                    "study_id": study_id,
                     "run_id": run_id,
                     "brand_id": brand_id,
                     "aparece": r["Aparece (1/0)"].strip() == "1",
@@ -357,5 +365,5 @@ def evaluated_sample_from_frame(df: pd.DataFrame, brands: list[Brand]) -> list[E
     return evaluations
 
 
-def load_evaluated_sample(path: str | Path, brands: list[Brand]) -> list[Evaluation]:
-    return evaluated_sample_from_frame(read_kit_csv(path), brands)
+def load_evaluated_sample(path: str | Path, brands: list[Brand], study_id: str) -> list[Evaluation]:
+    return evaluated_sample_from_frame(read_kit_csv(path), brands, study_id)

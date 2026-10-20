@@ -86,6 +86,7 @@ def evaluation_from_detection(
     """
     return Evaluation(
         id=f"{run.id}:{brand.id}",
+        study_id=run.study_id,
         run_id=run.id,
         brand_id=brand.id,
         aparece=detection is not None,
