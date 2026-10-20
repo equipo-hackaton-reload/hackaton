@@ -108,4 +108,6 @@ class StudyRunner:
             raise ResumeError(f"payload de «{revision}» inválido: {exc}") from exc
 
     def estado(self, study: Study) -> str:
-        return "error" if study.id in self.fallos else study.estado
+        if study.id in self.fallos:
+            return "error"
+        return "en_curso" if study.id in self.en_marcha else study.estado

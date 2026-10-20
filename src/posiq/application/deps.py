@@ -55,6 +55,7 @@ class Deps:
     repo: StudyRepo
     budget: BudgetFactory
     settings: Settings
+    engine_factory: Callable[[list[str], Budget], list[Engine]] | None = None
 
 
 def study_budget(deps: Deps, state: StudyState) -> Budget:

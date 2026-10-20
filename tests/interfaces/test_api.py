@@ -121,11 +121,11 @@ async def test_unknown_study_is_404(client: httpx.AsyncClient) -> None:
     assert (await client.get("/studies/nope/export")).status_code == 404
 
 
-async def test_export_is_not_implemented_yet(client: httpx.AsyncClient) -> None:
+async def test_export_requires_completed_proposal(client: httpx.AsyncClient) -> None:
     sid = await create(client)
     response = await client.get(f"/studies/{sid}/export", params={"formato": "pdf"})
-    assert response.status_code == 501
-    assert "Zona E" in response.json()["detail"]
+    assert response.status_code == 409
+    assert "completada" in response.json()["detail"]
     assert (await client.get(f"/studies/{sid}/export?formato=odt")).status_code == 422
 
 

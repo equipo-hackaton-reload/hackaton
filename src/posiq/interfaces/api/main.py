@@ -19,8 +19,11 @@ from typing import Annotated, Any, Literal
 
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Query, Request, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 from pydantic import ValidationError
 
+from posiq.adapters.export import DocxExporter, PdfExporter, SofficeNotFoundError
+from posiq.application.deps import db
 from posiq.application.runner import ResumeError, StudyRunner
 from posiq.domain.schemas import ModoEstudio, Study
 from posiq.interfaces.api.schemas import (
@@ -192,11 +195,23 @@ def create_app(runner: StudyRunner | None = None, settings: Settings | None = No
     async def export_study(
         request: Request, study_id: str, formato: Literal["docx", "pdf"] = "docx"
     ) -> Any:
-        get_study(get_runner(request), study_id)
-        raise HTTPException(
-            status.HTTP_501_NOT_IMPLEMENTED,
-            f"la exportación a {formato} aún no está disponible: el Exporter lo implementa la "
-            "Zona E y todavía no está en develop",
+        r = get_runner(request)
+        get_study(r, study_id)
+        values, _ = await r.state(study_id)
+        proposal = values.get("proposal")
+        if proposal is None:
+            raise HTTPException(status.HTTP_409_CONFLICT, "la propuesta a?n no est? completada")
+        from posiq.ports import Exporter
+
+        exporter: Exporter = DocxExporter() if formato == "docx" else PdfExporter()
+        try:
+            data = await db(exporter.render, proposal, formato=formato)
+        except SofficeNotFoundError as exc:
+            raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(exc)) from exc
+        return Response(
+            data,
+            media_type=DOCX if formato == "docx" else "application/pdf",
+            headers={"Content-Disposition": f'attachment; filename="posiq-{study_id}.{formato}"'},
         )
 
     return app

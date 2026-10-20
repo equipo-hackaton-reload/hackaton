@@ -11,13 +11,21 @@ from typing import TYPE_CHECKING, Any, Literal, Protocol
 from pydantic import BaseModel
 
 from posiq.domain.schemas import (
-    Brand, Evaluation, Finding, Metrics, MetricsDelta, Plan, PromptInstance,
-    Proposal, Run, Study, Trace,
+    Brand,
+    Evaluation,
+    Finding,
+    Metrics,
+    MetricsDelta,
+    Plan,
+    PromptInstance,
+    Proposal,
+    Run,
+    Study,
+    Trace,
 )
 
 if TYPE_CHECKING:
     from posiq.adapters.export.branding import AgencyBrandKit
-
 
 
 class LLM(Protocol):

@@ -18,6 +18,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from posiq.adapters.budget import Budget, BudgetExceeded
+from posiq.adapters.engines.base import RealEngine
 from posiq.adapters.engines.kit import KitMissError
 from posiq.application.deps import Deps, cost_update, db, persist_traces, study_budget
 from posiq.application.state import StudyState
@@ -85,28 +86,43 @@ async def _pair(
                 if repeticion == 1:
                     ctx.sin_kit.setdefault(prompt.id, []).append(engine.name)
                 break
+            except BudgetExceeded as exc:
+                ctx.stop(str(exc))
+                break
             if not kit:
                 run = run.model_copy(update={"marcas_a_evaluar": marcas})
             runs.append(run)
             if run.coste_eur > 0 or run.origen == "api":
                 trace = _trace(run, engine, prompt, start)
-                ctx.traces.append(trace)
                 try:
-                    ctx.budget.record(trace)
+                    # Los adaptadores reales ya registran su llamada en el presupuesto compartido.
+                    if not (
+                        isinstance(engine, RealEngine)
+                        and engine.budget is ctx.budget
+                        and run.coste_eur > 0
+                    ):
+                        ctx.budget.record(trace)
                 except BudgetExceeded as exc:
                     ctx.stop(str(exc))
     return runs
 
 
 async def run(state: StudyState, deps: Deps) -> dict[str, Any]:
-    if not deps.engines:
-        raise RuntimeError(f"no hay motores configurados para el modo {state['modo']}")
     ctx = _Run(study_budget(deps, state))
+    initial_traces = len(ctx.budget.traces)
+    engines = (
+        deps.engine_factory([b.id for b in state["market"].marcas], ctx.budget)
+        if deps.engine_factory is not None
+        else deps.engines
+    )
+    if not engines:
+        raise RuntimeError(f"no hay motores configurados para el modo {state['modo']}")
     semaphore = asyncio.Semaphore(CONCURRENCIA)
-    pairs = [(p, e) for p in state["prompts"] for e in deps.engines]
+    pairs = [(p, e) for p in state["prompts"] for e in engines]
     async with asyncio.TaskGroup() as tg:
         tasks = [tg.create_task(_pair(ctx, state, p, e, semaphore)) for p, e in pairs]
     runs = [r for t in tasks for r in t.result()]
+    ctx.traces = ctx.budget.traces[initial_traces:]
 
     for prompt_id, motores in ctx.sin_kit.items():
         ctx.errores.append(f"run: el kit no tiene {prompt_id} para {', '.join(motores)}; se salta")

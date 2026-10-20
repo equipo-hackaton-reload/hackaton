@@ -25,7 +25,9 @@ from posiq.domain.schemas import Market, Plan
 
 
 def _aprobado(payload: Any) -> bool:
-    return payload is None or (isinstance(payload, dict) and set(payload) == {"aprobado"})
+    return payload is None or (
+        isinstance(payload, dict) and set(payload) == {"aprobado"} and payload["aprobado"] is True
+    )
 
 
 def parse_market(payload: Any, state: StudyState) -> Market:

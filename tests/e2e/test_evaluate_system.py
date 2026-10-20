@@ -51,6 +51,7 @@ def test_ultimo_informe_de_calibracion(script: ModuleType, tmp_path: Path) -> No
 
 
 def test_estudio_desde_json(script: ModuleType, tmp_path: Path) -> None:
+    from posiq.domain.findings import detect_findings
     from tests.golden.conftest import (
         STUDY_ID,
         alborada_brief_summary,
@@ -58,8 +59,6 @@ def test_estudio_desde_json(script: ModuleType, tmp_path: Path) -> None:
         example_plan,
         load_kit,
     )
-
-    from posiq.domain.findings import detect_findings
 
     kit = load_kit()
     brief = alborada_brief_summary()
