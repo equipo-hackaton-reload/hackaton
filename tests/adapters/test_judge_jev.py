@@ -51,8 +51,10 @@ class StubFallback(SystemOneJudge):
     def _open(self) -> Any:
         return self.fake
 
-    async def _call(self, client: Any, state: dict[str, Any]) -> tuple[dict[str, Any], int, int]:
-        response = await client.system_one(state=state, questions=JUDGE_QUESTIONS)
+    async def _call(
+        self, client: Any, state: dict[str, Any], questions: Any
+    ) -> tuple[dict[str, Any], int, int]:
+        response = await client.system_one(state=state, questions=questions)
         return as_dicts(response.answers), 0, 0
 
 
