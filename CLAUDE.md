@@ -40,8 +40,9 @@ competidores y genera una propuesta con un plan de acción.
 
 - Ramas: `main` (solo merges etiquetados desde `develop`) ← `develop` (integración) ←
   `feature/<LETRA-ZONA>-<tarea>` (p. ej. `feature/A-domain-core`). Nunca hay push directo a `main` ni a `develop`.
-- PR a `develop` con CI en verde, 1 revisión y squash merge. Commits en Conventional Commits
+- PR a `develop` con CI en verde y squash merge. Commits en Conventional Commits
   (`feat(domain): ...`).
+- Las PRs las fusiona el propio agente tras CI verde, sin revisión humana; los conflictos los resuelve el agente de la rama.
 - Cada PR añade una línea a `CHANGELOG.md` → `[Unreleased]`. Los hitos suben `VERSION` (SemVer) y se
   etiquetan `vX.Y.Z`.
 - Zonas:
