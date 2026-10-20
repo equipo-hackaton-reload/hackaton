@@ -7,6 +7,8 @@ Formato [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); versionado 
 ### Added
 - Dominio puro (zona A): esquemas, cargador del kit, detección, preguntas del juez, score de citación, métricas, hallazgos, tests golden y ADR 0001.
 - `Study` y `study_id` obligatorio en todos los resultados; `diff_metrics` para re-medición (ADR 0002).
+- Adaptadores (zona B): firmas reales en `ports.py`, cliente LLM compatible con OpenAI, motor del kit, juez Jev con fallback LLM, caché en disco, presupuesto y calibración del juez (ADR 0003).
+- PENDIENTE: calibración real con Jev y fallback (falta `TYPESAFE_API_KEY` y `DEEPSEEK_API_KEY`; ver `docs/calibracion/README.md`).
 ### Changed
 ### Fixed
 

@@ -227,6 +227,8 @@ class Evaluation(_Model):
 
     `fuerza` sigue el kit: 3 principal · 2 positiva secundaria · 1 neutra · 0 no aparece ·
     -1 aparece con advertencia o percepción negativa. `tipo_fuente` None = no resuelto.
+    `necesita_revision`: el juez respondió con confianza entre los umbrales de fallback y de
+    aceptación; la evaluación se usa, pero conviene que la revise una persona.
     """
 
     id: str
@@ -242,6 +244,7 @@ class Evaluation(_Model):
     apoyada_en_fuente: bool = False
     confianza: float = Field(ge=0, le=1)
     origen: OrigenEvaluacion
+    necesita_revision: bool = False
 
     @model_validator(mode="after")
     def _coherente_con_aparicion(self) -> Self:

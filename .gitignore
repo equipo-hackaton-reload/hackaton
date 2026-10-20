@@ -24,6 +24,7 @@ apps/web/dist/
 # Datos locales
 posiq.db
 *.db-journal
+.cache/
 
 # Claude Code y worktrees
 .claude/settings.local.json
