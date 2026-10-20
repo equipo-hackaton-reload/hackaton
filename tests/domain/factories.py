@@ -7,6 +7,7 @@ from posiq.domain.schemas import (
     Brand,
     BriefSummary,
     Evaluation,
+    PromptInstance,
     Run,
     Source,
 )
@@ -84,3 +85,16 @@ def brief(**kw: object) -> BriefSummary:
         "tono": "Riguroso",
     } | kw
     return BriefSummary.model_validate(data)
+
+
+def prompt(id: str = "P-1", instanciacion: str = "generico", **kw: object) -> PromptInstance:
+    data: dict[str, object] = {
+        "id": id,
+        "template_id": id,
+        "familia": "Descubrimiento genérico",
+        "fase_embudo": "descubrimiento",
+        "instanciacion": instanciacion,
+        "texto": "¿Qué clínica me recomiendas?",
+        "prioridad": "P1",
+    } | kw
+    return PromptInstance.model_validate(data)
