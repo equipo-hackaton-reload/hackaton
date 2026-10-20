@@ -20,6 +20,8 @@ dependencies = [
     "docxtpl",
     "httpx",
     "langfuse",
+    "google-genai>=2.31.0",
+    "anthropic>=1.17.0",
 ]
 
 [dependency-groups]
