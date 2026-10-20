@@ -36,16 +36,20 @@ respetar un presupuesto y que ninguna cifra de la propuesta salga del LLM.
     propuesto, banco de prompts (solo en modo real), `Plan` y textos de la `Proposal`.
   - Código: la conciliación de ids del mercado con el kit, las ejecuciones, el presupuesto, las
     métricas, los hallazgos, la comparación con la medición anterior y la validación del plan.
-    `write` sobrescribe en la propuesta las métricas, el ranking, los hallazgos, el plan, los
-    objetivos, el presupuesto y el contexto (motores, origen de los datos, si son sintéticos). Así
-    ninguna cifra viene del LLM.
+    `write` pide `ProposalDraft`, exclusivamente textos, con interpretaciones por id de hallazgo.
+    El código construye `Proposal` con métricas, ranking, hallazgos, plan aprobado, objetivos,
+    presupuesto, hitos y responsabilidades. `Proposal.marcas` sale de `Market` (id → nombre).
+    La narrativa puede citar cifras recibidas, pero no genera los campos numéricos estructurados.
 - **El plan se valida contra el brief** (`validate_plan_against_brief` y los hallazgos enlazados).
   Si falla, se reintenta una vez con las violaciones en el `state`. Si siguen, el plan llega a la
   revisión con las violaciones en `errores`.
 - **El modo kit no necesita ninguna API para ejecutar y medir.** Los prompts son el banco del kit
   instanciado, los motores son `KitEngine` y, si falta la clave del juez, las evaluaciones salen
-  de la detección por reglas (y se anota). Los nodos de LLM sí necesitan clave; el e2e los sustituye
-  por dobles.
+  de la detección por reglas (y se anota). Con `LLM_PROVIDER=fixture`, `FixtureLLM` devuelve el
+  brief, plan y textos de ejemplo de Alborada, derivados de las fixtures golden y distribuidos en
+  el paquete sin importar tests ni pytest. No interpreta otras marcas. Sus trazas cuestan 0.
+  Sin claves de juez, `FixtureJudge` usa detección con fuerza 1 si aparece; no inventa sentimiento.
+  El informe identifica explícitamente el modo demo y las evaluaciones por reglas.
 - **Reintentos:** los nodos que llaman a servicios externos usan `RetryPolicy` (3 intentos, espera
   exponencial 1 s → 16 s) solo ante errores transitorios (red, 5xx). `BudgetExceeded`,
   `MissingCredentialError` y las salidas inválidas del LLM no se reintentan.
@@ -73,5 +77,15 @@ respetar un presupuesto y que ninguna cifra de la propuesta salga del LLM.
   checkpoint sigue en el último paso completado.
 - **SQLite con un solo proceso:** con varios workers habría que cambiar a Postgres (el checkpointer
   `langgraph-checkpoint-postgres` y el repositorio por `DATABASE_URL`).
-- **`write` pide al LLM una `Proposal` completa** (incluidas las métricas) aunque luego se
-  sobrescribe. Es caro en tokens; si da problemas, se puede pedir un borrador solo con textos.
+- **Integración con B y E:** `build_engines(settings, modo, brand_ids)` se instancia para el modo
+  real después de confirmar el mercado, con presupuesto compartido; no se duplica el gasto ya
+  registrado por el motor. `/export` usa el puerto `Exporter` con `DocxExporter`/`PdfExporter`.
+  Antes de completar la propuesta devuelve 409; sin LibreOffice, PDF devuelve 503.
+- **Multipart:** `python-multipart` es dependencia directa. La API acepta texto, Word, JSON y
+  formularios multipart; no hace falta una instalación adicional para subir el brief.
+- **Demo HTTP reproducible:** `LLM_PROVIDER=fixture uv run uvicorn posiq.interfaces.api.main:app`
+  y `uv run python scripts/demo_kit.py`. El script crea el estudio, espera y confirma competidores,
+  espera y aprueba el plan y descarga el Word a `data/demo/` (ignorado en Git). El modo fixture es
+  una demostración sintética explícita, no una prueba de calidad semántica ni de APIs reales.
+- **Estado observable:** mientras el grafo sigue activo se devuelve `en_curso`, aunque un nodo
+  haya persistido el estado de revisión, evitando reanudar antes de alcanzar `interrupt()`.
