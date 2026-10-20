@@ -33,5 +33,8 @@ def test_proposal_alborada(proposal_alborada: Proposal, plan_alborada: Plan) -> 
     assert proposal_alborada.plan == plan_alborada
     assert proposal_alborada.contexto.datos_sinteticos
     assert len(proposal_alborada.hallazgos) == 7
+    assert proposal_alborada.marcas["clinica-alborada-vision"] == "Clínica Alborada Visión"
+    assert len(proposal_alborada.marcas) == 10
+    assert all(f.unidad for f in proposal_alborada.hallazgos)
     assert proposal_alborada.hoja_ruta.hitos[-1].semana == 42
     assert Proposal.model_validate_json(proposal_alborada.model_dump_json()) == proposal_alborada

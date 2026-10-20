@@ -335,9 +335,17 @@ def example_plan(findings: list[Finding], brief: BriefSummary, study_id: str = S
 
 
 def alborada_proposal(
-    metrics: Metrics, findings: list[Finding], plan: Plan, brief: BriefSummary
+    metrics: Metrics,
+    findings: list[Finding],
+    plan: Plan,
+    brief: BriefSummary,
+    brands: list[Brand] | None = None,
 ) -> Proposal:
-    """Propuesta mínima válida de Alborada sobre el plan de ejemplo (sin cifras inventadas)."""
+    """Propuesta mínima válida de Alborada sobre el plan de ejemplo (sin cifras inventadas).
+
+    `brands` rellena `Proposal.marcas` (id → nombre legible); por defecto, las marcas del kit.
+    """
+    brands = brands if brands is not None else load_kit().brands
     semana = 0
     hitos: list[Hito] = []
     for fase in plan.fases:
@@ -405,6 +413,7 @@ def alborada_proposal(
             presupuesto_eur=plan.presupuesto_estimado_eur,
             seguimiento="Informe de evolución trimestral al comité de dirección",
         ),
+        marcas={b.id: b.nombre for b in brands},
     )
 
 
@@ -444,9 +453,12 @@ def proposal_alborada(
     findings_alborada: list[Finding],
     plan_alborada: Plan,
     alborada_brief: BriefSummary,
+    kit: Kit,
 ) -> Proposal:
     """Propuesta mínima válida de Alborada que usa `plan_alborada`."""
-    return alborada_proposal(metrics_alborada, findings_alborada, plan_alborada, alborada_brief)
+    return alborada_proposal(
+        metrics_alborada, findings_alborada, plan_alborada, alborada_brief, kit.brands
+    )
 
 
 @pytest.fixture(scope="session")

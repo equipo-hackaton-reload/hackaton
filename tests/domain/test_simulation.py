@@ -75,6 +75,7 @@ FINDINGS = [
         impacto="M",
         confianza=0.8,
         cifra=0.1,
+        unidad="fraccion",
         origen_cifra="x",
         evaluation_ids=["EJ-1:alborada"],
     )

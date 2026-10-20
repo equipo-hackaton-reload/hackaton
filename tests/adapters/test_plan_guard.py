@@ -21,6 +21,7 @@ FINDING = Finding(
     impacto="L",
     confianza=0.65,
     cifra=0.04,
+    unidad="fraccion",
     origen_cifra="visibilidad espontánea por ciudad: Barcelona",
     evaluation_ids=["EJ-1:alborada"],
 )

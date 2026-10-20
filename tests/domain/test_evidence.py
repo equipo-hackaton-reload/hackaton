@@ -12,6 +12,7 @@ def finding(id: str, evaluation_ids: list[str]) -> Finding:
         impacto="M",
         confianza=0.6,
         cifra=0.1,
+        unidad="fraccion",
         origen_cifra="x",
         evaluation_ids=evaluation_ids,
     )
