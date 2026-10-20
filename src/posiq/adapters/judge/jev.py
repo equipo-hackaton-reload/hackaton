@@ -7,6 +7,7 @@ from typesafe_sdk import AsyncTypeSafeClient, RetryPolicy
 
 from posiq.adapters.budget import Budget
 from posiq.adapters.cache import DiskCache
+from posiq.adapters.errors import require_secret
 from posiq.adapters.judge.base import Answers, SystemOneJudge, answers_to_dict
 from posiq.domain.judge_questions import JUDGE_QUESTIONS
 from posiq.domain.schemas import Brand
@@ -43,9 +44,12 @@ class JevJudge(SystemOneJudge):
             budget=budget,
             cache=cache,
         )
-        api_key = settings.typesafe_api_key.get_secret_value()
         self._factory = client_factory or (
-            lambda: AsyncTypeSafeClient(api_key=api_key, model=self.model, retry=RETRY)
+            lambda: AsyncTypeSafeClient(
+                api_key=require_secret(settings.typesafe_api_key, "TYPESAFE_API_KEY", "JevJudge"),
+                model=self.model,
+                retry=RETRY,
+            )
         )
 
     def _open(self) -> Any:

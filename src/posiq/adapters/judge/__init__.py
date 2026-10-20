@@ -13,14 +13,16 @@ from posiq.settings import Settings
 
 def build_judge(
     settings: Settings,
-    market: Sequence[Brand],
+    market: Sequence[Brand] = (),
     *,
     budget: Budget | None = None,
     cache: DiskCache | None = None,
 ) -> SystemOneJudge:
     """`JevJudge` con `LLMJudge` de fallback si hay `TYPESAFE_API_KEY`; si no, solo `LLMJudge`.
 
-    `market` son las marcas del estudio: la posición se calcula entre las marcas presentes.
+    `market` son las marcas del estudio: la posición se calcula entre las marcas presentes. Sin
+    `market`, cada marca se detecta sola (posición 1 si aparece); pásalo siempre en un estudio.
+    Construir el juez no exige claves: si falta alguna, `MissingCredentialError` al evaluar.
     """
     fallback = LLMJudge(settings, market, budget=budget, cache=cache)
     if settings.typesafe_api_key.get_secret_value():

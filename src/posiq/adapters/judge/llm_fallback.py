@@ -13,6 +13,7 @@ from typesafe_sdk import RetryPolicy
 
 from posiq.adapters.budget import Budget
 from posiq.adapters.cache import DiskCache
+from posiq.adapters.errors import require_secret
 from posiq.adapters.judge.base import Answers, SystemOneJudge, answers_to_dict
 from posiq.adapters.llm.openai_compat import DEFAULT_MODEL
 from posiq.domain.judge_questions import JUDGE_QUESTIONS
@@ -29,7 +30,7 @@ class _AdapterSession:
         self.provider = AsyncOpenAIProvider(
             model,
             base_url=settings.deepseek_base_url,
-            api_key=settings.deepseek_api_key.get_secret_value() or None,
+            api_key=require_secret(settings.deepseek_api_key, "DEEPSEEK_API_KEY", "LLMJudge"),
             api="chat_completions",
         )
         # DeepSeek no ofrece JSON Schema estricto: se pide JSON y se valida en cliente.

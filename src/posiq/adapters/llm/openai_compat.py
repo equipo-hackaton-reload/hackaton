@@ -19,6 +19,7 @@ from pydantic import BaseModel, ValidationError
 
 import posiq
 from posiq.adapters.cache import DiskCache
+from posiq.adapters.errors import require_secret
 from posiq.domain.schemas import Trace
 from posiq.settings import Settings, usd_per_m_to_eur
 
@@ -90,12 +91,20 @@ class OpenAICompatLLM:
         self.usd_eur = settings.usd_eur
         self.prompts_dir = prompts_dir
         self.cache = cache
-        # El SDK reintenta con espera creciente ante errores de red, 429 y 5xx.
-        self.client: Any = client or OpenAI(
-            base_url=settings.deepseek_base_url,
-            api_key=settings.deepseek_api_key.get_secret_value() or None,
-            max_retries=3,
-        )
+        self._settings = settings
+        self._client: Any = client
+
+    @property
+    def client(self) -> Any:
+        """Cliente del SDK, creado en la primera llamada (sin clave, error claro al llamar)."""
+        if self._client is None:
+            # El SDK reintenta con espera creciente ante errores de red, 429 y 5xx.
+            self._client = OpenAI(
+                base_url=self._settings.deepseek_base_url,
+                api_key=require_secret(self._settings.deepseek_api_key, "DEEPSEEK_API_KEY", "LLM"),
+                max_retries=3,
+            )
+        return self._client
 
     def structured[T: BaseModel](
         self, schema: type[T], prompt_name: str, state: dict[str, Any], *, study_id: str
