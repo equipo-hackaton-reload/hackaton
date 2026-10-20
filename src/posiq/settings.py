@@ -28,3 +28,21 @@ class Settings(BaseSettings):
     budget_eur_max: float = 5.0
     judge_confidence_accept: float = 0.80
     judge_confidence_fallback: float = 0.55
+    judge_concurrency: int = 8
+
+    # Precios en USD por millón de tokens (verificar en la documentación oficial vigente).
+    deepseek_price_in_usd_per_m: float = 0.28
+    deepseek_price_out_usd_per_m: float = 0.42
+    jev_price_in_usd_per_m: float = 0.04
+    jev_price_out_usd_per_m: float = 0.0
+    usd_eur: float = 0.86
+
+    cache_enabled: bool = True
+    cache_path: str = ".cache/posiq_cache.sqlite"
+
+    kit_dir: str = "data/kit/02_Datos/caso_oftalmologia"
+
+
+def usd_per_m_to_eur(tokens: int, usd_per_m: float, usd_eur: float) -> float:
+    """Coste en EUR de `tokens` a `usd_per_m` dólares por millón."""
+    return tokens * usd_per_m / 1_000_000 * usd_eur
