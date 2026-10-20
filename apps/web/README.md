@@ -1,3 +1,102 @@
-# apps/web
+# apps/web — interfaz de posiq.
 
-Interfaz React + Vite (Zona D). Se inicializa en otro prompt.
+Interfaz React de la zona D. Recorre un estudio completo en cinco pantallas: brief, revisión de
+competidores, diagnóstico, revisión del plan y propuesta.
+
+Stack: Vite + React 18 + TypeScript + TanStack Query + React Router + Tailwind. Sin estado global:
+el estado del estudio vive en la caché de TanStack Query y se sondea cada 3 s mientras está en curso.
+
+## Arrancar
+
+Requiere Node 20 o posterior.
+
+```sh
+cd apps/web
+npm install
+cp .env.example .env.local   # y ajusta las variables
+npm run dev                  # http://localhost:5173
+```
+
+### Con mocks (sin backend)
+
+```sh
+# .env.local
+VITE_API_URL=
+VITE_USE_MOCKS=true
+```
+
+MSW intercepta las llamadas en el navegador (`public/mockServiceWorker.js`) y simula el grafo: cada
+tramo tarda unos 4,5 s, así que se ve el sondeo y los estados «en curso». Los estudios del mock se
+guardan en `sessionStorage` y sobreviven a recargar la página.
+
+El mock devuelve siempre el caso **Clínica Alborada Visión** del kit, sea cual sea el brief. Sus
+cifras no están escritas a mano: `src/mocks/fixtures/` sale de ejecutar `posiq.domain` sobre el kit
+(score 25,93, 8.ª de 10, líder Valdecruz 66,46). El plan, la propuesta y las trazas son de ejemplo,
+pero leen sus valores actuales de esas métricas. La descarga Word del mock es un `.txt`; la de PDF
+es un PDF mínimo válido.
+
+### Contra la API
+
+```sh
+# .env.local
+VITE_API_URL=http://localhost:8000
+VITE_USE_MOCKS=false
+```
+
+y en la raíz del repo: `uv run uvicorn posiq.interfaces.api.main:app --reload`. La API debe permitir
+CORS desde el origen de Vite.
+
+## Scripts
+
+| Comando | Qué hace |
+|---|---|
+| `npm run dev` | Servidor de desarrollo |
+| `npm run build` | Comprueba tipos y genera `dist/` |
+| `npm run lint` | ESLint sin avisos permitidos |
+| `npm test` | Vitest + Testing Library, con MSW en Node |
+
+Desde la raíz del repo, con el entorno de Python:
+
+| Comando | Qué hace |
+|---|---|
+| `uv run python apps/web/scripts/check_types.py` | Comprueba que `src/types/schemas.ts` replica campo a campo `domain/schemas.py` |
+| `uv run python apps/web/scripts/gen_mock_fixtures.py` | Regenera los fixtures del mock con el dominio |
+
+## Estructura
+
+```
+src/
+  api/        cliente HTTP, hooks de TanStack Query (sondeo de 3 s) y QueryClient
+  components/ bloques de pantalla: score, ranking, visibilidad, fuentes, hallazgos, evidencias,
+              editores de marcas y acciones, trazas
+  pages/      las cinco pantallas y el layout del estudio con la barra de estado
+  mocks/      handlers de MSW, estudios en memoria y fixtures del kit
+  types/      espejo de schemas.py (schemas.ts) y contrato HTTP (api.ts)
+  lib/        formato es-ES y utilidades sin React
+```
+
+## Contrato con la API (zona C)
+
+Contrato base:
+
+| Método | Ruta | Cuerpo | Respuesta |
+|---|---|---|---|
+| POST | `/studies` | `{brief_texto, modo: "kit" \| "real"}` | `{study_id}` |
+| GET | `/studies/{id}` | — | `{study, estado, revision_pendiente, coste_acumulado_eur, errores, brief?, market?, metrics?, findings?, plan?, proposal?}` |
+| POST | `/studies/{id}/resume` | `{revision: "competidores", payload: Market}` o `{revision: "plan", payload: Plan}` | 202 |
+| GET | `/studies/{id}/export?formato=docx\|pdf` | — | fichero, con `Content-Disposition` |
+| GET | `/studies?brand_id=` | — | `Study[]` |
+
+Endpoints que la web **asume además** y que la zona C debe confirmar. Si no existen, la web degrada:
+
+| Método | Ruta | Respuesta | Si falta |
+|---|---|---|---|
+| GET | `/studies/{id}/evaluations?ids=a,b` | `[{evaluation, motor, prompt, texto_respuesta, fuentes}]` | El panel de evidencias muestra solo los ids |
+| GET | `/studies/{id}/traces` | `Trace[]` | El panel de trazas dice que no hay datos |
+| GET | `/estimate?modo=real` | `{llamadas, coste_estimado_eur, presupuesto_max_eur}` | Sin estimación en la pantalla 1 |
+
+Supuestos de comportamiento:
+
+- Los errores llegan como `{"detail": "..."}` (formato de FastAPI) y se muestran tal cual.
+- `errores` trae, durante la revisión del plan, las violaciones de `validate_plan_against_brief`.
+- Tras el `resume`, `GET /studies/{id}` devuelve `estado: "en_curso"` hasta la siguiente revisión.
