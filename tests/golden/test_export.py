@@ -182,6 +182,11 @@ def _texto(contenido: bytes) -> str:
     return "\n".join(partes)
 
 
+def _partes(contenido: bytes) -> dict[str, bytes]:
+    with zipfile.ZipFile(BytesIO(contenido)) as z:
+        return {n: z.read(n) for n in z.namelist()}
+
+
 def test_cumple_el_puerto() -> None:
     exporters: list[Exporter] = [DocxExporter(), PdfExporter()]
     assert all(callable(e.render) for e in exporters)
@@ -200,8 +205,10 @@ def test_docx_con_las_diez_secciones_y_cifras(proposal: Proposal, docx_bytes: by
     for limitacion in proposal.contexto.limitaciones:
         assert limitacion in texto
     assert "posiq." in texto
-    EJEMPLO.parent.mkdir(parents=True, exist_ok=True)
-    EJEMPLO.write_bytes(docx_bytes)
+    # Solo se reescribe si cambia el contenido: el zip lleva marcas de tiempo distintas cada vez.
+    if not EJEMPLO.is_file() or _partes(EJEMPLO.read_bytes()) != _partes(docx_bytes):
+        EJEMPLO.parent.mkdir(parents=True, exist_ok=True)
+        EJEMPLO.write_bytes(docx_bytes)
 
 
 def test_cabecera_con_marca_de_agencia(proposal: Proposal) -> None:
