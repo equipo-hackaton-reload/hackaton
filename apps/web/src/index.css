@@ -1,0 +1,140 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Tokens de posiq. Un fondo, una tinta y un acento magenta que solo marca la marca foco y la
+ * acción principal. Claro u oscuro según el sistema.
+ */
+:root {
+  color-scheme: light;
+  --ground: #f6f5f4;
+  --surface: #ffffff;
+  --raised: #f1f0ee;
+  --active: #e9e7e5;
+  --border: #e4e2df;
+  --rule: #eeecea;
+  --control: #cdcac6;
+  --text: #171516;
+  --muted: #595557;
+  --faint: #6b6769;
+  --primary: #1b191a;
+  --on-primary: #ffffff;
+  --accent: #c41d63;
+  --accent-soft: #fbe8f0;
+  --accent-ink: #8f1347;
+  --positive: #247b50;
+  --negative: #c4242a;
+  --pill-positive-bg: #dcfae5;
+  --pill-positive-ink: #04250e;
+  --pill-negative-bg: #ffedea;
+  --pill-negative-ink: #831c1e;
+  --pill-warning-bg: #fffbeb;
+  --pill-warning-ink: #92400e;
+  --pill-warning-line: #fde68a;
+  --track: #e9e7e5;
+  --bar: #a8a3a5;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --ground: #121112;
+    --surface: #1a191a;
+    --raised: #222022;
+    --active: #2b292b;
+    --border: #2d2b2d;
+    --rule: #242224;
+    --control: #4a474a;
+    --text: #f3f1f2;
+    --muted: #b5b1b3;
+    --faint: #9a9698;
+    --primary: #f3f1f2;
+    --on-primary: #121112;
+    --accent: #ff5e9c;
+    --accent-soft: #3a1828;
+    --accent-ink: #ff8fb9;
+    --positive: #3fc07a;
+    --negative: #f0657a;
+    --pill-positive-bg: #172a1d;
+    --pill-positive-ink: #5fd393;
+    --pill-negative-bg: #2c1a20;
+    --pill-negative-ink: #f0899a;
+    --pill-warning-bg: #2a2110;
+    --pill-warning-ink: #f5c46b;
+    --pill-warning-line: #5a4517;
+    --track: #2b292b;
+    --bar: #6d686b;
+  }
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-rendering: optimizeLegibility;
+  }
+  body {
+    @apply bg-ground font-sans text-body text-ink antialiased;
+    font-feature-settings: "kern";
+  }
+  ::selection {
+    background: var(--accent-soft);
+    color: var(--accent-ink);
+  }
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+  input,
+  select,
+  textarea {
+    caret-color: var(--accent);
+  }
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--control) transparent;
+  }
+  a {
+    text-underline-offset: 3px;
+  }
+}
+
+@layer components {
+  .panel {
+    @apply rounded-card border border-line bg-surface;
+  }
+  .btn {
+    @apply inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-control px-3.5 text-body font-medium transition-[background-color,color,transform] duration-150 ease-out active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 disabled:active:scale-100;
+  }
+  .btn-primary {
+    @apply btn bg-primary text-on-primary hover:opacity-90;
+  }
+  .btn-secondary {
+    @apply btn border border-control bg-surface text-ink hover:bg-raised;
+  }
+  .btn-ghost {
+    @apply btn text-ink hover:bg-raised;
+  }
+  .field {
+    @apply h-9 w-full rounded-control border border-line bg-surface px-2.5 text-body text-ink placeholder:text-faint hover:border-control;
+  }
+  .label {
+    @apply mb-1.5 block text-body font-medium text-ink;
+  }
+  .num {
+    font-variant-numeric: tabular-nums;
+  }
+  .pill {
+    @apply inline-flex h-5 flex-none items-center whitespace-nowrap rounded-chip px-1.5 text-meta font-medium;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
