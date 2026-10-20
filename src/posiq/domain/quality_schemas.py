@@ -37,3 +37,16 @@ class PlanQuality(_Model):
     por_debajo_umbral: list[str]
     baja_confianza: list[str]
     nota: str
+
+
+class EvidenceCoverage(_Model):
+    """Cuánta evidencia trazable hay detrás de hallazgos y acciones."""
+
+    n_hallazgos: int = Field(ge=0)
+    hallazgos_con_evidencia: int = Field(ge=0)
+    pct_hallazgos: float | None
+    n_acciones: int = Field(ge=0)
+    acciones_con_hallazgos: int = Field(ge=0)
+    pct_acciones: float | None
+    hallazgos_sin_evidencia: list[str]
+    acciones_sin_hallazgos: list[str]
