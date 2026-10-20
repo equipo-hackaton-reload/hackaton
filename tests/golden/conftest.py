@@ -5,6 +5,7 @@ Las funciones normales (`load_kit`, `alborada_brief_summary`, `example_plan`…)
 """
 
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -17,14 +18,23 @@ from posiq.domain.schemas import (
     Action,
     Brand,
     BriefSummary,
+    Competencia,
+    Contexto,
+    Diagnostico,
+    Estrategia,
     Evaluation,
     Finding,
+    Hito,
+    HojaRuta,
     Market,
+    Medicion,
     Metrics,
     Objective,
     Phase,
     Plan,
     PromptInstance,
+    Proposal,
+    Riesgo,
     Run,
     Source,
 )
@@ -324,6 +334,80 @@ def example_plan(findings: list[Finding], brief: BriefSummary, study_id: str = S
     )
 
 
+def alborada_proposal(
+    metrics: Metrics, findings: list[Finding], plan: Plan, brief: BriefSummary
+) -> Proposal:
+    """Propuesta mínima válida de Alborada sobre el plan de ejemplo (sin cifras inventadas)."""
+    semana = 0
+    hitos: list[Hito] = []
+    for fase in plan.fases:
+        semana += fase.semanas
+        hitos.append(Hito(semana=semana, descripcion=f"Fin de {fase.nombre}"))
+    responsabilidades: dict[str, list[str]] = {}
+    for accion in plan.acciones:
+        responsabilidades.setdefault(accion.responsable, []).append(accion.id)
+    return Proposal(
+        study_id=metrics.study_id,
+        resumen_ejecutivo=(
+            f"{brief.marca} aparece en los asistentes de IA sobre todo cuando la pregunta la "
+            "nombra, pero mucho menos cuando el usuario pregunta en general, y queda por detrás "
+            "del líder del mercado. Se propone un plan por fases centrado en las fuentes que citan "
+            "los motores, contenido que responde a preguntas reales y Barcelona. Datos sintéticos "
+            "del kit del hackathon."
+        ),
+        contexto=Contexto(
+            marca=brief.marca,
+            sector=f"{brief.sector} · {brief.subsector}",
+            motores=["ChatGPT", "Gemini", "Perplexity", "Claude"],
+            fecha=datetime(2026, 9, 14),
+            origen_datos="kit",
+            datos_sinteticos=True,
+            limitaciones=[
+                "Datos sintéticos: reproducen la estructura de un estudio real, no su resultado.",
+                "Evaluaciones de la muestra etiquetadas por personas; el resto, solo por reglas.",
+                "Foto en una fecha: los asistentes cambian y hay que volver a medir.",
+            ],
+        ),
+        diagnostico=Diagnostico(
+            texto="Diagnóstico de visibilidad espontánea y asistida por motor, fase y ciudad.",
+            metrics=metrics,
+        ),
+        competencia=Competencia(
+            texto="Ranking por Score de Citación espontáneo frente a competidores y líder.",
+            ranking=list(metrics.ranking),
+        ),
+        hallazgos=findings,
+        estrategia=Estrategia(
+            texto="Ganar presencia en las fuentes que citan los motores y responder a las "
+            "preguntas de comparación y decisión, empezando por los motores más débiles.",
+            objetivos=list(plan.objetivos),
+            prioridades=["Autoridad en terceros", "Contenido de decisión", "Barcelona"],
+        ),
+        plan=plan,
+        medicion=Medicion(
+            kpis=["Score de Citación espontáneo", "Visibilidad espontánea por motor y ciudad"],
+            metodologia="Mismo banco de prompts, motores y repeticiones que la línea base.",
+            cadencia="Trimestral",
+        ),
+        riesgos=[
+            Riesgo(
+                riesgo="Los asistentes cambian de modelo o de fuentes durante el plan",
+                mitigacion="Re-medición trimestral y comparación solo entre estudios compatibles",
+            ),
+            Riesgo(
+                riesgo="Publicidad sanitaria regulada",
+                mitigacion="Revisión de cada contenido frente a las restricciones del brief",
+            ),
+        ],
+        hoja_ruta=HojaRuta(
+            hitos=hitos,
+            responsabilidades=responsabilidades,
+            presupuesto_eur=plan.presupuesto_estimado_eur,
+            seguimiento="Informe de evolución trimestral al comité de dirección",
+        ),
+    )
+
+
 @pytest.fixture(scope="session")
 def kit(kit_dir: Path) -> Kit:
     return load_kit(kit_dir)
@@ -335,8 +419,39 @@ def alborada_brief() -> BriefSummary:
 
 
 @pytest.fixture(scope="session")
-def alborada_study(kit: Kit, alborada_brief: BriefSummary) -> tuple[Metrics, list[Finding], Plan]:
+def metrics_alborada(kit: Kit, alborada_brief: BriefSummary) -> Metrics:
+    return alborada_metrics(kit, alborada_brief)
+
+
+@pytest.fixture(scope="session")
+def findings_alborada(metrics_alborada: Metrics, alborada_brief: BriefSummary) -> list[Finding]:
+    """Los 7 hallazgos reales del kit."""
+    return detect_findings(metrics_alborada, alborada_brief)
+
+
+@pytest.fixture(scope="session")
+def plan_alborada(findings_alborada: list[Finding], alborada_brief: BriefSummary) -> Plan:
+    """Plan de ejemplo de Alborada: 9 acciones en 4 fases, enlazado a los 7 hallazgos reales.
+
+    Datos compartidos por la exportación (zona E), los mocks de la web (zona D) y la demo.
+    """
+    return example_plan(findings_alborada, alborada_brief)
+
+
+@pytest.fixture(scope="session")
+def proposal_alborada(
+    metrics_alborada: Metrics,
+    findings_alborada: list[Finding],
+    plan_alborada: Plan,
+    alborada_brief: BriefSummary,
+) -> Proposal:
+    """Propuesta mínima válida de Alborada que usa `plan_alborada`."""
+    return alborada_proposal(metrics_alborada, findings_alborada, plan_alborada, alborada_brief)
+
+
+@pytest.fixture(scope="session")
+def alborada_study(
+    metrics_alborada: Metrics, findings_alborada: list[Finding], plan_alborada: Plan
+) -> tuple[Metrics, list[Finding], Plan]:
     """Métricas, hallazgos y plan de ejemplo del estudio del kit."""
-    metrics = alborada_metrics(kit, alborada_brief)
-    findings = detect_findings(metrics, alborada_brief)
-    return metrics, findings, example_plan(findings, alborada_brief)
+    return metrics_alborada, findings_alborada, plan_alborada
