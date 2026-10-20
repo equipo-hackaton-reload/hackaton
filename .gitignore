@@ -1,11 +1,36 @@
+# Secretos
 .env
 .env.*
 !.env.example
 !.env.template
-node_modules/
-.venv/
-venv/
+
+# Python
 __pycache__/
 *.py[cod]
+.venv/
+venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+dist/
+*.egg-info/
+
+# Node
+node_modules/
+apps/web/dist/
+
+# Datos locales
+posiq.db
+*.db-journal
+
+# Claude Code y worktrees
+.claude/settings.local.json
+.worktrees/
+
+# SO
 .DS_Store
 Thumbs.db
+# Playwright CLI output (may contain credentials)
+.playwright-cli/

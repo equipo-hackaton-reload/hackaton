@@ -1,0 +1,16 @@
+# Una línea por zona. Sustituir @TODO por el handle de GitHub del dueño.
+/src/posiq/domain/                @TODO
+/tests/domain/                    @TODO
+/tests/golden/                    @TODO
+/src/posiq/adapters/engines/      @TODO
+/src/posiq/adapters/judge/        @TODO
+/src/posiq/adapters/llm/          @TODO
+/src/posiq/application/           @TODO
+/src/posiq/interfaces/api/        @TODO
+/apps/web/                        @TODO
+/src/posiq/adapters/export/       @TODO
+/src/posiq/prompts/               @TODO
+/docs/                            @TODO
+# Contratos compartidos: revisión de todos los dueños de zona
+/src/posiq/domain/schemas.py      @TODO
+/src/posiq/ports.py               @TODO
