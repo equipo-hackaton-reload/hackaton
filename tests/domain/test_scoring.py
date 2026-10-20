@@ -82,3 +82,13 @@ def test_calidad_sin_tipo_resuelto_usa_fuentes_de_la_ejecucion() -> None:
     assert appearance_quality(e, run(fuentes=[source(), source("x.example", "Medio")])) == 0.95
     assert appearance_quality(e, run()) == QUALITY_BY_TYPE["Sin fuente"]
     assert appearance_quality(evaluation(tipo_fuente="Web propia"), run()) == 0.7
+
+
+def test_score_desde_perfil_coincide_con_la_formula() -> None:
+    from posiq.domain.scoring import AppearanceProfile, score_from_profile
+
+    perfil = AppearanceProfile(tasa=0.5, peso_medio=2.0, fuerza_media=2.0, calidad_media=0.55)
+    s = score_from_profile("alborada", 4, perfil)
+    assert (s.aparicion, s.posicion, s.fuerza, s.calidad_fuente) == (15, 6.67, 10, 5.5)
+    negativa = AppearanceProfile(tasa=0.5, peso_medio=1.0, fuerza_media=-1.0, calidad_media=0.2)
+    assert score_from_profile("alborada", 2, negativa).fuerza == 0
