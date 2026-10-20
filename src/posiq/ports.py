@@ -4,11 +4,14 @@ Contrato compartido: cambiarlo requiere PR con etiqueta `contract-change`.
 Los tipos concretos (esquemas Pydantic) viven en `posiq.domain.schemas`.
 """
 
-from typing import Any, Protocol
+from typing import TYPE_CHECKING, Any, Literal, Protocol
 
 from pydantic import BaseModel
 
-from posiq.domain.schemas import Brand, Evaluation, PromptInstance, Run, Trace
+from posiq.domain.schemas import Brand, Evaluation, PromptInstance, Proposal, Run, Trace
+
+if TYPE_CHECKING:
+    from posiq.adapters.export.branding import AgencyBrandKit
 
 
 class LLM(Protocol):
@@ -51,4 +54,16 @@ class StudyRepo(Protocol):
 
 
 class Exporter(Protocol):
-    """Exporta la propuesta a Word/PDF."""
+    """Exporta la propuesta a Word/PDF.
+
+    No calcula cifras: solo da formato a las que ya trae la `Proposal`. Sin `marca_agencia`, la
+    cabecera dice «posiq.».
+    """
+
+    def render(
+        self,
+        proposal: Proposal,
+        *,
+        formato: Literal["docx", "pdf"],
+        marca_agencia: "AgencyBrandKit | None" = None,
+    ) -> bytes: ...
