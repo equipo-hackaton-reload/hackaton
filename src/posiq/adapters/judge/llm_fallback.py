@@ -4,7 +4,7 @@ Usa `system-one-adapter` (sustituto del cliente de TypeSafe sobre APIs de LLM) a
 endpoint compatible con OpenAI de settings (DeepSeek por defecto). Origen `fallback`.
 """
 
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from typing import Any
 
 from system_one_adapter import AsyncSystemOneAdapterClient
@@ -16,7 +16,6 @@ from posiq.adapters.cache import DiskCache
 from posiq.adapters.errors import require_secret
 from posiq.adapters.judge.base import Answers, SystemOneJudge, answers_to_dict
 from posiq.adapters.llm.openai_compat import DEFAULT_MODEL
-from posiq.domain.judge_questions import JUDGE_QUESTIONS
 from posiq.domain.schemas import Brand
 from posiq.settings import Settings
 
@@ -84,8 +83,10 @@ class LLMJudge(SystemOneJudge):
     def _open(self) -> Any:
         return self._factory()
 
-    async def _call(self, client: Any, state: dict[str, Any]) -> tuple[Answers, int, int]:
-        response = await client.system_one(state, JUDGE_QUESTIONS)
+    async def _call(
+        self, client: Any, state: dict[str, Any], questions: Mapping[str, Any]
+    ) -> tuple[Answers, int, int]:
+        response = await client.system_one(state, questions)
         usage = response.usage
         tokens_in = getattr(usage, "input_tokens_total", None) or getattr(usage, "input_tokens", 0)
         tokens_out = getattr(usage, "output_tokens_total", None) or getattr(

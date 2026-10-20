@@ -1,6 +1,6 @@
 """Juez Jev (TypeSafe System One) con fallback al juez LLM cuando la confianza es baja."""
 
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from typing import Any
 
 from typesafe_sdk import AsyncTypeSafeClient, RetryPolicy
@@ -9,7 +9,6 @@ from posiq.adapters.budget import Budget
 from posiq.adapters.cache import DiskCache
 from posiq.adapters.errors import require_secret
 from posiq.adapters.judge.base import Answers, SystemOneJudge, answers_to_dict
-from posiq.domain.judge_questions import JUDGE_QUESTIONS
 from posiq.domain.schemas import Brand
 from posiq.settings import Settings
 
@@ -55,7 +54,9 @@ class JevJudge(SystemOneJudge):
     def _open(self) -> Any:
         return self._factory()
 
-    async def _call(self, client: Any, state: dict[str, Any]) -> tuple[Answers, int, int]:
-        response = await client.system_one(state=state, questions=JUDGE_QUESTIONS, model=self.model)
+    async def _call(
+        self, client: Any, state: dict[str, Any], questions: Mapping[str, Any]
+    ) -> tuple[Answers, int, int]:
+        response = await client.system_one(state=state, questions=questions, model=self.model)
         usage = response.usage
         return answers_to_dict(response.answers), usage.input_tokens, usage.output_tokens

@@ -18,6 +18,7 @@ Población: evaluaciones de la marca en ejecuciones cuyo prompt es espontáneo (
     score           = aparicion + posicion + fuerza + calidad_fuente   (redondeado a 2 decimales)
 """
 
+from dataclasses import dataclass
 from statistics import fmean
 from typing import Final
 
@@ -100,14 +101,42 @@ def score_citacion(
             brand_id=brand_id, motor=motor, n_evaluaciones=0, score_version=SCORE_VERSION
         )
 
-    evals = [e for e, _ in population]
-    tasa = sum(e.aparece for e in evals) / n
-    aparicion = WEIGHTS["aparicion"] * tasa
-    posicion = WEIGHTS["posicion"] * fmean(e.peso_posicion for e in evals) / MAX_PESO_POSICION
-    fuerza = WEIGHTS["fuerza"] * max(0.0, fmean(e.fuerza for e in evals)) / MAX_FUERZA
-    calidades = [appearance_quality(e, r) for e, r in population if e.aparece]
-    calidad_fuente = WEIGHTS["calidad_fuente"] * tasa * fmean(calidades) if calidades else 0.0
+    apariciones = [(e, r) for e, r in population if e.aparece]
+    profile = AppearanceProfile(
+        tasa=len(apariciones) / n,
+        peso_medio=fmean(e.peso_posicion for e, _ in apariciones) if apariciones else 0.0,
+        fuerza_media=fmean(e.fuerza for e, _ in apariciones) if apariciones else 0.0,
+        calidad_media=fmean(appearance_quality(e, r) for e, r in apariciones)
+        if apariciones
+        else 0.0,
+    )
+    return score_from_profile(brand_id, n, profile, motor)
 
+
+@dataclass(frozen=True)
+class AppearanceProfile:
+    """Perfil de las apariciones de una marca: lo que necesita la fórmula del score.
+
+    `tasa` es apariciones / N. `peso_medio`, `fuerza_media` y `calidad_media` son medias SOLO
+    sobre las apariciones (quien no aparece aporta peso 0 y fuerza 0, así que la media sobre N es
+    `tasa × media sobre apariciones`). Permite recalcular el score con otra tasa (simulación).
+    """
+
+    tasa: float
+    peso_medio: float
+    fuerza_media: float
+    calidad_media: float
+
+
+def score_from_profile(
+    brand_id: str, n: int, profile: AppearanceProfile, motor: Motor | None = None
+) -> ScoreBreakdown:
+    """Score de Citación a partir del perfil de apariciones (misma fórmula del módulo)."""
+    t = profile.tasa
+    aparicion = WEIGHTS["aparicion"] * t
+    posicion = WEIGHTS["posicion"] * t * profile.peso_medio / MAX_PESO_POSICION
+    fuerza = WEIGHTS["fuerza"] * max(0.0, t * profile.fuerza_media) / MAX_FUERZA
+    calidad_fuente = WEIGHTS["calidad_fuente"] * t * profile.calidad_media
     return ScoreBreakdown(
         brand_id=brand_id,
         motor=motor,

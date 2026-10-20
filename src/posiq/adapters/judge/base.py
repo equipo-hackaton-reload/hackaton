@@ -117,8 +117,10 @@ class SystemOneJudge(ABC):
         """Cliente asíncrono de la API (se usa como `async with`)."""
 
     @abstractmethod
-    async def _call(self, client: Any, state: dict[str, Any]) -> tuple[Answers, int, int]:
-        """Envía `state` con `JUDGE_QUESTIONS`; devuelve respuestas y tokens de entrada/salida."""
+    async def _call(
+        self, client: Any, state: dict[str, Any], questions: Mapping[str, Any]
+    ) -> tuple[Answers, int, int]:
+        """Envía `state` con `questions`; devuelve respuestas y tokens de entrada/salida."""
 
     # --- Interfaz pública -------------------------------------------------------------------------
 
@@ -158,7 +160,7 @@ class SystemOneJudge(ABC):
         )
         detection = detect_in_run(run, brands).get(brand.id)
         state = build_state(run, brand)
-        answers = await self._answers(run, state, client)
+        answers = await self.ask(run.study_id, state, client=client)
         evaluation = answers_to_evaluation(answers, run, brand, detection, origen=self.origen)
         return JudgeOutcome(evaluation, score_confidence(answers, detection), answers)
 
@@ -172,27 +174,40 @@ class SystemOneJudge(ABC):
         async with self._open() as opened:
             yield opened
 
-    async def _answers(self, run: Run, state: dict[str, Any], client: Any | None) -> Answers:
-        key = DiskCache.key(
-            f"judge:{self.name}", self.model, {"state": state, "questions": QUESTIONS_VERSION}
-        )
+    async def ask(
+        self,
+        study_id: str,
+        state: dict[str, Any],
+        *,
+        questions: Mapping[str, Any] = JUDGE_QUESTIONS,
+        version: str = f"judge_questions@{QUESTIONS_VERSION}",
+        nodo: str | None = None,
+        client: Any | None = None,
+    ) -> Answers:
+        """Una llamada System One con caché, `Trace` y presupuesto, para cualquier batería de
+        preguntas (por defecto las de menciones). `version` identifica las preguntas en la caché y
+        en la traza; `nodo` es el nombre de la traza (por defecto `judge:<nombre>`)."""
+        nodo = nodo or f"judge:{self.name}"
+        key = DiskCache.key(nodo, self.model, {"state": state, "questions": version})
         start = time.perf_counter()
         if self.cache is not None and (cached := self.cache.get(key)) is not None:
-            self._record(run.study_id, 0, 0, start)
+            self._record(study_id, nodo, version, 0, 0, start)
             return dict(cached)
         async with self._session(client) as session:
-            answers, tokens_in, tokens_out = await self._call(session, state)
+            answers, tokens_in, tokens_out = await self._call(session, state, questions)
         if self.cache is not None:
             self.cache.set(key, answers)
-        self._record(run.study_id, tokens_in, tokens_out, start)
+        self._record(study_id, nodo, version, tokens_in, tokens_out, start)
         return answers
 
-    def _record(self, study_id: str, tokens_in: int, tokens_out: int, start: float) -> None:
+    def _record(
+        self, study_id: str, nodo: str, version: str, tokens_in: int, tokens_out: int, start: float
+    ) -> None:
         trace = Trace(
             study_id=study_id,
-            nodo=f"judge:{self.name}",
+            nodo=nodo,
             modelo=self.model,
-            prompt_version=f"judge_questions@{QUESTIONS_VERSION}",
+            prompt_version=version,
             tokens_in=tokens_in,
             tokens_out=tokens_out,
             coste_eur=usd_per_m_to_eur(tokens_in, self.price_in, self.usd_eur)
