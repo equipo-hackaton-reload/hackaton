@@ -13,7 +13,7 @@ ESPERADOS = {
     "market": "Market",
     "prompts": "PromptSet",
     "plan": "Plan",
-    "write": "Proposal",
+    "write": "ProposalDraft",
 }
 INTERPOLACION = re.compile(r"\{[^{}]*\}")
 
@@ -24,7 +24,7 @@ def test_prompt_valido(nombre: str) -> None:
     spec = load_prompt(nombre)
     assert spec.version_tag == f"{nombre}.v1"
     assert spec.schema_name == ESPERADOS[nombre]
-    assert spec.schema_name == "PromptSet" or hasattr(schemas, spec.schema_name)
+    assert spec.schema_name in ("PromptSet", "ProposalDraft") or hasattr(schemas, spec.schema_name)
     assert spec.state and all(clave and desc for clave, desc in spec.state.items())
     assert "no inventes cifras" in spec.texto.lower()
 

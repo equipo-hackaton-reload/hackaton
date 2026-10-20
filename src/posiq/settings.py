@@ -1,11 +1,15 @@
 """Configuración de posiq. leída de variables de entorno / `.env`. Ninguna clave va en el código."""
 
+from typing import Literal
+
 from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+
+    llm_provider: Literal["deepseek", "fixture"] = "deepseek"
 
     deepseek_api_key: SecretStr = SecretStr("")
     deepseek_base_url: str = "https://api.deepseek.com"
