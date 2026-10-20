@@ -12,29 +12,21 @@ from sqlmodel import create_engine
 from posiq.adapters.budget import Budget
 from posiq.adapters.repo.sql import SqlStudyRepo
 from posiq.application.deps import Deps
+from posiq.application.schemas_draft import ProposalDraft
 from posiq.domain.detection import detect_in_run, evaluation_from_detection
 from posiq.domain.schemas import (
     Action,
     Brand,
     BriefSummary,
-    Competencia,
-    Contexto,
-    Diagnostico,
-    Estrategia,
     Evaluation,
     Finding,
-    HojaRuta,
     Market,
-    Medicion,
-    Metrics,
     Objective,
     Phase,
     Plan,
     PromptInstance,
-    Proposal,
     Riesgo,
     Run,
-    ScoreBreakdown,
     Trace,
 )
 from posiq.ports import Engine
@@ -233,48 +225,18 @@ def plan_from_findings(state: dict[str, Any], *, restricciones: list[str] | None
     )
 
 
-def proposal_draft(state: dict[str, Any]) -> Proposal:
-    """Borrador válido del LLM con cifras inventadas: el nodo `write` debe sobrescribirlas."""
-    plan = Plan.model_validate(state["plan"])
-    sid = plan.study_id
-    score = ScoreBreakdown.model_validate(state["metricas"]["score_global"])
-    metrics = Metrics(
-        study_id=sid,
-        score_version="9.9",
-        marca_foco_id=score.brand_id,
-        lider_id=None,
-        score_global=score.model_copy(update={"score": 99.0}),
-        scores=[],
-        scores_por_motor=[],
-        ranking=["inventada"],
-        visibilidad=[],
-        calidad_menciones=[],
-        top_fuentes=[],
-        brecha_fuentes=[],
-        n_ejecuciones={},
-    )
-    return Proposal(
-        study_id=sid,
+def proposal_draft(state: dict[str, Any]) -> ProposalDraft:
+    return ProposalDraft(
         resumen_ejecutivo="Resumen.",
-        contexto=Contexto(
-            marca="Otra",
-            sector="Otro",
-            motores=["ChatGPT"],
-            fecha=datetime(2000, 1, 1, tzinfo=UTC),
-            origen_datos="api",
-            datos_sinteticos=False,
-            limitaciones=["Muestra pequeña"],
-        ),
-        diagnostico=Diagnostico(texto="Diagnóstico.", metrics=metrics),
-        competencia=Competencia(texto="Competencia.", ranking=["inventada"]),
-        hallazgos=[Finding.model_validate(f) for f in state["hallazgos"]],
-        estrategia=Estrategia(texto="Estrategia.", objetivos=[], prioridades=["Contenido"]),
-        plan=plan,
-        medicion=Medicion(kpis=["Score"], metodologia="GEO", cadencia="Trimestral"),
+        contexto_alcance="Muestra pequeña",
+        diagnostico="Diagnóstico.",
+        competencia="Competencia.",
+        interpretacion_hallazgos={f["id"]: f["descripcion"] for f in state["hallazgos"]},
+        estrategia="Estrategia.",
+        prioridades=["Contenido"],
         riesgos=[Riesgo(riesgo="Cambios de modelo", mitigacion="Re-medir")],
-        hoja_ruta=HojaRuta(
-            hitos=[], responsabilidades={}, presupuesto_eur=1.0, seguimiento="Mensual"
-        ),
+        supuestos=["Muestra pequeña"],
+        hoja_ruta="Mensual",
     )
 
 
