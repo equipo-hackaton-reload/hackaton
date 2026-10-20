@@ -10,16 +10,16 @@
 
 ## Pull requests
 
-- Siempre contra `develop`. CI en verde y al menos 1 revisión de otra persona.
-- Squash merge.
-- Antes de abrir PR:
-
-  ```sh
-  uv run pre-commit run --all-files
-  uv run pytest
-  ```
-
-- Cada PR añade una línea en `CHANGELOG.md`, sección `[Unreleased]`, bajo Added, Changed o Fixed.
+- **Revisión y CI:** PR obligatorio a `develop` con CI en verde. No hace falta aprobación humana.
+- **Fusión:** quien abre la PR la fusiona con squash (`gh pr merge <n> --squash --delete-branch`)
+  en cuanto CI pase.
+- **Conflictos con `develop`:** los resuelve el agente de esa rama:
+  1. `git fetch origin && git rebase origin/develop`.
+  2. Resuelve conservando ambos lados; si el conflicto es en `uv.lock`, ejecuta `uv lock`.
+  3. Pasa ruff, mypy y pytest.
+  4. `push --force-with-lease` y fusiona.
+- **Después del squash:** la rama se borra y la siguiente tarea empieza en una rama nueva desde
+  `develop`. Nadie rebasa una rama sobre su propio squash.
 
 ## Commits
 
