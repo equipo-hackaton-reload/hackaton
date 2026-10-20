@@ -1,0 +1,11 @@
+﻿Marca,Nivel,Rol,Dominio_propio,Alias
+Instituto Oftálmico Tramuntana,foco,Marca líder de referencia (premium),tramuntana-oftalmologia.example,Tramuntana
+Clínica Alborada Visión,foco,MARCA DEL BRIEF,alboradavision.example,Alborada Visión | Alborada
+Láser Nítida,foco,Competidor directo (cadena low cost),lasernitida.example,Nítida
+Vistalia Oftalmología,foco,Competidor directo (red regional),vistalia-oftalmologia.example,Vistalia
+Grupo Hospitalario Valdecruz,contexto,Contexto — líder real del mercado,valdecruz.example,Valdecruz
+Oftalmos Centro,contexto,Contexto,oftalmoscentro.example,Oftalmos
+Clínica del Ojo Cervantes,contexto,Contexto,clinicacervantes.example,Cervantes
+Visionar Clínicas,contexto,Contexto,visionar-clinicas.example,Visionar
+Instituto Ocular Santa Eulalia,contexto,Contexto,santaeulalia-ocular.example,Santa Eulalia
+Centro Lasik Península,contexto,Contexto,lasikpeninsula.example,Lasik Península

@@ -1,0 +1,26 @@
+﻿Dominio,Tipo_de_fuente,Calidad_de_fuente_0_1
+comparaclinicas.example,Directorio / comparador,0.6
+directoriomedico.example,Directorio / comparador,0.6
+bienestar-hoy.example,Medio,0.9
+diariosalud.example,Medio,0.9
+saludactual.example,Medio,0.9
+google.com,Plataforma de reseñas,0.6
+opinaclinicas.example,Plataforma de reseñas,0.6
+trustpilot.com,Plataforma de reseñas,0.6
+colegiooftalmologos.example,Ranking / institución,1.0
+guiaoftalmologia.example,Ranking / institución,1.0
+rankingclinicas.example,Ranking / institución,1.0
+wikipedia.org,Ranking / institución,1.0
+foroscorazonsalud.example,Red social / foro,0.4
+reddit.com,Red social / foro,0.4
+youtube.com,Red social / foro,0.4
+alboradavision.example,Web propia,0.7
+clinicacervantes.example,Web propia,0.7
+lasernitida.example,Web propia,0.7
+lasikpeninsula.example,Web propia,0.7
+oftalmoscentro.example,Web propia,0.7
+santaeulalia-ocular.example,Web propia,0.7
+tramuntana-oftalmologia.example,Web propia,0.7
+valdecruz.example,Web propia,0.7
+visionar-clinicas.example,Web propia,0.7
+vistalia-oftalmologia.example,Web propia,0.7
