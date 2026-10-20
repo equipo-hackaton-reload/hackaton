@@ -87,6 +87,7 @@ def test_caida_embudo() -> None:
     (f,) = detect_findings(metrics(fases), brief())
     assert f.id == "F-caida-embudo" and f.fase_embudo == "decision" and f.impacto == "L"
     assert f.cifra == 0.4 and f.evaluation_ids[0].startswith("EJ-fase-decision")
+    assert f.unidad == "fraccion"
     assert f.study_id == "S-1"
     plana = [
         cell("espontaneo", "fase", "descubrimiento", 0.5),
@@ -124,6 +125,7 @@ def test_fuente_lider() -> None:
     )
     (f,) = detect_findings(metrics(gaps=[gap]), brief())
     assert f.id == "F-fuente-lider" and f.impacto == "L" and f.evaluation_ids == ["EJ-1:alborada"]
+    assert f.cifra == 6 and f.unidad == "recuento"
     poco = gap.model_copy(update={"lider_sin_marca": 1})
     assert ids(metrics(gaps=[poco])) == []
     assert ids(metrics(gaps=[gap], lider=None)) == []
@@ -145,6 +147,7 @@ def test_brecha_lider() -> None:
     cells = [cell("espontaneo", "global", "global", 0.4)]
     (f,) = detect_findings(metrics(cells, scores=(20, 60)), brief())
     assert f.id == "F-brecha-lider" and f.cifra == 40 and f.impacto == "L"
+    assert f.unidad == "puntos"
     assert ids(metrics(cells, scores=(55, 60))) == []
     assert ids(metrics(cells, scores=(None, 60))) == []
 
@@ -170,6 +173,7 @@ def test_recomendacion_debil_y_negativas() -> None:
     found = detect_findings(metrics(cells, qualities=[debil, negativas]), brief())
     assert [f.id for f in found] == ["F-recomendacion-debil", "F-menciones-negativas"]
     assert found[1].evaluation_ids == ["a", "b", "c"]
+    assert [f.unidad for f in found] == ["puntos", "recuento"]
     assert ids(metrics(cells, qualities=[quality(apariciones=2, fuerza_media=1.0)])) == []
 
 

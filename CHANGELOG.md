@@ -13,6 +13,7 @@ Formato [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); versionado 
 - Exportación de la propuesta (zona E): puerto `Exporter`, `AgencyBrandKit`, `DocxExporter` con plantilla reproducible, `PdfExporter` con LibreOffice, golden y ejemplo en `docs/ejemplos/` (ADR 0004).
 - Prompts versionados v1 (`intake`, `market`, `prompts`, `plan`, `write`), `PromptSet` y `load_prompt`.
 ### Changed
+- `Finding.unidad` y `Proposal.marcas` (contract-change aditivo, zona E); `pyyaml` como dependencia directa.
 ### Fixed
 
 ## [0.1.0] - 2026-10-20

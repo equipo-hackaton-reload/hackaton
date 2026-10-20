@@ -22,6 +22,9 @@ Reglas:
 8. menciones_negativas — apariciones con advertencia (fuerza −1) o por desconocimiento, en
    espontáneo y asistido (≥ 1). Impacto M ≥ 3 · S.
 
+Unidad de la cifra (`Finding.unidad`): tasas y diferencias de tasas → fraccion · score y fuerza
+media → puntos · ejecuciones o menciones → recuento.
+
 Confianza según el tamaño de la muestra que respalda la cifra: n ≥ 60 → 0,8 · n ≥ 20 → 0,65 ·
 resto → 0,45.
 """
@@ -84,6 +87,7 @@ def _caida_embudo(m: Metrics, brief: BriefSummary) -> list[Finding]:
             impacto="L" if caida >= 0.25 else "M" if caida >= 0.15 else "S",
             confianza=confidence_for(destino.n),
             cifra=round(caida, 4),
+            unidad="fraccion",
             origen_cifra=f"visibilidad espontánea por fase: {desde} − {hasta}",
             evaluation_ids=destino.evaluation_ids,
         )
@@ -115,6 +119,7 @@ def _motor_debil(m: Metrics, brief: BriefSummary) -> list[Finding]:
             impacto="L" if gap >= 0.40 else "M" if gap >= 0.25 else "S",
             confianza=confidence_for(debil.n),
             cifra=round(debil.tasa or 0, 4),
+            unidad="fraccion",
             origen_cifra=f"visibilidad espontánea por motor: {debil.valor}",
             evaluation_ids=debil.evaluation_ids,
         )
@@ -140,6 +145,7 @@ def _fuente_lider(m: Metrics, brief: BriefSummary) -> list[Finding]:
             impacto="L" if gap.tipo in ("Ranking / institución", "Medio") else "M",
             confianza=confidence_for(gap.con_lider),
             cifra=float(gap.lider_sin_marca),
+            unidad="recuento",
             origen_cifra=f"brecha de fuentes frente al líder: {gap.dominio}",
             evaluation_ids=gap.evaluation_ids,
         )
@@ -177,6 +183,7 @@ def _ciudad_baja(m: Metrics, brief: BriefSummary) -> list[Finding]:
                 impacto="L" if cell.tasa < 0.10 else "M",
                 confianza=confidence_for(cell.n),
                 cifra=round(cell.tasa, 4),
+                unidad="fraccion",
                 origen_cifra=f"visibilidad espontánea por ciudad: {ciudad}",
                 evaluation_ids=cell.evaluation_ids,
             )
@@ -205,6 +212,7 @@ def _brecha_lider(m: Metrics, brief: BriefSummary) -> list[Finding]:
             impacto="L" if gap >= 30 else "M",
             confianza=confidence_for(foco.n_evaluaciones),
             cifra=round(gap, 2),
+            unidad="puntos",
             origen_cifra="score de citación: líder − marca foco",
             evaluation_ids=cell.evaluation_ids,
         )
@@ -231,6 +239,7 @@ def _asistida_vs_espontanea(m: Metrics, brief: BriefSummary) -> list[Finding]:
             impacto="M",
             confianza=confidence_for(esp.n),
             cifra=round(gap, 4),
+            unidad="fraccion",
             origen_cifra="visibilidad asistida − visibilidad espontánea",
             evaluation_ids=esp.evaluation_ids,
         )
@@ -268,6 +277,7 @@ def _recomendacion_debil(m: Metrics, brief: BriefSummary) -> list[Finding]:
             impacto="M",
             confianza=confidence_for(q.apariciones),
             cifra=q.fuerza_media,
+            unidad="puntos",
             origen_cifra="fuerza media de las apariciones espontáneas",
             evaluation_ids=cell.evaluation_ids,
         )
@@ -294,6 +304,7 @@ def _menciones_negativas(m: Metrics, brief: BriefSummary) -> list[Finding]:
             impacto="M" if len(ids) >= 3 else "S",
             confianza=confidence_for(len(ids)),
             cifra=float(len(ids)),
+            unidad="recuento",
             origen_cifra="calidad de menciones: negativas + por desconocimiento",
             evaluation_ids=ids,
         )

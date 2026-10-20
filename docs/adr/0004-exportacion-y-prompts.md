@@ -34,12 +34,11 @@ nunca tiene llaves de interpolación: los datos van en `state`. `PromptSet` vive
 
 ## Consecuencias
 
-- La cifra de cada hallazgo se imprime tal cual, junto a su `origen_cifra`. `Finding` no declara
-  unidad (fracción, puntos o recuento) y adivinarla sería inventar. Lo legible lo aporta su
-  `descripcion`.
-- La propuesta solo trae ids de marca. Salvo la marca foco, cuyo nombre está en `contexto.marca`,
-  los nombres se muestran a partir del id y pierden las tildes. Un `contract-change` futuro podría
-  añadir `Market` o los nombres a `Proposal`.
+- **Contract-change aditivo en `schemas.py`.** `Finding.unidad` (`fraccion`, `puntos`, `recuento`
+  o `eur`; por defecto `fraccion`) dice cómo leer `cifra`, y cada regla de `findings.py` la declara.
+  El exportador la usa para dar formato: `15,0 %`, `40,53 puntos` o `37`. `Proposal.marcas`
+  (id → nombre, por defecto vacío) da los nombres con tildes. Si falta un id, la marca foco toma el
+  nombre de `contexto.marca` y el resto se muestra a partir del id. El nodo `write` rellena
+  `marcas` desde `Market`.
 - El PDF depende de un binario externo. En CI (Ubuntu) se puede instalar `libreoffice-writer`.
-- `posiq.prompts` usa PyYAML, que hoy llega como dependencia transitiva de LangGraph. Conviene
-  declararla explícitamente en `pyproject.toml`.
+- `posiq.prompts` usa PyYAML, declarada como dependencia directa.

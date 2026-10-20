@@ -19,6 +19,7 @@ from posiq.domain.schemas import (
     Metrics,
     Proposal,
     TipoVisibilidad,
+    UnidadCifra,
     VisibilityCell,
 )
 
@@ -75,11 +76,20 @@ def fmt_eur(x: float | None) -> str:
     return SIN_DATOS if x is None else f"{fmt_num(x, 0)} €"
 
 
-def fmt_cifra(x: float) -> str:
-    """Cifra de un hallazgo tal cual llega (su unidad la explica `origen_cifra`)."""
-    if float(x).is_integer():
+def _sin_ceros(x: float, decimales: int) -> str:
+    return fmt_num(x, decimales).rstrip("0").rstrip(",")
+
+
+def fmt_cifra(x: float, unidad: UnidadCifra = "fraccion") -> str:
+    """Cifra de un hallazgo según su `unidad`: `0.15` → `15,0 %`, `40.53` → `40,53 puntos`."""
+    if unidad == "fraccion":
+        return fmt_pct(x)
+    if unidad == "eur":
+        return fmt_eur(x)
+    if unidad == "recuento":
         return fmt_num(x, 0)
-    return fmt_num(x, 4).rstrip("0").rstrip(",")
+    texto = _sin_ceros(x, 2)
+    return f"{texto} punto" if texto == "1" else f"{texto} puntos"
 
 
 def fmt_score(x: float | None) -> str:
@@ -102,17 +112,16 @@ def _semanas(n: int) -> str:
 
 
 class _Nombres:
-    """Nombre legible de una marca a partir de su id (la propuesta solo trae ids, salvo la foco)."""
+    """Nombre legible de una marca: `Proposal.marcas`; si falta, la foco desde el contexto y el
+    resto a partir del id."""
 
-    def __init__(self, foco_id: str, foco_nombre: str) -> None:
-        self._foco = (foco_id, foco_nombre)
+    def __init__(self, marcas: dict[str, str], foco_id: str, foco_nombre: str) -> None:
+        self._marcas = {foco_id: foco_nombre, **marcas}
 
     def __call__(self, brand_id: str | None) -> str:
         if brand_id is None:
             return SIN_DATOS
-        if brand_id == self._foco[0]:
-            return self._foco[1]
-        return brand_id.replace("-", " ").title()
+        return self._marcas.get(brand_id) or brand_id.replace("-", " ").title()
 
 
 def _filas_visibilidad(
@@ -247,7 +256,7 @@ def build_context(
 ) -> dict[str, Any]:
     p = proposal
     c = p.contexto
-    nombre = _Nombres(p.diagnostico.metrics.marca_foco_id, c.marca)
+    nombre = _Nombres(p.marcas, p.diagnostico.metrics.marca_foco_id, c.marca)
     agencia = marca_agencia.nombre if marca_agencia else MARCA_POR_DEFECTO
     color = marca_agencia.color_hex if marca_agencia else COLOR_POR_DEFECTO
     logo: Any = ""
@@ -286,7 +295,7 @@ def build_context(
                 "id": f.id,
                 "titulo": f.titulo,
                 "descripcion": f.descripcion,
-                "cifra": fmt_cifra(f.cifra),
+                "cifra": fmt_cifra(f.cifra, f.unidad),
                 "origen": f.origen_cifra,
                 "fase": FASES[f.fase_embudo] if f.fase_embudo else "Transversal",
                 "impacto": f.impacto,

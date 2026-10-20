@@ -35,6 +35,7 @@ from posiq.domain.schemas import (
     Plan,
     Proposal,
     Riesgo,
+    UnidadCifra,
 )
 from posiq.ports import Exporter
 from tests.golden.conftest import STUDY_ID, Kit
@@ -166,6 +167,7 @@ def proposal(kit: Kit, alborada_brief: BriefSummary) -> Proposal:
             presupuesto_eur=22000,
             seguimiento="Comité mensual",
         ),
+        marcas={b.id: b.nombre for b in kit.brands},
     )
 
 
@@ -199,9 +201,11 @@ def test_docx_con_las_diez_secciones_y_cifras(proposal: Proposal, docx_bytes: by
     assert "{{" not in texto and "{%" not in texto
     score = proposal.diagnostico.metrics.score_global.score
     assert fmt_score(score) in texto
-    hallazgo = proposal.hallazgos[0]
-    assert hallazgo.titulo in texto and fmt_cifra(hallazgo.cifra) in texto
-    assert hallazgo.origen_cifra in texto
+    for hallazgo in proposal.hallazgos:
+        assert hallazgo.titulo in texto and hallazgo.origen_cifra in texto
+        assert fmt_cifra(hallazgo.cifra, hallazgo.unidad) in texto
+    assert {"fraccion", "puntos", "recuento"} <= {h.unidad for h in proposal.hallazgos}
+    assert "Láser Nítida" in texto and "Instituto Oftálmico Tramuntana" in texto
     for limitacion in proposal.contexto.limitaciones:
         assert limitacion in texto
     assert "posiq." in texto
@@ -209,6 +213,27 @@ def test_docx_con_las_diez_secciones_y_cifras(proposal: Proposal, docx_bytes: by
     if not EJEMPLO.is_file() or _partes(EJEMPLO.read_bytes()) != _partes(docx_bytes):
         EJEMPLO.parent.mkdir(parents=True, exist_ok=True)
         EJEMPLO.write_bytes(docx_bytes)
+
+
+@pytest.mark.parametrize(
+    ("cifra", "unidad", "esperado"),
+    [
+        (0.15, "fraccion", "15,0 %"),
+        (40.53, "puntos", "40,53 puntos"),
+        (1.0, "puntos", "1 punto"),
+        (37.0, "recuento", "37"),
+        (22000.0, "eur", "22.000 €"),
+    ],
+)
+def test_cifra_segun_unidad(cifra: float, unidad: UnidadCifra, esperado: str) -> None:
+    assert fmt_cifra(cifra, unidad) == esperado
+
+
+def test_sin_marcas_cae_a_los_ids(proposal: Proposal) -> None:
+    sin_marcas = proposal.model_copy(update={"marcas": {}})
+    texto = _texto(DocxExporter().render(sin_marcas, formato="docx"))
+    assert "Laser Nitida" in texto and "Láser Nítida" not in texto
+    assert proposal.contexto.marca in texto
 
 
 def test_cabecera_con_marca_de_agencia(proposal: Proposal) -> None:

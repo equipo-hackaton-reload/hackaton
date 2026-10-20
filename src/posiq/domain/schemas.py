@@ -59,6 +59,7 @@ Palanca = Literal[
     "tecnico",
     "medicion",
 ]
+UnidadCifra = Literal["fraccion", "puntos", "recuento", "eur"]
 
 ESPONTANEAS: frozenset[str] = frozenset({"generico", "ciudad"})
 
@@ -425,6 +426,8 @@ class MetricsDelta(_Model):
 
 
 class Finding(_Model):
+    """`unidad` dice cómo leer `cifra`: fracción 0-1, puntos (score o escala), recuento o euros."""
+
     id: str
     study_id: str
     titulo: str
@@ -433,6 +436,7 @@ class Finding(_Model):
     impacto: Talla
     confianza: float = Field(ge=0, le=1)
     cifra: float
+    unidad: UnidadCifra = "fraccion"
     origen_cifra: str
     evaluation_ids: list[str] = Field(min_length=1)
 
@@ -559,7 +563,10 @@ class HojaRuta(_Model):
 
 
 class Proposal(_Model):
-    """Las 10 secciones del formato del entregable (doc 06), todas del mismo estudio."""
+    """Las 10 secciones del formato del entregable (doc 06), todas del mismo estudio.
+
+    `marcas` traduce cada `brand_id` a su nombre legible (con tildes); vacío = se muestran los ids.
+    """
 
     study_id: str
     resumen_ejecutivo: str
@@ -572,6 +579,7 @@ class Proposal(_Model):
     medicion: Medicion
     riesgos: list[Riesgo] = Field(min_length=1)
     hoja_ruta: HojaRuta
+    marcas: dict[str, str] = {}
 
     @model_validator(mode="after")
     def _mismo_estudio(self) -> Self:

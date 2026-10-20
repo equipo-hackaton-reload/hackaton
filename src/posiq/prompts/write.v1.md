@@ -64,4 +64,7 @@ el brief lo exige).
 10. `hoja_ruta`: hitos por semana coherentes con las fases del plan, responsabilidades de cliente,
     agencia y terceros, presupuesto (el del plan) y modelo de seguimiento.
 
+`marcas`: un mapa con el `id` de cada marca de `market` como clave y su `nombre` como valor, copiados
+tal cual (con tildes). Los hallazgos conservan su `unidad`.
+
 `study_id` es el de `study`. Devuelve exclusivamente un objeto que cumpla el esquema `Proposal`.
