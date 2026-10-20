@@ -59,6 +59,11 @@ function Item({ e, marca }: { e: Evidence; marca: Brand | undefined }) {
       </blockquote>
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-meta text-muted">
         <span>
+          {ev.necesita_revision && (
+            <span className="pill mr-1.5 bg-pill-warn-bg text-pill-warn-ink" title="El juez dudó: conviene que la revise una persona">
+              Revisar
+            </span>
+          )}
           {ORIGEN[ev.origen] ?? ev.origen} · confianza <span className="num">{fmtPct(ev.confianza)}</span>
           {e.fuentes.length > 0 && ` · fuentes: ${e.fuentes.join(", ")}`}
         </span>

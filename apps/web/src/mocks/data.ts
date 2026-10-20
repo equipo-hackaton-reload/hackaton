@@ -320,6 +320,7 @@ export function proposalFor(
         mitigacion: "Tres repeticiones por prompt y lectura de tendencias, no de ejecuciones sueltas.",
       },
     ],
+    marcas: Object.fromEntries(kitMarket.marcas.map((b) => [b.id, b.nombre])),
     hoja_ruta: {
       hitos: [
         { semana: 0, descripcion: "Arranque y línea base" },

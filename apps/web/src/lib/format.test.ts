@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { Finding } from "../types/schemas";
 import { nb } from "../test/utils";
 import { DASH, fmtCifra, fmtEur, fmtInt, fmtNum, fmtPct, slug } from "./format";
 
@@ -15,14 +16,15 @@ describe("format", () => {
     expect(nb(fmtPct(0.0417))).toBe("4 %");
   });
 
-  it("da unidad a la cifra de un hallazgo según su origen", () => {
-    expect(nb(fmtCifra({ cifra: 0.15, origen_cifra: "visibilidad espontánea por motor: Claude" }))).toBe("15 %");
-    expect(fmtCifra({ cifra: 0.6125, origen_cifra: "visibilidad asistida − visibilidad espontánea" })).toBe(
-      "61,3 pp",
-    );
-    expect(fmtCifra({ cifra: 40.53, origen_cifra: "score de citación: líder − marca foco" })).toBe("40,53 pts");
-    expect(fmtCifra({ cifra: 37, origen_cifra: "brecha de fuentes frente al líder: x" })).toBe("37 resp.");
-    expect(fmtCifra({ cifra: 1.011, origen_cifra: "fuerza media de las apariciones" })).toBe("1,01");
+  it("da unidad a la cifra de un hallazgo según su `unidad`", () => {
+    const c = (cifra: number, unidad: Finding["unidad"], origen_cifra: string) =>
+      nb(fmtCifra({ cifra, unidad, origen_cifra }));
+    expect(c(0.15, "fraccion", "visibilidad espontánea por motor: Claude")).toBe("15 %");
+    expect(c(0.6125, "fraccion", "visibilidad asistida − visibilidad espontánea")).toBe("61,3 pp");
+    expect(c(40.53, "puntos", "score de citación: líder − marca foco")).toBe("40,53 pts");
+    expect(c(1.011, "puntos", "fuerza media de las apariciones")).toBe("1,01");
+    expect(c(37, "recuento", "brecha de fuentes frente al líder: x")).toBe("37 resp.");
+    expect(c(24000, "eur", "presupuesto")).toBe("24.000 €");
   });
 
   it("genera ids de marca sin tildes", () => {

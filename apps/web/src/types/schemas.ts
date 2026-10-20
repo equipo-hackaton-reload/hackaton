@@ -53,6 +53,7 @@ export type Palanca =
   | "tecnico"
   | "medicion";
 export type Dimension = "global" | "motor" | "fase" | "ciudad" | "perfil" | "familia";
+export type UnidadCifra = "fraccion" | "puntos" | "recuento" | "eur";
 
 /** Fecha ISO 8601 tal como la serializa Pydantic. */
 export type DateTimeISO = string;
@@ -173,6 +174,8 @@ export interface Evaluation {
   apoyada_en_fuente: boolean;
   confianza: number;
   origen: OrigenEvaluacion;
+  /** El juez dudó (confianza entre los umbrales): se usa, pero conviene revisarla. */
+  necesita_revision: boolean;
   readonly peso_posicion: number;
   readonly por_desconocimiento: boolean;
 }
@@ -286,6 +289,8 @@ export interface Finding {
   impacto: Talla;
   confianza: number;
   cifra: number;
+  /** Cómo leer `cifra`: fracción 0-1, puntos (score o escala), recuento o euros. */
+  unidad: UnidadCifra;
   origen_cifra: string;
   evaluation_ids: string[];
 }
@@ -390,6 +395,8 @@ export interface Proposal {
   medicion: Medicion;
   riesgos: Riesgo[];
   hoja_ruta: HojaRuta;
+  /** `brand_id` → nombre legible; vacío = se muestran los ids. */
+  marcas: Record<string, string>;
 }
 
 // --- Trazas --------------------------------------------------------------------------------------

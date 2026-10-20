@@ -41,19 +41,22 @@ export function ordinal(n: number): string {
 }
 
 /**
- * La cifra de un hallazgo con su unidad, deducida de su origen: las tasas de visibilidad son
- * porcentajes (o puntos porcentuales si son una diferencia), el score va en puntos y la brecha de
- * fuentes cuenta respuestas.
+ * La cifra de un hallazgo con su `unidad`. Una fracción es un porcentaje, o puntos porcentuales si
+ * el origen es una diferencia; los puntos del score llevan «pts» y los de una escala van solos; un
+ * recuento de fuentes cuenta respuestas.
  */
-export function fmtCifra(f: Pick<Finding, "cifra" | "origen_cifra">): string {
+export function fmtCifra(f: Pick<Finding, "cifra" | "origen_cifra" | "unidad">): string {
   const o = f.origen_cifra.toLowerCase();
-  const diferencia = o.includes("−") || o.includes(" - ");
-  if (o.startsWith("visibilidad")) {
-    return diferencia ? `${fmtNum(f.cifra * 100, 1)} pp` : fmtPct(f.cifra);
+  switch (f.unidad) {
+    case "fraccion":
+      return o.includes("−") || o.includes(" - ") ? `${fmtNum(f.cifra * 100, 1)} pp` : fmtPct(f.cifra);
+    case "puntos":
+      return o.startsWith("score") ? `${fmtNum(f.cifra)} pts` : fmtNum(f.cifra);
+    case "recuento":
+      return o.startsWith("brecha de fuentes") ? `${fmtInt(f.cifra)} resp.` : fmtInt(f.cifra);
+    case "eur":
+      return fmtEur(f.cifra, 0);
   }
-  if (o.startsWith("score")) return `${fmtNum(f.cifra)} pts`;
-  if (o.startsWith("brecha de fuentes")) return `${fmtInt(f.cifra)} resp.`;
-  return fmtNum(f.cifra);
 }
 
 export function fmtDate(iso: string): string {
