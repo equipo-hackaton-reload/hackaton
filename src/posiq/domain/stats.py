@@ -28,7 +28,7 @@ import random
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from statistics import NormalDist, fmean
-from typing import Final, Literal
+from typing import Final, Literal, cast
 
 from posiq.domain.findings import MAX_FUERZA_DEBIL, MAX_TASA_CIUDAD
 from posiq.domain.metrics import DELTA_DIMENSIONES, TIPOS
@@ -168,6 +168,18 @@ def intervalos_aparicion(
     ]
 
 
+def aparicion_por_motor(
+    metrics: Metrics, brand_id: str | None = None, nivel: float = NIVEL
+) -> dict[Motor, Intervalo]:
+    """Wilson de la tasa de aparición ESPONTÁNEA por motor (solo motores con datos)."""
+    marca = brand_id or metrics.marca_foco_id
+    return {
+        cast(Motor, c.valor): wilson(c.apariciones, c.n, nivel)
+        for c in metrics.cells(marca, "espontaneo", "motor")
+        if c.n > 0
+    }
+
+
 # --- Bootstrap ------------------------------------------------------------------------------------
 
 
@@ -281,6 +293,25 @@ def intervalo_score(
         nivel=nivel,
         metodo="bootstrap",
     )
+
+
+def intervalos_score_por_motor(
+    muestra: Muestra,
+    brand_id: str,
+    *,
+    replicas: int = REPLICAS_BOOTSTRAP,
+    semilla: int = SEMILLA_BOOTSTRAP,
+    nivel: float = NIVEL,
+) -> dict[Motor, Intervalo]:
+    """`intervalo_score` de `brand_id` en cada motor de la muestra (solo motores con datos)."""
+    out: dict[Motor, Intervalo] = {}
+    for motor in sorted({r.motor for r in muestra.runs}):
+        i = intervalo_score(
+            muestra, brand_id, motor, replicas=replicas, semilla=semilla, nivel=nivel
+        )
+        if i is not None:
+            out[motor] = i
+    return out
 
 
 def diferencia_scores(

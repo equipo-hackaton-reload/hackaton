@@ -8,12 +8,14 @@ from posiq.domain.schemas import Evaluation, Finding, Market, Metrics, PromptIns
 from posiq.domain.stats import (
     SIN_CONTRASTE_FUENTE_LIDER,
     Muestra,
+    aparicion_por_motor,
     diferencia_proporciones,
     diferencia_scores,
     formato_intervalo,
     formato_margen,
     intervalo_score,
     intervalos_aparicion,
+    intervalos_score_por_motor,
     significancia_hallazgos,
     significancia_remedicion,
     wilson,
@@ -292,6 +294,13 @@ def test_significancia_remedicion_alineada_con_diff_metrics() -> None:
             assert t.significancia is None
         else:
             assert t.significancia is not None and t.significancia.delta == v.delta
+    claves = s.por_clave()
+    assert claves["score_global"] == s.score
+    esp = next(
+        v for v in delta.visibilidad_delta if (v.tipo, v.dimension) == ("espontaneo", "global")
+    )
+    assert claves["espontaneo:global:global"].delta == esp.delta
+    assert not any(k.startswith("asistido:") for k in claves)  # sin datos asistidos: se omiten
     global_esp = next(t for t in s.tasas if (t.tipo, t.dimension) == ("espontaneo", "global"))
     assert global_esp.significancia is not None and global_esp.significancia.significativa
 
@@ -327,3 +336,15 @@ def test_formato_en_espanol() -> None:
     assert formato_intervalo(negativo, 2) == "−0,26 [−0,29; −0,10]"
     cruza = Intervalo(valor=0.004, inf=-0.0004, sup=0.01, n=24, metodo="wilson")
     assert formato_intervalo(cruza, 2) == "0,00 [0,00–0,01]"
+
+
+def test_diccionarios_por_motor() -> None:
+    muestra, market = _muestra(0.25, 0.8)
+    metrics = _metrics(muestra, market)
+    aparicion = aparicion_por_motor(metrics)
+    assert list(aparicion) == list(MOTORES)
+    for c in metrics.cells(FOCO, "espontaneo", "motor"):
+        assert aparicion[c.valor] == wilson(c.apariciones, c.n)  # type: ignore[index]
+    scores = intervalos_score_por_motor(muestra, FOCO, replicas=100)
+    assert list(scores) == list(MOTORES)
+    assert scores["ChatGPT"] == intervalo_score(muestra, FOCO, "ChatGPT", replicas=100)

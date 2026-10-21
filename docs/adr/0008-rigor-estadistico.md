@@ -151,6 +151,17 @@ significativo». `F-fuente-lider` no admite contraste.
 
 - La web (D), el Word (E) y la API (C) pueden enseñar «25,9 [21,6–30,1]» y el margen por motor,
   con `formato_intervalo` y `formato_margen` (formato español).
-- La integración en el grafo y en `GET /studies/{id}` es de la Zona C: `informe_rigor(metrics,
-  findings, Muestra(evaluations, runs, prompts))`. Tarda unos 4 s con Alborada y es determinista.
+- La integración en el grafo y en `GET /studies/{id}` es de la Zona C. Va sobre el contenedor
+  `application.diferencial.Rigor`, que ya está en `develop`:
+  - `score_global` sale de `intervalo_score(muestra, foco)`.
+  - `score_por_motor` sale de `intervalos_score_por_motor(muestra, foco)`.
+  - `aparicion_por_motor` sale de `aparicion_por_motor(metrics)`.
+  - `hallazgos` sale de `significancia_hallazgos(...)`.
+  - `deltas` sale de `significancia_remedicion(...).por_clave()`.
+
+  Con Alborada tarda unos 4 s y es determinista.
+- **Hueco en `Rigor.hallazgos`:** es `dict[str, Significancia]` y no puede decir «sin contraste».
+  Hay dos opciones:
+  - Que la Zona C lo cambie a `dict[str, SignificanciaHallazgo]` (recomendado).
+  - Que omita esos hallazgos. Entonces la web no debe leer la ausencia como «no significativo».
 - Cambiar la semilla o las réplicas cambia los intervalos: hay que actualizar los golden y este ADR.

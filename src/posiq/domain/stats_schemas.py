@@ -124,6 +124,17 @@ class SignificanciaRemedicion(_Model):
     score: Significancia | None
     tasas: list[SignificanciaSegmento]
 
+    def por_clave(self) -> dict[str, Significancia]:
+        """`score_global` y `tipo:dimension:valor` → significancia (sin los que no tienen datos).
+
+        Mismas claves que `application.diferencial.Rigor.deltas`.
+        """
+        out = {"score_global": self.score} if self.score is not None else {}
+        for t in self.tasas:
+            if t.significancia is not None:
+                out[f"{t.tipo}:{t.dimension}:{t.valor}"] = t.significancia
+        return out
+
 
 class ConsensoJuez(_Model):
     """Voto por mayoría de N evaluaciones de la misma marca en la misma respuesta.
