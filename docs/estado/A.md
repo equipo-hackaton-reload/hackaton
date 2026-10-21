@@ -39,6 +39,40 @@
   - Falta: que la web lo pinte (D, forma del JSON en `docs/estado/D.md`). `posicionamiento_deseado`
     y `atributos_deseados` existen, pero `intake.v1` aún no los extrae ni son puntos de cobertura.
 
+## Seguimiento con método: serie temporal (`feature/A-serie-temporal`, ADR 0016)
+
+- `domain/tracking_schemas.py` (contrato para C y D): `PuntoSerie`, `CambioSerie`,
+  `IndicadorAdelantado`, `ValorIndicador` y `SerieMarca`.
+- `domain/tracking.py` (puro):
+  - `huella_banco(prompts)` y `comparabilidad(anterior, actual)`.
+  - `construir_serie(brand_id, nombre, mediciones, *, replicas, semilla, nivel)`, con
+    `MedicionSerie(study, metrics, muestra, market=None, catalogo=(), exactitud=None)`.
+  - Indicadores sueltos: `cuota_web_propia(medicion)` y `presencia_top_fuentes(medicion)`.
+  - Constantes: `SIN_CAMBIOS` y `MOTIVO_LINEA_BASE`.
+- **Comparable** si coinciden la versión de la metodología, la del score, la huella del banco y los
+  motores. Si cambia el modelo de un motor, sigue siendo comparable, con aviso.
+- **El primer punto** sale con `comparable_con_anterior=False` y el motivo «Línea base: …».
+- **Métricas de `CambioSerie`:** `score`, `aparicion_espontanea:global`,
+  `aparicion_espontanea:<Motor>`, `posicion` (negativo = mejora) y `diferencia_vs_competidores`.
+  Las dos últimas llevan `relativo_a_competidores=True`, con bootstrap del mercado entero.
+- **Kit de Alborada:**
+  - Medido dos veces: 25,93 [21,6; 30,15], 8.º de 10, −8,59 frente a la media de competidores
+    (34,52). Da 0 cambios significativos y «Sin cambios fuera del margen de error».
+  - Indicadores: web propia 5,85 %, presencia en el top 5 de fuentes 74,1 %, 0 inexactitudes y
+    21 afirmaciones a revisar.
+  - Con un segundo punto perturbado (sintético: 40 no-apariciones pasan a 1.ª) sale +15,88
+    [+9,51; +22,47] y del 8.º al 3.º.
+- **Para C (Seguimiento API):**
+  - `GET /brands/{id}/serie` = `construir_serie(...)` con los estudios completados del usuario.
+  - Cada medición necesita la `Muestra`: evaluaciones, ejecuciones y prompts del estudio, los
+    mismos con los que se calcularon las métricas (si no cuadran, lanza `ValueError`).
+  - `market` + `catalogo` y `exactitud` (`accuracy.evaluar_exactitud`) son opcionales. Sin ellos,
+    los indicadores valen `null`.
+  - Coste: unos 4 s por serie de 2 puntos del kit con 2000 réplicas. Cachearla por conjunto de
+    study_ids.
+- **Para D:** pintar el primer punto como «línea base», no como aviso. Los textos de `resumen` y de
+  `cambios[].texto` ya vienen redactados.
+
 ## Exactitud de marca (`feature/A-exactitud-marca`, ADR 0011)
 
 - `domain/accuracy.py` (puro):
