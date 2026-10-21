@@ -52,7 +52,7 @@ function StudyBar({ status }: { status: StudyStatus }) {
       <div className="ml-auto flex items-center gap-3 text-meta">
         <span className="hidden text-muted md:inline">{status.study.brief.marca}</span>
         <StatusBadge estado={status.estado} />
-        <span className="num text-muted" title="Coste acumulado del estudio">
+        <span className="num hidden text-muted sm:inline" title="Coste acumulado del estudio">
           {fmtEur(status.coste_acumulado_eur)}
         </span>
         {status.study.modo === "kit" && (

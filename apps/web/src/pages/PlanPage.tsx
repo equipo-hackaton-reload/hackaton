@@ -6,6 +6,8 @@ import { ActionEditor } from "../components/ActionEditor";
 import { KitNotice } from "../components/KitNotice";
 import { PageTitle } from "../components/PageTitle";
 import { Panel } from "../components/Panel";
+import { PlanQualityCard } from "../components/PlanQualityCard";
+import { SimulationCard } from "../components/SimulationCard";
 import { Waiting } from "../components/States";
 import { fmtEur, fmtNum } from "../lib/format";
 import type { Action, Plan } from "../types/schemas";
@@ -143,6 +145,10 @@ function Editor({ original }: { original: Plan }) {
 
       <div className="grid gap-6">
         <Objetivos plan={plan} />
+        {status.simulacion && (
+          <SimulationCard simulation={status.simulacion} quality={status.calidad_plan} />
+        )}
+        {status.calidad_plan && <PlanQualityCard quality={status.calidad_plan} />}
         {plan.fases.map((f, i) => (
           <Panel
             key={f.nombre}

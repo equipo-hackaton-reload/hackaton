@@ -40,6 +40,10 @@ export function useResume(id: string) {
   });
 }
 
+export function useRemeasure() {
+  return useMutation({ mutationFn: (id: string) => api.remeasure(id) });
+}
+
 export function useStudies(brandId: string | undefined) {
   return useQuery({
     queryKey: keys.studies(brandId ?? ""),

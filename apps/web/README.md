@@ -93,6 +93,7 @@ Endpoints que la web **asume además** y que la zona C debe confirmar. Si no exi
 |---|---|---|---|
 | GET | `/studies/{id}/evaluations?ids=a,b` | `[{evaluation, motor, prompt, texto_respuesta, fuentes}]` | El panel de evidencias muestra solo los ids |
 | GET | `/studies/{id}/traces` | `Trace[]` | El panel de trazas dice que no hay datos |
+| POST | `/studies/{id}/remeasure` | `{study_id}` (202) | La API debe crear una nueva medición con el brief y mercado confirmados |
 | GET | `/estimate?modo=real` | `{llamadas, coste_estimado_eur, presupuesto_max_eur}` | Sin estimación en la pantalla 1 |
 
 Supuestos de comportamiento:
@@ -100,3 +101,7 @@ Supuestos de comportamiento:
 - Los errores llegan como `{"detail": "..."}` (formato de FastAPI) y se muestran tal cual.
 - `errores` trae, durante la revisión del plan, las violaciones de `validate_plan_against_brief`.
 - Tras el `resume`, `GET /studies/{id}` devuelve `estado: "en_curso"` hasta la siguiente revisión.
+- Cuando existe `plan`, la respuesta puede incluir `simulacion` (rangos por fase) y `calidad_plan`
+  (calidad por acción); ambos se muestran como ayudas orientativas y no sustituyen una re-medición.
+- Una re-medición devuelve un nuevo `study_id`; si existe `metrics_delta`, el diagnóstico muestra
+  el score anterior, actual y su diferencia.
