@@ -18,3 +18,7 @@ class ProposalDraft(BaseModel):
     riesgos: list[Riesgo] = Field(min_length=1)
     supuestos: list[str] = Field(min_length=1)
     hoja_ruta: str = Field(min_length=1)
+    # id del punto del brief (`objetivo-1`, `ciudad-2`...) → ids de acciones o hallazgos que lo
+    # tratan. Lo valida y completa `domain.brief_coverage`; las restricciones y el presupuesto los
+    # comprueba solo el código.
+    cobertura_brief: dict[str, list[str]] = {}

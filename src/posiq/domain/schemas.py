@@ -60,6 +60,16 @@ Palanca = Literal[
     "medicion",
 ]
 UnidadCifra = Literal["fraccion", "puntos", "recuento", "eur"]
+TipoPuntoBrief = Literal[
+    "objetivo",
+    "restriccion",
+    "servicio_prioritario",
+    "ciudad",
+    "publico",
+    "competidor",
+    "presupuesto",
+]
+EstadoCobertura = Literal["cubierto", "pendiente"]
 
 ESPONTANEAS: frozenset[str] = frozenset({"generico", "ciudad"})
 
@@ -86,7 +96,11 @@ class Brand(_Model):
 
 
 class BriefSummary(_Model):
-    """Ficha estructurada del brief. `ciudades` va ordenada por prioridad (primera = principal)."""
+    """Ficha estructurada del brief. `ciudades` va ordenada por prioridad (primera = principal).
+
+    `posicionamiento_deseado` y `atributos_deseados` dicen cómo quiere verse la marca (identidad
+    deseada); vacíos si el brief no lo dice.
+    """
 
     marca: str
     sector: str
@@ -101,6 +115,8 @@ class BriefSummary(_Model):
     objetivos: list[str]
     audiencia_del_entregable: str
     tono: str
+    posicionamiento_deseado: str = ""
+    atributos_deseados: list[str] = []
 
     @model_validator(mode="after")
     def _presupuesto_ordenado(self) -> Self:
@@ -488,6 +504,11 @@ class Plan(_Model):
         return [a for f in self.fases for a in f.acciones]
 
 
+def ignora_restriccion(accion: Action, restriccion: str) -> bool:
+    """La acción no declara la restricción del brief en `restricciones_revisadas`."""
+    return restriccion not in accion.restricciones_revisadas
+
+
 def validate_plan_against_brief(plan: Plan, brief: BriefSummary) -> list[str]:
     """Violaciones del plan frente al brief. No lanza: devuelve una lista (vacía si cumple).
 
@@ -506,7 +527,7 @@ def validate_plan_against_brief(plan: Plan, brief: BriefSummary) -> list[str]:
         )
     for accion in plan.acciones:
         for restriccion in brief.restricciones:
-            if restriccion not in accion.restricciones_revisadas:
+            if ignora_restriccion(accion, restriccion):
                 violaciones.append(f"acción {accion.id} ignora la restricción «{restriccion}»")
     if not plan.respeta_restricciones:
         violaciones.append("el plan declara que no respeta las restricciones del brief")
@@ -562,10 +583,64 @@ class HojaRuta(_Model):
     seguimiento: str
 
 
+class PuntoBrief(_Model):
+    """Un punto del brief, con su texto literal, y dónde lo trata la propuesta.
+
+    `id` es estable dentro del estudio (`objetivo-1`, `ciudad-2`, `presupuesto`...). `cubierto`
+    exige al menos una acción o un hallazgo, salvo en restricciones y presupuesto, que se comprueban
+    contra el plan entero. `motivo` explica la comprobación o por qué queda pendiente.
+    """
+
+    id: str
+    tipo: TipoPuntoBrief
+    texto: str
+    accion_ids: list[str] = []
+    hallazgo_ids: list[str] = []
+    estado: EstadoCobertura
+    motivo: str = ""
+
+    @model_validator(mode="after")
+    def _cubierto_con_enlace(self) -> Self:
+        enlazado = self.accion_ids or self.hallazgo_ids
+        if (
+            self.estado == "cubierto"
+            and self.tipo not in ("restriccion", "presupuesto")
+            and not enlazado
+        ):
+            raise ValueError(f"punto {self.id} cubierto sin acciones ni hallazgos")
+        return self
+
+
+class Encargo(_Model):
+    """Lo que pidió el cliente, TAL CUAL viene en el brief, y la cobertura de cada punto."""
+
+    objetivos: list[str]
+    restricciones: list[str]
+    servicios_prioritarios: list[str]
+    ciudades: list[str]
+    publicos: list[str]
+    competidores_declarados: list[str]
+    presupuesto_anual_eur: tuple[int, int] | None = None
+    cobertura: list[PuntoBrief] = []
+
+    @model_validator(mode="after")
+    def _ids_unicos(self) -> Self:
+        ids = [p.id for p in self.cobertura]
+        if len(ids) != len(set(ids)):
+            raise ValueError("Encargo.cobertura tiene ids repetidos")
+        return self
+
+    @property
+    def pendientes(self) -> list[PuntoBrief]:
+        return [p for p in self.cobertura if p.estado == "pendiente"]
+
+
 class Proposal(_Model):
     """Las 10 secciones del formato del entregable (doc 06), todas del mismo estudio.
 
     `marcas` traduce cada `brand_id` a su nombre legible (con tildes); vacío = se muestran los ids.
+    `encargo` recoge lo que pidió el cliente y dónde se trata cada punto (None en propuestas
+    anteriores a la trazabilidad brief → propuesta).
     """
 
     study_id: str
@@ -580,6 +655,7 @@ class Proposal(_Model):
     riesgos: list[Riesgo] = Field(min_length=1)
     hoja_ruta: HojaRuta
     marcas: dict[str, str] = {}
+    encargo: Encargo | None = None
 
     @model_validator(mode="after")
     def _mismo_estudio(self) -> Self:
@@ -601,6 +677,20 @@ class Proposal(_Model):
                 raise ValueError(
                     f"acción {accion.id} enlaza hallazgos inexistentes: {sorted(sueltos)}"
                 )
+        return self
+
+    @model_validator(mode="after")
+    def _encargo_enlazado(self) -> Self:
+        if self.encargo is None:
+            return self
+        acciones = {a.id for a in self.plan.acciones}
+        hallazgos = {f.id for f in self.hallazgos}
+        for punto in self.encargo.cobertura:
+            sueltos = sorted(
+                (set(punto.accion_ids) - acciones) | (set(punto.hallazgo_ids) - hallazgos)
+            )
+            if sueltos:
+                raise ValueError(f"punto {punto.id} del encargo enlaza ids inexistentes: {sueltos}")
         return self
 
 

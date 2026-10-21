@@ -21,6 +21,11 @@
     competidores: su problema es que aparece menos.
   - **Para que C lo enchufe:** falta `StudyRepo.list_by_sector`.
 
+- Trazabilidad brief → propuesta (en curso, `feature/A-trazabilidad-*`): PR 1 contrato aditivo
+  (`Proposal.encargo`, `PuntoBrief`, `BriefSummary.posicionamiento_deseado/atributos_deseados`,
+  `ProposalDraft.cobertura_brief`). Siguen PR 2 (`domain/brief_coverage.py`) y PR 3 (cableado en
+  `write`, prompt y Word).
+
 ## Exactitud de marca (`feature/A-exactitud-marca`, ADR 0011)
 
 - `domain/accuracy.py` (puro):
