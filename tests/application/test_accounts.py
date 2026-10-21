@@ -142,7 +142,8 @@ def test_expired_code_and_expired_session(monkeypatch: pytest.MonkeyPatch) -> No
 
 
 def test_ownership_and_demo_user() -> None:
-    s = service(auth_demo_user="Demo@posiq.local")
+    # Modo demo explícito: no depende de que el entorno exporte LLM_PROVIDER=fixture.
+    s = service(auth_demo_user="Demo@posiq.local", llm_provider="fixture")
     a = s.register(RegisterBody(email="a@b.es", password="12345678")).user
     demo = s.register(RegisterBody(email="demo@posiq.local", password="12345678")).user
     s.repo.set_owner("s1", a.id)
@@ -151,7 +152,7 @@ def test_ownership_and_demo_user() -> None:
     assert s.can_access(demo, "antiguo") and not s.can_access(a, "antiguo")
     assert s.visible_ids(a, ["s1", "antiguo"]) == ["s1"]
     assert s.visible_ids(demo, ["s1", "antiguo"]) == ["antiguo"]
-    assert service().visible_ids(a, ["antiguo"]) == []
+    assert service(llm_provider="deepseek").visible_ids(a, ["antiguo"]) == []
 
 
 def test_rate_limiter_window() -> None:
