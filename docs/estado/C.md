@@ -21,6 +21,8 @@
   limitaciones; la demo en fixture explica en sus supuestos que usa etiquetas del kit y reglas.
   PlanGuard ya no bloquea el plan si su API falla.
 - Demo sin claves: `LLM_PROVIDER=fixture` + `scripts/demo_kit.py`.
+- README de arranque reproducible: requisitos, demo sin claves (API + web o `demo_kit.py`), claves,
+  API, desarrollo y limitaciones. Comprobado desde cero en un worktree el 2026-10-21.
 
 ## Falta
 - Estudio de Alborada con DeepSeek real → `docs/ejemplos/` (bloqueado: falta `DEEPSEEK_API_KEY`).
@@ -30,8 +32,8 @@
   10,56 € y `BUDGET_EUR_MAX` es 5 €: hay que subir el tope o reducir el estudio.
 
 ## Siguiente tarea
-- README de arranque reproducible (clonar, `uv sync`, `.env`, uvicorn, `npm run dev`).
 - Estudio de Alborada con DeepSeek en cuanto haya `DEEPSEEK_API_KEY`.
+- Persistir `StudyRunner.fallos` para que el estado `error` sobreviva a un reinicio.
 
 ## No tocar
 - Cifras: se calculan en `domain/`, nunca en nodos ni en la API.
