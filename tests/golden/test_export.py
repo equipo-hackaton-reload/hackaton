@@ -129,8 +129,9 @@ def proposal(kit: Kit, alborada_brief: BriefSummary) -> Proposal:
             "detrás del líder del sector (Grupo Hospitalario Valdecruz).\n"
             "Se propone un plan estratégico por fases orientado a reforzar la presencia en fuentes "
             "sanitarias de referencia, generar contenido especializado para momentos de decisión y "
-            "recuperar visibilidad en Barcelona, respetando escrupulosamente la normativa de "
-            "publicidad sanitaria y los recursos del equipo."
+            "recuperar visibilidad en Barcelona, dentro de las restricciones del brief y los "
+            "recursos del equipo; cada contenido requiere revisión médica y jurídica antes de "
+            "publicarse."
         ),
         contexto=Contexto(
             marca=alborada_brief.marca,

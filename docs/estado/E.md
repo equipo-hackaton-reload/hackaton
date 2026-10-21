@@ -17,7 +17,9 @@
 - `docs/deck.md` (+ `.html` y `.pdf` con `scripts/build_deck_pdf.py`): 10 diapositivas con las cifras
   de los golden (25,93; 8.ª de 10; 25,9 → 30,8 [27,8–34,0]); sin marcadores `[SCORE]`.
 - `docs/revision-word.md`: revisión del Word para el comité de la clínica (11 secciones).
-- Textos del fixture de Alborada y del golden de exportación más cuidados para el cliente; el
+- Textos del fixture de Alborada y del golden de exportación más cuidados para el cliente (el
+  resumen ejecutivo no promete cumplir la normativa: plan dentro de las restricciones del brief y
+  revisión médica y jurídica de cada contenido antes de publicarse); el
   ejemplo `docs/ejemplos/propuesta_alborada_ejemplo.docx` se regenera con
   `uv run pytest tests/golden/test_export.py`.
 - `.github/CODEOWNERS` con los handles reales de las cinco zonas.

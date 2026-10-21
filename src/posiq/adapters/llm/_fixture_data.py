@@ -301,8 +301,9 @@ def alborada_proposal(
             "pero su prescripción desciende sensiblemente ante consultas abiertas sobre cirugía "
             "refractiva y control de miopía infantil, situándose por detrás del líder del mercado. "
             "Se propone un plan estratégico por fases centrado en fuentes sanitarias de autoridad, "
-            "contenido clínico para momentos de decisión y refuerzo local en Barcelona, respetando "
-            "escrupulosamente la normativa de publicidad sanitaria y los recursos del equipo."
+            "contenido clínico para momentos de decisión y refuerzo local en Barcelona, dentro de "
+            "las restricciones del brief y los recursos del equipo; cada contenido requiere "
+            "revisión médica y jurídica antes de publicarse."
         ),
         contexto=Contexto(
             marca=brief.marca,
