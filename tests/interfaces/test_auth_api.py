@@ -131,6 +131,30 @@ async def test_login_is_rate_limited(repo: SqlStudyRepo) -> None:
     assert codes == [401, 401, 401, 429]
 
 
+async def test_another_ip_cannot_lock_the_owner_out_of_login(repo: SqlStudyRepo) -> None:
+    """El cupo de un correo se cuenta por IP: un atacante agota el suyo, no el del dueño."""
+    app = create_app(runner=build_runner(repo), settings=settings(auth_rate_limit_por_min=3))
+    atacante = httpx.ASGITransport(app=app, client=("6.6.6.6", 1))
+    dueno = httpx.ASGITransport(app=app, client=("2.2.2.2", 1))
+    login = {"email": "a@b.es", "password": "x"}
+    async with httpx.AsyncClient(transport=atacante, base_url=BASE) as c:
+        codes = [(await c.post("/auth/login", json=login)).status_code for _ in range(6)]
+    assert codes == [401, 401, 401, 429, 429, 429]
+    async with httpx.AsyncClient(transport=dueno, base_url=BASE) as c:
+        assert (await c.post("/auth/login", json=login)).status_code == 401
+
+
+async def test_rejected_requests_do_not_store_per_email_keys(repo: SqlStudyRepo) -> None:
+    """Rechazada por la clave de IP, la petición no crea claves por correo (memoria acotada)."""
+    app = create_app(runner=build_runner(repo), settings=settings(auth_rate_limit_por_min=3))
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=BASE) as c:
+        for n in range(20):
+            await c.post("/auth/login", json={"email": f"u{n}@b.es", "password": "x"})
+    accounts = app.state.accounts
+    assert len(accounts.limiter_correo) == 3
+    assert len(accounts.limiter) == 1 + 3  # la clave de IP y ruta y 3 de IP y correo
+
+
 async def test_every_protected_route_needs_a_token(anon: httpx.AsyncClient) -> None:
     assert (await anon.get("/health")).status_code == 200
     rutas = [

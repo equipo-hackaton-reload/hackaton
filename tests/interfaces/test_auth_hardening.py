@@ -8,7 +8,7 @@ import httpx
 import pytest
 
 from posiq.adapters.repo.sql import SqlStudyRepo
-from posiq.application.accounts import DEMO_EMAIL
+from posiq.application.accounts import DEMO_EMAIL, FACTOR_LIMITE_CORREO
 from posiq.interfaces.api.main import create_app
 from posiq.interfaces.api.schemas import AVISO_KIT, StudyCreated
 from tests.auth_helpers import authenticate_async
@@ -37,14 +37,16 @@ async def test_verify_and_resend_share_a_per_email_limit(repo: SqlStudyRepo) -> 
 
 
 async def test_per_email_limit_holds_across_client_ips(repo: SqlStudyRepo) -> None:
+    """Repartir el login entre IPs tiene un tope global por correo (más alto que el de una IP)."""
     app = create_app(runner=build_runner(repo), settings=settings(auth_rate_limit_por_min=2))
+    tope = 2 * FACTOR_LIMITE_CORREO
     codigos = []
-    for ip in ("10.0.0.1", "10.0.0.2", "10.0.0.3"):
-        transport = httpx.ASGITransport(app=app, client=(ip, 1234))
+    for n in range(tope + 1):
+        transport = httpx.ASGITransport(app=app, client=(f"10.0.0.{n}", 1234))
         async with httpx.AsyncClient(transport=transport, base_url=BASE) as c:
             r = await c.post("/auth/login", json={"email": "a@b.es", "password": "x"})
             codigos.append(r.status_code)
-    assert codigos == [401, 401, 429]
+    assert codigos == [401] * tope + [429]
 
 
 async def test_resend_is_limited_per_hour_with_429(repo: SqlStudyRepo) -> None:

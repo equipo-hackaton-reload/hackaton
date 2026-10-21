@@ -13,8 +13,11 @@ Endurecimiento (revisión de #36):
   código (`AccountRepo.count_attempt`): peticiones concurrentes no pasan de `CODIGO_MAX_INTENTOS`
   comparaciones por código.
 - Reenviar da un código nuevo con sus intentos, pero cada correo solo puede pedir
-  `REENVIOS_POR_HORA` códigos por hora (exista o no): como mucho
-  `(1 + REENVIOS_POR_HORA) · CODIGO_MAX_INTENTOS` comparaciones por correo y hora.
+  `REENVIOS_POR_HORA` códigos por hora desde un mismo cliente y `REENVIOS_POR_CORREO_HORA` en
+  total (exista o no): como mucho `(1 + REENVIOS_POR_CORREO_HORA) · CODIGO_MAX_INTENTOS`
+  comparaciones por correo y hora. El límite por cliente y correo es el estrecho; el global, más
+  alto, solo acota la fuerza bruta repartida entre IPs, para que un tercero no bloquee con unas
+  pocas peticiones la verificación de una cuenta ajena (riesgo residual en ADR 0015).
 - Registro y reenvío calculan los mismos hashes exista o no el correo (tiempo parecido).
 - La cuenta de demo con credenciales fijas en el repo (`DEMO_EMAIL`, `scripts/demo_kit.py`) y los
   privilegios de `AUTH_DEMO_USER` solo existen en modo demo (`demo_activo`: códigos de desarrollo
@@ -24,7 +27,7 @@ Endurecimiento (revisión de #36):
 import logging
 import re
 import time
-from collections import defaultdict, deque
+from collections import deque
 from datetime import UTC, datetime, timedelta
 from typing import Annotated, Protocol
 from uuid import uuid4
@@ -45,7 +48,10 @@ log = logging.getLogger(__name__)
 
 CODIGO_TTL = timedelta(minutes=15)
 CODIGO_MAX_INTENTOS = 5
-REENVIOS_POR_HORA = 3
+REENVIOS_POR_HORA = 3  # por correo y cliente
+REENVIOS_POR_CORREO_HORA = 10  # por correo, sumando todos los clientes
+# El límite por minuto global de un correo (todas las IP) es este múltiplo del de cada cliente.
+FACTOR_LIMITE_CORREO = 5
 # Cuenta de demo con contraseña fija en `scripts/demo_kit.py`: solo vale en modo demo.
 DEMO_EMAIL = "demo@posiq.local"
 PASSWORD_MIN = 8
@@ -259,7 +265,9 @@ class AccountService:
         self.dev_codes = dev_codes(settings)
         self.demo = demo_activo(settings)
         self.limiter = RateLimiter(settings.auth_rate_limit_por_min)
+        self.limiter_correo = RateLimiter(settings.auth_rate_limit_por_min * FACTOR_LIMITE_CORREO)
         self.reenvios = RateLimiter(REENVIOS_POR_HORA, ventana_s=3600.0)
+        self.reenvios_correo = RateLimiter(REENVIOS_POR_CORREO_HORA, ventana_s=3600.0)
         # Hash de relleno: un login con un correo inexistente tarda lo mismo que uno real.
         self._dummy_hash = hash_secret(new_token(), self.params)
         if settings.auth_demo_user and not self.demo:
@@ -298,13 +306,15 @@ class AccountService:
         self.repo.add_user(user)
         return Registro(user=user.publico(), codigo=self._issue_code(user.email))
 
-    def resend(self, email: str) -> str | None:
+    def resend(self, email: str, cliente: str = "?") -> str | None:
         """Código nuevo si el correo existe y no está verificado; si no, None (sin revelarlo).
 
-        `TooManyAttempts` si el correo ya pidió `REENVIOS_POR_HORA` códigos en la última hora,
-        exista o no. Sin código que enviar se calcula igualmente un hash, para tardar lo mismo.
+        `TooManyAttempts` si `cliente` ya pidió `REENVIOS_POR_HORA` códigos para ese correo en la
+        última hora, o el correo `REENVIOS_POR_CORREO_HORA` en total, exista o no. La clave global
+        solo se apunta si la del cliente admitió la petición. Sin código que enviar se calcula
+        igualmente un hash, para tardar lo mismo.
         """
-        if not self.reenvios.hit(email):
+        if not self.reenvios.hit(f"{cliente}:{email}") or not self.reenvios_correo.hit(email):
             raise TooManyAttempts()
         user = self.repo.get_user_by_email(email)
         if user is None or user.verificado or self._demo_bloqueado(email):
@@ -404,21 +414,38 @@ class RateLimiter:
     """Límite de intentos por clave y minuto, en memoria del proceso.
 
     Limitación conocida: se pierde al reiniciar y no se comparte entre procesos; vale para un
-    solo worker (ver README, limitaciones).
+    solo worker (ver README, limitaciones). Las claves sin intentos en la ventana se borran (una
+    pasada completa como mucho una vez por ventana), así que la memoria la acota el tráfico de la
+    última ventana y no el número de claves vistas desde el arranque.
     """
 
     def __init__(self, por_minuto: int, ventana_s: float = 60.0) -> None:
         self.por_minuto = por_minuto
         self.ventana_s = ventana_s
-        self._hits: dict[str, deque[float]] = defaultdict(deque)
+        self._hits: dict[str, deque[float]] = {}
+        self._ultima_purga = time.monotonic()
+
+    def __len__(self) -> int:
+        """Claves guardadas ahora mismo."""
+        return len(self._hits)
 
     def hit(self, clave: str) -> bool:
         """Apunta un intento; False si `clave` ya agotó los de la ventana."""
         ahora = time.monotonic()
-        hits = self._hits[clave]
+        self._purgar(ahora)
+        hits = self._hits.setdefault(clave, deque())
         while hits and ahora - hits[0] >= self.ventana_s:
             hits.popleft()
         if len(hits) >= self.por_minuto:
             return False
         hits.append(ahora)
         return True
+
+    def _purgar(self, ahora: float) -> None:
+        """Borra las claves cuyo último intento ya salió de la ventana."""
+        if ahora - self._ultima_purga < self.ventana_s:
+            return
+        self._ultima_purga = ahora
+        caducadas = [k for k, h in self._hits.items() if not h or ahora - h[-1] >= self.ventana_s]
+        for clave in caducadas:
+            del self._hits[clave]

@@ -119,21 +119,43 @@ def test_resend_is_limited_per_email_and_hour_even_for_unknown_emails() -> None:
     s = service()
     s.register(RegisterBody(email="a@b.es", password="12345678"))
     for _ in range(acc.REENVIOS_POR_HORA):
-        assert s.resend("a@b.es") is not None
+        assert s.resend("a@b.es", "1.1.1.1") is not None
     with pytest.raises(TooManyAttempts):
-        s.resend("a@b.es")
+        s.resend("a@b.es", "1.1.1.1")
     for _ in range(acc.REENVIOS_POR_HORA):
-        assert s.resend("nadie@b.es") is None
+        assert s.resend("nadie@b.es", "1.1.1.1") is None
     with pytest.raises(TooManyAttempts):  # mismo trato exista o no: no revela nada
-        s.resend("nadie@b.es")
+        s.resend("nadie@b.es", "1.1.1.1")
+
+
+def test_a_third_party_cannot_exhaust_the_owner_resends() -> None:
+    """Quien agota sus reenvíos para un correo ajeno no deja al dueño sin los suyos."""
+    s = service()
+    s.register(RegisterBody(email="a@b.es", password="12345678"))
+    for _ in range(acc.REENVIOS_POR_HORA + 5):  # los rechazados no gastan el cupo global
+        try:
+            s.resend("a@b.es", "6.6.6.6")
+        except TooManyAttempts:
+            pass
+    assert s.resend("a@b.es", "2.2.2.2") is not None
+
+
+def test_resend_has_a_global_cap_per_email_across_clients() -> None:
+    s = service()
+    s.register(RegisterBody(email="a@b.es", password="12345678"))
+    for n in range(acc.REENVIOS_POR_CORREO_HORA):
+        assert s.resend("a@b.es", f"10.0.0.{n}") is not None
+    with pytest.raises(TooManyAttempts):
+        s.resend("a@b.es", "10.0.1.1")
 
 
 def test_resend_bounds_comparisons_per_email_and_hour() -> None:
+    """Ni repartiendo los reenvíos entre IPs pasa de `(1 + global) · intentos` comparaciones."""
     s = service()
     registro = s.register(RegisterBody(email="a@b.es", password="12345678"))
     fallos = 0
     codigos = [registro.codigo]
-    while True:
+    for n in range(1000):
         for _ in range(acc.CODIGO_MAX_INTENTOS + 1):
             try:
                 s.verify("a@b.es", otro(codigos[-1]))
@@ -142,12 +164,12 @@ def test_resend_bounds_comparisons_per_email_and_hour() -> None:
             except TooManyAttempts:
                 break
         try:
-            nuevo = s.resend("a@b.es")
+            nuevo = s.resend("a@b.es", f"10.0.0.{n}")
         except TooManyAttempts:
             break
         assert nuevo is not None
         codigos.append(nuevo)
-    assert fallos == (1 + acc.REENVIOS_POR_HORA) * acc.CODIGO_MAX_INTENTOS
+    assert fallos == (1 + acc.REENVIOS_POR_CORREO_HORA) * acc.CODIGO_MAX_INTENTOS
 
 
 # --- 3. Tiempo uniforme ---------------------------------------------------------------------------

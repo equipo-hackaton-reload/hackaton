@@ -43,7 +43,10 @@
   **La web necesita login (zona D)**: sin él, contra la API real todo da 401.
 - Revisión de cuentas (`feature/C-cuentas-coste-fixes`): intentos de verificación atómicos
   (`AccountRepo.count_attempt`, `UPDATE … RETURNING`, contado antes de comparar); 3 reenvíos por
-  correo y hora; límite también por correo (verificar y reenviar comparten clave); tiempo igual
+  correo, cliente y hora y 10 por correo; límite por IP y ruta, por IP y correo y por correo con
+  umbral 5 veces mayor, con cortocircuito (verificar y reenviar comparten clave; el bloqueo de
+  cuentas ajenas queda como riesgo residual, ADR 0015 punto 10); `RateLimiter` purga claves
+  caducadas; tiempo igual
   exista o no el correo en alta y reenvío; el 409 del alta se mantiene (riesgo aceptado, ADR 0015
   punto 11); brief leído en streaming con tope (413 sin `Content-Length`); cuenta de demo y
   `AUTH_DEMO_USER` solo en modo demo (`demo_activo`, si no 403 `cuenta_demo_desactivada`). El

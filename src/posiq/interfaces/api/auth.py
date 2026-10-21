@@ -100,15 +100,26 @@ def current_user(request: Request, accounts: Accounts) -> Usuario:
 CurrentUser = Annotated[Usuario, Depends(current_user)]
 
 
+def _cliente(request: Request) -> str:
+    return request.client.host if request.client else "?"
+
+
 def _limit(request: Request, accounts: AccountService, correo: str | None = None) -> None:
-    """429 si el cliente (IP y ruta) o, con `correo`, esa clave por correo agotó sus intentos."""
-    cliente = request.client.host if request.client else "?"
-    claves = [f"ip:{cliente}:{request.url.path}"]
+    """429 si el cliente agotó sus intentos en la ruta o, con `correo`, para ese correo.
+
+    Con `correo` hay tres claves, de la más estrecha a la más ancha: IP y ruta, IP y correo, y el
+    correo desde cualquier IP (con un umbral `FACTOR_LIMITE_CORREO` veces mayor). Se cortocircuita:
+    una petición ya rechazada no se apunta en las claves siguientes, así que un cliente limitado
+    no crea claves nuevas (memoria) ni gasta el cupo global del correo (bloqueo de cuentas ajenas).
+    """
+    cliente = _cliente(request)
+    claves = [(accounts.limiter, f"ip:{cliente}:{request.url.path}")]
     if correo is not None:
-        claves.append(f"correo:{correo}")
-    # Se apuntan todas (sin cortocircuito): cada intento cuenta en cada clave.
-    if not all([accounts.limiter.hit(clave) for clave in claves]):
-        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "demasiados_intentos")
+        claves.append((accounts.limiter, f"ip-correo:{cliente}:{correo}"))
+        claves.append((accounts.limiter_correo, f"correo:{correo}"))
+    for limiter, clave in claves:
+        if not limiter.hit(clave):
+            raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "demasiados_intentos")
 
 
 def correo_clave(ruta: str, email: str) -> str:
@@ -160,11 +171,12 @@ def verify(request: Request, body: VerifyBody, accounts: Accounts) -> UserRespon
 def resend(request: Request, body: EmailBody, accounts: Accounts) -> JSONResponse:
     """202 exista o no el correo, para no revelar qué correos están registrados.
 
-    429 si el correo pidió ya 3 códigos en la última hora (también si no existe).
+    429 si este cliente pidió ya 3 códigos para el correo en la última hora, o el correo 10 en
+    total (también si no existe).
     """
     _limit(request, accounts, correo_clave("reenviar", body.email))
     try:
-        codigo = accounts.resend(body.email)
+        codigo = accounts.resend(body.email, _cliente(request))
     except AccountError as exc:
         raise _http(exc) from exc
     return JSONResponse(_verificacion(accounts, codigo), status_code=status.HTTP_202_ACCEPTED)

@@ -161,3 +161,16 @@ def test_rate_limiter_window() -> None:
     assert limiter.hit("otra")
     limiter.ventana_s = 0
     assert limiter.hit("k")
+
+
+def test_rate_limiter_forgets_expired_keys(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Las claves sin intentos en la ventana se borran: la memoria no crece con cada correo."""
+    reloj = [1000.0]
+    monkeypatch.setattr(acc.time, "monotonic", lambda: reloj[0])
+    limiter = RateLimiter(1, ventana_s=60)
+    for n in range(100):
+        limiter.hit(f"correo:{n}@b.es")
+    assert len(limiter) == 100
+    reloj[0] += 61
+    assert limiter.hit("otra")
+    assert len(limiter) == 1

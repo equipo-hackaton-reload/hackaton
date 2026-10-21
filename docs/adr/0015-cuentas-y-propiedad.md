@@ -51,11 +51,24 @@ solo del navegador y `GET /studies` listaba los estudios de todo el mundo.
    `UPDATE verification SET intentos = intentos + 1 WHERE email = ? AND intentos < 5 RETURNING …`
    **antes** de comparar el código. Antes era lectura-modificación-escritura sin bloqueo y, con las
    rutas `def` en el threadpool, peticiones simultáneas comparaban más de 5 veces.
-10. **Reenvíos limitados.** Reenviar da un código nuevo (con sus 5 intentos), pero cada correo
-    solo puede pedir 3 por hora (`REENVIOS_POR_HORA`; el cuarto, 429, exista o no el correo). Cota:
-    20 comparaciones por correo y hora. El límite por minuto cuenta también por correo en login,
-    verificación y reenvío; verificar y reenviar comparten la clave del correo, así que repartir
-    los intentos entre IPs o entre las dos rutas no da más intentos.
+10. **Reenvíos limitados.** Reenviar da un código nuevo (con sus 5 intentos), pero cada cliente
+    solo puede pedir 3 por hora para un correo (`REENVIOS_POR_HORA`; el cuarto, 429, exista o no
+    el correo) y el correo 10 en total (`REENVIOS_POR_CORREO_HORA`). Cota: 55 comparaciones por
+    correo y hora frente a un código de 6 dígitos. En login, verificación y reenvío el límite por
+    minuto tiene tres claves: IP y ruta, IP y correo (`AUTH_RATE_LIMIT_POR_MIN`), y el correo desde
+    cualquier IP con un umbral 5 veces mayor (`FACTOR_LIMITE_CORREO`); verificar y reenviar
+    comparten las claves del correo. Las claves se comprueban en ese orden y con cortocircuito: una
+    petición rechazada no se apunta en las siguientes, así que no gasta el cupo global del correo
+    ni crea claves nuevas. `RateLimiter` borra las claves sin intentos en la ventana (una pasada
+    por ventana), así que su memoria la acota el tráfico reciente y no los correos vistos.
+    **Riesgo aceptado (bloqueo de cuentas ajenas).** Con los cupos solo por correo (revisión
+    anterior), 8 peticiones por hora desde una IP dejaban a un tercero sin poder verificar y 10
+    logins por minuto le cerraban el login. Ahora un atacante con una sola IP solo gasta su propio
+    cupo; para bloquear el correo de otro necesita repartir las peticiones entre al menos 4 IPs
+    por hora (reenvíos) o 5 por minuto (login). Sigue siendo posible quemar los 5 intentos del
+    código pendiente o sustituirlo con un reenvío: no filtra nada y el dueño pide otro código. Se
+    acepta para el prototipo; en producción, correo con enlace firmado, CAPTCHA tras el primer
+    429 y límites en un almacén compartido (Redis) en lugar de la memoria del proceso.
 11. **Enumeración.** `POST /auth/register` sigue respondiendo **409** si el correo existe: la web
     (PR #38) lo usa para ofrecer el login y `scripts/demo_kit.py` para saltarse el alta. **Riesgo
     aceptado**: revela qué correos están registrados, acotado por el límite de intentos por IP. Lo
