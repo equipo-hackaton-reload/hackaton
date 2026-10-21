@@ -11,6 +11,7 @@ from posiq.domain.schemas import (
     Finding,
     Market,
     Metrics,
+    MetricsDelta,
     ModoEstudio,
     Motor,
     Plan,
@@ -37,6 +38,13 @@ class StudyCreated(BaseModel):
     study_id: str
 
 
+class RemeasureCreated(BaseModel):
+    """Estudio nuevo que re-mide `remedicion_de` con su brief y su mercado confirmado."""
+
+    study_id: str
+    remedicion_de: str
+
+
 class StudyView(BaseModel):
     study: Study
     estado: EstadoApi
@@ -46,6 +54,8 @@ class StudyView(BaseModel):
     brief: BriefSummary | None = None
     market: Market | None = None
     metrics: Metrics | None = None
+    # Diferencia con la medición anterior de la marca (None en la primera medición).
+    metrics_delta: MetricsDelta | None = None
     findings: list[Finding] | None = None
     plan: Plan | None = None
     # Ayudas a la revisión del plan: proyección del score (estimación con supuestos, no promesa)

@@ -5,6 +5,7 @@ Formato [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); versionado 
 ## [Unreleased]
 
 ### Added
+- Re-medición (zona C): `POST /studies/{id}/remeasure` crea un estudio nuevo con el brief y el mercado confirmado de un estudio completado (409 si no lo está), arranca en `prompts` y compara con la medición anterior; `GET /studies/{id}` expone `metrics_delta`.
 - Simulación del impacto y calidad del plan en el grafo (zona C): el nodo `plan` añade `simulacion` (`simulate_plan`) y `calidad_plan` (PlanGuard, solo con claves de juez; sin ellas queda en null y no bloquea), se recalculan si la persona edita el plan y se exponen en `GET /studies/{id}`. El checkpointer admite los modelos de `simulation_schemas` y `quality_schemas`.
 - Cifras canónicas de la demo (zona A): score de Alborada 25,93 con etiquetas del kit (25,87 con el juez por reglas de la API en fixture), 8.ª de 10 y proyección 25,9 → 30,8, en `tests/golden/test_demo_canonico.py`; `posiq.db*` en `.gitignore`.
 - Cierre e integración (zona A): `.claude/settings.json` con permisos de PR, push y uv; reglas de pre-commit, CHANGELOG por PR y protección de ramas en plan gratuito en CONTRIBUTING; `docs/estado/A–E.md` y `docs/plan-b.md`.
