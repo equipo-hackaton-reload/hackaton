@@ -5,14 +5,16 @@ import { useCreateStudy, useEstimate } from "../api/hooks";
 import briefEjemplo from "../assets/brief-ejemplo.md?raw";
 import { AppShell } from "../components/AppShell";
 import { PageTitle } from "../components/PageTitle";
-import { fmtEur, fmtInt } from "../lib/format";
+import { CostEstimateView } from "../components/CostEstimateView";
+import { fmtInt } from "../lib/format";
 import type { ModoEstudio } from "../types/schemas";
 
 const MODOS: { value: ModoEstudio; label: string; detail: string }[] = [
   {
     value: "kit",
     label: "Kit",
-    detail: "Usa las respuestas del kit del reto (624 ejecuciones). Los motores no cuestan nada.",
+    detail:
+      "Usa las respuestas del kit del reto (624 ejecuciones): no se pregunta a los motores, pero el juez y la redacción sí pueden tener coste.",
   },
   {
     value: "real",
@@ -29,39 +31,19 @@ const PASOS = [
   ["Redacta la propuesta", "para el comité, en Word o PDF."],
 ] as const;
 
-function Estimacion() {
-  const q = useEstimate(true);
-  if (q.isPending) return <p className="text-muted">Calculando la estimación…</p>;
-  if (q.isError || !q.data) {
-    return <p className="text-muted">La API no ha devuelto una estimación de coste.</p>;
-  }
-  const { llamadas, coste_estimado_eur, presupuesto_max_eur } = q.data;
-  const excede = coste_estimado_eur > presupuesto_max_eur;
-  return (
-    <dl className="grid grid-cols-3 gap-3" data-testid="estimacion">
-      <div>
-        <dt className="text-meta text-muted">Llamadas</dt>
-        <dd className="num mt-0.5 text-section font-medium">{fmtInt(llamadas)}</dd>
-      </div>
-      <div>
-        <dt className="text-meta text-muted">Coste estimado</dt>
-        <dd className={`num mt-0.5 text-section font-medium ${excede ? "text-negative" : ""}`}>
-          {fmtEur(coste_estimado_eur)}
-        </dd>
-      </div>
-      <div>
-        <dt className="text-meta text-muted">Tope</dt>
-        <dd className="num mt-0.5 text-section text-muted">{fmtEur(presupuesto_max_eur)}</dd>
-      </div>
-    </dl>
-  );
-}
-
 export function NewStudyPage() {
   const navigate = useNavigate();
   const create = useCreateStudy();
   const [brief, setBrief] = useState("");
   const [modo, setModo] = useState<ModoEstudio>("kit");
+  const estimacion = useEstimate(modo);
+  const [aceptaCoste, setAceptaCoste] = useState(false);
+  const aceptaId = useId();
+  // En real, si la estimación supera el tope (o no se ha podido calcular) hace falta confirmarlo.
+  const est = estimacion.data;
+  const requiereConfirmar =
+    modo === "real" && (estimacion.isError || (est != null && est.coste_estimado_eur > est.presupuesto_max_eur));
+  const bloqueadoPorCoste = modo === "real" && (estimacion.isPending || (requiereConfirmar && !aceptaCoste));
   const [origen, setOrigen] = useState<string | null>(null);
   const [errorFichero, setErrorFichero] = useState<string | null>(null);
   const briefId = useId();
@@ -82,7 +64,7 @@ export function NewStudyPage() {
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!brief.trim()) return;
+    if (!brief.trim() || bloqueadoPorCoste) return;
     create.mutate(
       { brief_texto: brief, modo },
       { onSuccess: ({ study_id }) => navigate(`/studies/${study_id}/competidores`) },
@@ -168,7 +150,10 @@ export function NewStudyPage() {
                     name="modo"
                     value={m.value}
                     checked={modo === m.value}
-                    onChange={() => setModo(m.value)}
+                    onChange={() => {
+                      setModo(m.value);
+                      setAceptaCoste(false);
+                    }}
                     className="sr-only"
                   />
                   {m.label}
@@ -176,18 +161,36 @@ export function NewStudyPage() {
               ))}
             </div>
             <p className="mt-3 text-muted">{MODOS.find((m) => m.value === modo)!.detail}</p>
-            {modo === "real" && (
-              <div className="mt-4 border-t border-rule pt-4">
-                <Estimacion />
-              </div>
-            )}
+            <div className="mt-4 border-t border-rule pt-4">
+              {estimacion.isPending ? (
+                <p className="text-muted">Calculando la estimación…</p>
+              ) : est ? (
+                <CostEstimateView estimate={est} />
+              ) : (
+                <p className="text-muted">La API no ha devuelto una estimación de coste.</p>
+              )}
+              {requiereConfirmar && (
+                <label htmlFor={aceptaId} className="mt-3 flex cursor-pointer items-start gap-2.5 rounded-control bg-pill-warn-bg px-3 py-2 text-meta text-pill-warn-ink">
+                  <input
+                    id={aceptaId}
+                    type="checkbox"
+                    checked={aceptaCoste}
+                    onChange={(ev) => setAceptaCoste(ev.target.checked)}
+                    className="mt-0.5 size-4 flex-none accent-[var(--accent)]"
+                  />
+                  {estimacion.isError
+                    ? "No hay estimación. Entiendo que el estudio real tiene coste y quiero lanzarlo igualmente."
+                    : "Entiendo que la estimación supera el tope y quiero lanzarlo igualmente."}
+                </label>
+              )}
+            </div>
           </fieldset>
 
           <div>
             <button
               type="submit"
               className="btn-primary h-10 w-full"
-              disabled={!brief.trim() || create.isPending}
+              disabled={!brief.trim() || create.isPending || bloqueadoPorCoste}
             >
               {create.isPending ? "Creando el estudio…" : "Analizar"}
             </button>

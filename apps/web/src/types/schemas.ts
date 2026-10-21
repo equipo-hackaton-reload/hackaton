@@ -54,6 +54,15 @@ export type Palanca =
   | "medicion";
 export type Dimension = "global" | "motor" | "fase" | "ciudad" | "perfil" | "familia";
 export type UnidadCifra = "fraccion" | "puntos" | "recuento" | "eur";
+export type TipoPuntoBrief =
+  | "objetivo"
+  | "restriccion"
+  | "servicio_prioritario"
+  | "ciudad"
+  | "publico"
+  | "competidor"
+  | "presupuesto";
+export type EstadoCobertura = "cubierto" | "pendiente";
 
 /** Fecha ISO 8601 tal como la serializa Pydantic. */
 export type DateTimeISO = string;
@@ -83,6 +92,9 @@ export interface BriefSummary {
   objetivos: string[];
   audiencia_del_entregable: string;
   tono: string;
+  /** Cómo quiere verse la marca (identidad deseada); vacío si el brief no lo dice. */
+  posicionamiento_deseado: string;
+  atributos_deseados: string[];
 }
 
 export interface Market {
@@ -383,6 +395,29 @@ export interface HojaRuta {
   seguimiento: string;
 }
 
+/** Un punto del brief y dónde se trata en la propuesta (ADR 0013). */
+export interface PuntoBrief {
+  id: string;
+  tipo: TipoPuntoBrief;
+  texto: string;
+  accion_ids: string[];
+  hallazgo_ids: string[];
+  estado: EstadoCobertura;
+  motivo: string;
+}
+
+/** Lo que pidió el cliente, tal cual, con su cobertura en la propuesta. */
+export interface Encargo {
+  objetivos: string[];
+  restricciones: string[];
+  servicios_prioritarios: string[];
+  ciudades: string[];
+  publicos: string[];
+  competidores_declarados: string[];
+  presupuesto_anual_eur: [number, number] | null;
+  cobertura: PuntoBrief[];
+}
+
 export interface Proposal {
   study_id: string;
   resumen_ejecutivo: string;
@@ -397,6 +432,8 @@ export interface Proposal {
   hoja_ruta: HojaRuta;
   /** `brand_id` → nombre legible; vacío = se muestran los ids. */
   marcas: Record<string, string>;
+  /** null en propuestas antiguas. */
+  encargo?: Encargo | null;
 }
 
 // --- Trazas --------------------------------------------------------------------------------------

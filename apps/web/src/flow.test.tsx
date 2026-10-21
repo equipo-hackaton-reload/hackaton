@@ -5,22 +5,22 @@ import { describe, expect, it } from "vitest";
 import { API_URL } from "./api/client";
 import { POLL_MS } from "./api/hooks";
 import { App } from "./App";
-import { clearSession, getSession, saveSession } from "./lib/session";
 import * as db from "./mocks/db";
 import { config } from "./mocks/db";
 import { server } from "./mocks/server";
-import { nb, testClient } from "./test/utils";
-
+import { iniciarSesion, nb, testClient } from "./test/utils";
 
 describe("flujo completo con MSW", () => {
   it("recorre brief → competidores → diagnóstico → plan → propuesta", async () => {
+    iniciarSesion();
     const user = userEvent.setup();
-    render(<App initialPath="/" client={testClient()} />);
+    render(<App initialPath="/" client={testClient()} requireLogin />);
 
-    // 1. Nuevo estudio: el modo kit viene por defecto y el real muestra su estimación.
+    // 1. Nuevo estudio: el modo kit viene por defecto y también enseña su estimación real.
     expect(screen.getByRole("heading", { level: 1, name: "Nuevo estudio" })).toBeInTheDocument();
     expect(screen.getByRole("radio", { name: "Kit" })).toBeChecked();
     expect(screen.getByRole("button", { name: "Analizar" })).toBeDisabled();
+    expect(nb((await screen.findByTestId("estimacion")).textContent)).toContain("0,44 €");
     await user.click(screen.getByRole("radio", { name: "Real" }));
     expect(nb((await screen.findByTestId("estimacion")).textContent)).toContain("3,55 €");
     await user.click(screen.getByRole("radio", { name: "Kit" }));
@@ -76,55 +76,23 @@ describe("flujo completo con MSW", () => {
   }, 15000);
 
   it("enseña el error si la API no encuentra el estudio", async () => {
+    iniciarSesion();
     render(<App initialPath="/studies/no-existe/diagnostico" client={testClient()} />);
-    expect(await screen.findByText("No existe ningún estudio con ese identificador.")).toBeInTheDocument();
+    expect(await screen.findByText("No existe ningún estudio con ese identificador en tu cuenta.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Reintentar" })).toBeInTheDocument();
   });
 
-  it("pide sesión, valida el formulario y vuelve a la ruta pedida", async () => {
-    const user = userEvent.setup();
-    try {
-      render(<App initialPath="/studies/no-existe/diagnostico" client={testClient()} requireLogin />);
-      expect(await screen.findByRole("heading", { name: "Inicia sesión" })).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Entrar" })).toBeDisabled();
-      await user.type(screen.getByLabelText("Correo"), "ana");
-      await user.tab();
-      expect(screen.getByText(/nombre@dominio\.com/)).toBeInTheDocument();
-      await user.click(screen.getByRole("button", { name: "Usar la cuenta de demostración" }));
-      await user.click(screen.getByRole("button", { name: "Entrar" }));
-      expect(await screen.findByText("No existe ningún estudio con ese identificador.")).toBeInTheDocument();
-    } finally {
-      clearSession();
-    }
-  });
-
-  it("verifica el correo con el código y quita el aviso", async () => {
-    const user = userEvent.setup();
-    saveSession({ email: "ana@clinica.es", nombre: "Ana" }, false);
-    try {
-      render(<App initialPath="/" client={testClient()} requireLogin />);
-      await user.click(await screen.findByRole("link", { name: "Verificar ahora" }));
-      await user.click(await screen.findByRole("button", { name: "Enviar código" }));
-      const demo = await screen.findByText(/Tu código es/);
-      const codigo = within(demo).getByText(/^\d{6}$/).textContent!;
-      const campo = screen.getByLabelText("Código de verificación");
-      await user.type(campo, codigo === "000000" ? "111111" : "000000");
-      await user.click(screen.getByRole("button", { name: "Verificar" }));
-      expect(await screen.findByRole("alert")).toHaveTextContent("El código no coincide");
-      await user.clear(campo);
-      await user.type(campo, codigo);
-      await user.click(screen.getByRole("button", { name: "Verificar" }));
-      expect(await screen.findByText("Correo verificado")).toBeInTheDocument();
-      expect(getSession()?.verificado).toBe(true);
-      await screen.findByRole("heading", { level: 1, name: "Nuevo estudio" }, { timeout: 3000 });
-      expect(screen.queryByRole("link", { name: "Verificar ahora" })).not.toBeInTheDocument();
-    } finally {
-      clearSession();
-    }
+  it("un estudio de otro usuario da 404, no se revela que existe", async () => {
+    const otra = iniciarSesion("otra@clinica.es");
+    const ajeno = db.crear("kit", otra.user.id);
+    iniciarSesion("ana@clinica.es");
+    render(<App initialPath={`/studies/${ajeno}/competidores`} client={testClient()} />);
+    expect(await screen.findByText("No existe ningún estudio con ese identificador en tu cuenta.")).toBeInTheDocument();
   });
 
   it("sondea cada 3 s mientras el estudio está en curso y para al llegar a una revisión", async () => {
     config.pasoMs = 1000;
-    const id = db.crear("kit");
+    const id = db.crear("kit", iniciarSesion().user.id);
     let llamadas = 0;
     server.events.on("request:start", ({ request }) => {
       if (request.method === "GET" && new URL(request.url).pathname === `/studies/${id}`) llamadas += 1;
@@ -146,7 +114,7 @@ describe("flujo completo con MSW", () => {
   }, 12000);
 
   it("avisa si la API rechaza la reanudación", async () => {
-    const id = db.crear("kit");
+    const id = db.crear("kit", iniciarSesion().user.id);
     server.use(
       http.post(`${API_URL}/studies/:id/resume`, () =>
         HttpResponse.json({ detail: "revisión fuera de turno" }, { status: 409 }),

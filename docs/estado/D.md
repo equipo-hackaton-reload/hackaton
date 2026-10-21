@@ -6,15 +6,41 @@
 - Consume `/studies`, `/studies/{id}`, `/resume`, `/traces`, `/evaluations` y `GET /estimate`.
 - La tarjeta de simulación y calidad del plan ya están conectadas a los campos opcionales de C;
   el mock incluye rangos por fase y calidad por acción.
-- El diagnóstico ya ofrece re-medición mock y vista del delta; queda probarlo cuando C publique
-  `POST /studies/{id}/remeasure`.
+
+## En `feature/D-cuentas-seguimiento` (PR abierta, sin fusionar)
+- Cuentas contra el contrato HTTP de `/auth/*` (aún no existe en la API; mocks MSW fieles en
+  `src/mocks/auth.ts` y `handlers.ts`): registro → verificación con código (la web solo enseña
+  `codigo_dev` si la API lo devuelve) → login con token Bearer. Token en sessionStorage, o
+  localStorage con «Recordarme». `api/client.ts` envía `Authorization` y, ante un 401, limpia la
+  sesión y vuelve a `/login?next=<ruta>`. «Salir» llama a `POST /auth/logout`. La caché de TanStack
+  Query se vacía al cambiar de usuario.
+- Seguimiento: `/marcas` (`GET /brands`) y `/marcas/:brandId` (`GET /brands/{id}/serie`): gráfico
+  SVG del score con banda del intervalo y media de competidores (las líneas se cortan en los puntos
+  no comparables, marcados con círculo hueco y motivo), resumen, lista solo de
+  `cambios_significativos` («Sin cambios fuera del margen de error» si no hay), tabla de mediciones e
+  indicadores adelantados. No se calcula ninguna cifra: se pinta `SerieMarca`.
+- «Volver a medir» (diagnóstico y seguimiento): `GET /studies/{id}/remeasure/estimate`, diálogo con
+  el coste y `POST /remeasure {confirmado: true, coste_estimado_eur}`. Ante 409 vuelve a pedir la
+  estimación: si cambió, enseña el coste nuevo; si no, avisa de que ya hay una re-medición en curso.
+- Arreglos de la auditoría: estado `error` (aviso con `errores`, «Volver a comprobar», sin spinner
+  infinito), fallo puntual del sondeo sin tapar la pantalla, estimación también en kit y
+  confirmación explícita en real si supera el tope, KPI de fracción como porcentaje y borrador del
+  plan que sobrevive al cambio de pestaña (`lib/planDraft.ts`).
+- Tipos: `types/auth.ts`, `types/tracking.ts` (espejo de `domain/tracking_schemas.py`, que aún no
+  existe) y `EstadoApi = EstadoEstudio | "error"` en `types/api.ts`. `types/schemas.ts` vuelve a
+  estar alineado con `schemas.py` (`Encargo`, `PuntoBrief`, `posicionamiento_deseado`,
+  `atributos_deseados`); falta pintar el encargo.
 
 ## Falta
-- Probar la integración con la API de C usando `LLM_PROVIDER=fixture`.
-- Pulir la interfaz, ejecutar build de producción y capturar la demo.
+- Integrar contra la API real cuando C fusione `/auth/*`, `/brands`, `/serie` y
+  `/remeasure/estimate`; comprobar el formato de `expira_en` (la web acepta ISO o segundos) y si
+  `POST /auth/verify/reenviar` devuelve `codigo_dev` en el cuerpo (la web lo lee si viene).
+- `Objective` no trae `unidad`: la web la infiere (KPI de tasa con valores 0-1 → porcentaje). Si A
+  añade `unidad` al objetivo, la web ya la usa.
+- Mostrar `proposal.encargo` (ver abajo).
 
 ## Siguiente tarea
-- `feature/D-simulacion`: mock implementado; pendiente validación contra la API real y capturas.
+- Integración de cuentas y seguimiento con la API real; capturas de la demo.
 
 ## No tocar
 - No calcular cifras en el front: se pintan las que da la API.

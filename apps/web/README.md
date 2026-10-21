@@ -69,7 +69,8 @@ src/
   api/        cliente HTTP, hooks de TanStack Query (sondeo de 3 s) y QueryClient
   components/ bloques de pantalla: score, ranking, visibilidad, fuentes, hallazgos, evidencias,
               editores de marcas y acciones, trazas
-  pages/      las cinco pantallas y el layout del estudio con la barra de estado
+  pages/      cuentas (login, registro, verificación), las cinco pantallas del estudio, su layout
+              y el seguimiento por marca
   mocks/      handlers de MSW, estudios en memoria y fixtures del kit
   types/      espejo de schemas.py (schemas.ts) y contrato HTTP (api.ts)
   lib/        formato es-ES y utilidades sin React
@@ -93,8 +94,31 @@ Endpoints que la web **asume además** y que la zona C debe confirmar. Si no exi
 |---|---|---|---|
 | GET | `/studies/{id}/evaluations?ids=a,b` | `[{evaluation, motor, prompt, texto_respuesta, fuentes}]` | El panel de evidencias muestra solo los ids |
 | GET | `/studies/{id}/traces` | `Trace[]` | El panel de trazas dice que no hay datos |
-| POST | `/studies/{id}/remeasure` | `{study_id}` (202) | La API debe crear una nueva medición con el brief y mercado confirmados |
-| GET | `/estimate?modo=real` | `{llamadas, coste_estimado_eur, presupuesto_max_eur}` | Sin estimación en la pantalla 1 |
+| GET | `/estimate?modo=kit\|real` | `{llamadas, coste_estimado_eur, presupuesto_max_eur, …}` | Sin estimación en la pantalla 1; en real hay que confirmar para lanzar |
+
+### Cuentas y seguimiento (contrato acordado con C; mientras no esté en la API, lo simula MSW)
+
+Todo endpoint salvo `/health` y `/auth/register|verify|verify/reenviar|login` exige
+`Authorization: Bearer <token>`; sin él o caducado, 401 y la web vuelve a `/login?next=<ruta>`. Un
+estudio ajeno responde 404.
+
+| Método | Ruta | Cuerpo | Respuesta |
+|---|---|---|---|
+| POST | `/auth/register` | `{email, password, nombre?}` | 201 `{user, verificacion: {enviado, codigo_dev?}}`; 409 si existe; 422 si la contraseña tiene menos de 8 caracteres |
+| POST | `/auth/verify` | `{email, codigo}` | 200 `{user}`; 429 tras 5 intentos |
+| POST | `/auth/verify/reenviar` | `{email}` | 202 |
+| POST | `/auth/login` | `{email, password}` | 200 `{token, expira_en, user}`; 401; 403 `correo_no_verificado` |
+| POST | `/auth/logout` | — | 204 |
+| GET | `/auth/me` | — | `{user}` |
+| GET | `/brands` | — | `[{brand_id, nombre, n_mediciones, ultima_medicion}]` |
+| GET | `/brands/{id}/serie` | — | `SerieMarca` (`src/types/tracking.ts`) |
+| GET | `/studies/{id}/remeasure/estimate` | — | `CostEstimate` |
+| POST | `/studies/{id}/remeasure` | `{confirmado: true, coste_estimado_eur}` | 201 `{study_id, remedicion_de}`; 400; 409 (coste cambiado o re-medición en curso) |
+| GET | `/estimate?modo=kit\|real` | — | `CostEstimate` (también en kit: el juez puede costar) |
+
+Con los mocks, la cuenta de demostración es `demo@posiq.app` / `demo1234`; trae dos mediciones de
+ejemplo anteriores para que el seguimiento muestre un cambio de método y un cambio significativo.
+Cualquier otra cuenta se registra en la propia web (el código aparece en pantalla: modo demo).
 
 Supuestos de comportamiento:
 

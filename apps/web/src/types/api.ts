@@ -15,6 +15,9 @@ import type {
 } from "./schemas";
 
 export type Revision = "competidores" | "plan";
+
+/** Estado que da la API: el del dominio más `error` (el grafo se ha detenido; ver `errores`). */
+export type EstadoApi = EstadoEstudio | "error";
 export type FormatoExport = "docx" | "pdf";
 
 /** `POST /studies` */
@@ -26,14 +29,12 @@ export interface CreateStudyResponse {
   study_id: string;
 }
 
-export interface RemeasureResponse {
-  study_id: string;
-}
+export type { RemeasureCreated as RemeasureResponse } from "./tracking";
 
 /** `GET /studies/{id}`: los bloques opcionales aparecen a medida que el grafo los produce. */
 export interface StudyStatus {
   study: Study;
-  estado: EstadoEstudio;
+  estado: EstadoApi;
   revision_pendiente: Revision | null;
   coste_acumulado_eur: number;
   errores: string[];
@@ -133,9 +134,15 @@ export interface Evidence {
   fuentes: string[];
 }
 
-/** `GET /estimate?modo=real` → estimación previa del coste de un estudio. */
+/**
+ * `GET /estimate?modo=kit|real` y `GET /studies/{id}/remeasure/estimate` → estimación previa del
+ * coste. En modo kit los motores no cuestan, pero el juez puede tener coste.
+ */
 export interface CostEstimate {
   llamadas: number;
   coste_estimado_eur: number;
+  coste_motores_eur?: number;
+  coste_juez_eur?: number;
+  juez?: string;
   presupuesto_max_eur: number;
 }

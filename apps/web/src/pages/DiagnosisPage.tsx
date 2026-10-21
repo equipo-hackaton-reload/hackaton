@@ -1,10 +1,9 @@
-import { Link, useNavigate } from "react-router-dom";
-import { ApiError } from "../api/client";
-import { useRemeasure } from "../api/hooks";
+import { Link } from "react-router-dom";
 import { FindingsList } from "../components/FindingsList";
 import { KitNotice } from "../components/KitNotice";
 import { PageTitle } from "../components/PageTitle";
 import { RankingChart } from "../components/RankingChart";
+import { RemeasureButton } from "../components/RemeasureButton";
 import { ScoreCard } from "../components/ScoreCard";
 import { SourcesPanel } from "../components/SourcesPanel";
 import { Waiting } from "../components/States";
@@ -59,16 +58,8 @@ function DeltaPanel({ delta }: { delta: MetricsDelta }) {
 
 export function DiagnosisPage() {
   const { id, status } = useStudyContext();
-  const navigate = useNavigate();
-  const remeasure = useRemeasure();
   const { metrics, findings, market } = status;
   const kit = status.study.modo === "kit";
-
-  function startRemeasure() {
-    remeasure.mutate(id, {
-      onSuccess: ({ study_id }) => navigate(`/studies/${study_id}/diagnostico`),
-    });
-  }
 
   if (!metrics || !findings) {
     return (
@@ -108,22 +99,15 @@ export function DiagnosisPage() {
                 {status.revision_pendiente === "plan" ? "Revisar el plan" : "Ver el plan"}
               </Link>
             )}
-            {status.estado === "completado" && (
-              <button type="button" className="btn-secondary" onClick={startRemeasure} disabled={remeasure.isPending}>
-                {remeasure.isPending ? "Preparando…" : "Volver a medir"}
-              </button>
-            )}
+            {status.estado === "completado" && <RemeasureButton studyId={id} />}
+            <Link to={`/marcas/${encodeURIComponent(status.study.brand_id)}`} className="btn-ghost">
+              Ver el seguimiento
+            </Link>
           </div>
         }
       >
         {kit && <KitNotice />}
       </PageTitle>
-
-      {remeasure.isError && (
-        <p role="alert" className="mb-6 rounded-control bg-pill-neg-bg px-4 py-3 text-pill-neg-ink">
-          {remeasure.error instanceof ApiError ? remeasure.error.message : "No se pudo iniciar la re-medición."}
-        </p>
-      )}
 
       {status.metrics_delta && <DeltaPanel delta={status.metrics_delta} />}
 

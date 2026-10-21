@@ -1,16 +1,29 @@
+import { clearSession, getToken } from "../lib/session";
+import type {
+  LoginRequest,
+  LoginResponse,
+  RegisterRequest,
+  RegisterResponse,
+  UserResponse,
+  VerificacionEnviada,
+  VerifyRequest,
+} from "../types/auth";
 import type {
   CostEstimate,
   CreateStudyRequest,
   CreateStudyResponse,
   Evidence,
   FormatoExport,
-  RemeasureResponse,
   ResumeRequest,
   StudyStatus,
 } from "../types/api";
-import type { Study, Trace } from "../types/schemas";
+import type { ModoEstudio, Study, Trace } from "../types/schemas";
+import type { BrandSummary, RemeasureCreated, RemeasureRequest, SerieMarca } from "../types/tracking";
 
 export const API_URL = (import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "");
+
+/** Evento que se lanza cuando la API rechaza el token: la app vuelve al login. */
+export const EVENTO_401 = "posiq:unauthorized";
 
 export class ApiError extends Error {
   constructor(
@@ -32,52 +45,96 @@ async function detalle(res: Response): Promise<string> {
   }
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
-    ...init,
-    headers: { "Content-Type": "application/json", ...init?.headers },
-  });
+interface Opciones extends RequestInit {
+  /** false en las rutas públicas de `/auth`: allí un 401 es «credenciales malas», no «sesión caducada». */
+  auth?: boolean;
+}
+
+function cabeceras(auth: boolean, extra?: HeadersInit): Headers {
+  const h = new Headers(extra);
+  if (!h.has("Content-Type")) h.set("Content-Type", "application/json");
+  const token = auth ? getToken() : null;
+  if (token) h.set("Authorization", `Bearer ${token}`);
+  return h;
+}
+
+/** Sin token o con el token caducado: se limpia la sesión y la app redirige al login. */
+function sesionCaducada(): void {
+  clearSession();
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(EVENTO_401));
+}
+
+async function llamar(path: string, { auth = true, headers, ...init }: Opciones = {}): Promise<Response> {
+  const res = await fetch(`${API_URL}${path}`, { ...init, headers: cabeceras(auth, headers) });
+  if (res.status === 401 && auth) sesionCaducada();
   if (!res.ok) throw new ApiError(res.status, await detalle(res));
-  // 202 puede venir con cuerpo (remeasure) o sin él (resume).
+  return res;
+}
+
+async function request<T>(path: string, init?: Opciones): Promise<T> {
+  const res = await llamar(path, init);
+  // 202 puede venir con cuerpo (remeasure) o sin él (resume); 204 nunca lo trae.
   const texto = res.status === 204 ? "" : await res.text();
   return (texto ? JSON.parse(texto) : undefined) as T;
 }
 
-export const api = {
-  createStudy: (body: CreateStudyRequest) =>
-    request<CreateStudyResponse>("/studies", { method: "POST", body: JSON.stringify(body) }),
+const json = (body: unknown) => JSON.stringify(body);
+const study = (id: string) => `/studies/${encodeURIComponent(id)}`;
 
-  getStudy: (id: string) => request<StudyStatus>(`/studies/${encodeURIComponent(id)}`),
+/** Cuerpo opcional de `POST /auth/verify/reenviar` (202): puede traer `codigo_dev` en modo demo. */
+export type ReenvioResponse = { verificacion?: VerificacionEnviada; codigo_dev?: string } | undefined;
+
+export const api = {
+  // --- Cuentas -----------------------------------------------------------------------------------
+  register: (body: RegisterRequest) =>
+    request<RegisterResponse>("/auth/register", { method: "POST", body: json(body), auth: false }),
+
+  verify: (body: VerifyRequest) =>
+    request<UserResponse>("/auth/verify", { method: "POST", body: json(body), auth: false }),
+
+  resendCode: (email: string) =>
+    request<ReenvioResponse>("/auth/verify/reenviar", { method: "POST", body: json({ email }), auth: false }),
+
+  login: (body: LoginRequest) =>
+    request<LoginResponse>("/auth/login", { method: "POST", body: json(body), auth: false }),
+
+  /** Invalida el token en la API. Un 401 aquí no redirige: ya se está saliendo. */
+  logout: (token: string) =>
+    request<void>("/auth/logout", { method: "POST", auth: false, headers: { Authorization: `Bearer ${token}` } }),
+
+  me: () => request<UserResponse>("/auth/me"),
+
+  // --- Estudios ----------------------------------------------------------------------------------
+  createStudy: (body: CreateStudyRequest) =>
+    request<CreateStudyResponse>("/studies", { method: "POST", body: json(body) }),
+
+  getStudy: (id: string) => request<StudyStatus>(study(id)),
 
   resume: (id: string, body: ResumeRequest) =>
-    request<void>(`/studies/${encodeURIComponent(id)}/resume`, {
-      method: "POST",
-      body: JSON.stringify(body),
-    }),
+    request<void>(`${study(id)}/resume`, { method: "POST", body: json(body) }),
 
-  remeasure: (id: string) =>
-    request<RemeasureResponse>(`/studies/${encodeURIComponent(id)}/remeasure`, {
-      method: "POST",
-    }),
+  remeasureEstimate: (id: string) => request<CostEstimate>(`${study(id)}/remeasure/estimate`),
 
-  listStudies: (brandId: string) =>
-    request<Study[]>(`/studies?brand_id=${encodeURIComponent(brandId)}`),
+  remeasure: (id: string, body: RemeasureRequest) =>
+    request<RemeasureCreated>(`${study(id)}/remeasure`, { method: "POST", body: json(body) }),
+
+  listStudies: (brandId: string) => request<Study[]>(`/studies?brand_id=${encodeURIComponent(brandId)}`),
 
   evidence: (id: string, ids: string[]) =>
-    request<Evidence[]>(
-      `/studies/${encodeURIComponent(id)}/evaluations?ids=${ids.map(encodeURIComponent).join(",")}`,
-    ),
+    request<Evidence[]>(`${study(id)}/evaluations?ids=${ids.map(encodeURIComponent).join(",")}`),
 
-  traces: (id: string) => request<Trace[]>(`/studies/${encodeURIComponent(id)}/traces`),
+  traces: (id: string) => request<Trace[]>(`${study(id)}/traces`),
 
-  estimate: (modo: "real") => request<CostEstimate>(`/estimate?modo=${modo}`),
+  estimate: (modo: ModoEstudio) => request<CostEstimate>(`/estimate?modo=${modo}`),
+
+  // --- Seguimiento -------------------------------------------------------------------------------
+  brands: () => request<BrandSummary[]>("/brands"),
+
+  serie: (brandId: string) => request<SerieMarca>(`/brands/${encodeURIComponent(brandId)}/serie`),
 
   /** Descarga la propuesta y la entrega al navegador con el nombre que indique la API. */
   async exportProposal(id: string, formato: FormatoExport): Promise<void> {
-    const res = await fetch(
-      `${API_URL}/studies/${encodeURIComponent(id)}/export?formato=${formato}`,
-    );
-    if (!res.ok) throw new ApiError(res.status, await detalle(res));
+    const res = await llamar(`${study(id)}/export?formato=${formato}`);
     const blob = await res.blob();
     const nombre =
       /filename="?([^";]+)"?/.exec(res.headers.get("Content-Disposition") ?? "")?.[1] ??
