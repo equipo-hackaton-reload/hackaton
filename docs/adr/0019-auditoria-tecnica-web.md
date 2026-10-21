@@ -275,6 +275,16 @@ La puntuación total de la auditoría es un indicador adelantado más de la seri
 misma `version` del catálogo. Si el catálogo cambia (`web_audit.v2`), la serie lo marca como **no
 comparable** en ese indicador.
 
+### Implementación del dominio (`domain/web_audit.py`)
+
+- `analizar_web(respuestas, *, study_id, brand_id, dominio, origen, fetcher, obtenido_en,
+  sitemaps, paginas)` (alias `auditar`) y `hallazgos_web(auditoria, evaluaciones, runs, *,
+  prompts, brand_id=None)` (alias `hallazgos_tecnicos`). `prompts` hace falta para saber qué
+  evaluación es espontánea.
+- Agentes/API: una comprobación que falla no lleva `motores_afectados` (es informativa).
+- 406 también es `falla` (la portada no tiene variante markdown).
+- `content_signal` se evalúa también con la cabecera `Content-Signal` aunque falte robots.txt.
+
 ## Consecuencias
 
 - **`contract-change` aditivo:** `ports.py` gana `WebFetcher` e importa `RespuestaWeb`. Ningún
