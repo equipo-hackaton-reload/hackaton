@@ -91,6 +91,11 @@ def _validar_ids(entrada: EntradaEscenario, acciones: list[Action]) -> None:
         raise ValueError(f"acciones que no están en el plan: {desconocidas}")
 
 
+def _cubre(accion: Action, medicion_cubre: bool) -> bool:
+    """Si la acción cuenta como cobertura de sus hallazgos."""
+    return medicion_cubre or accion.palanca != "medicion"
+
+
 def _plan_reducido(plan: Plan, mantenidas: set[str]) -> Plan:
     """El mismo plan, con las mismas fases, quedándose solo con las acciones mantenidas."""
     return plan.model_copy(
@@ -111,12 +116,16 @@ def build_scenario(
     nombre: NombreEscenario = "personalizado",
     *,
     detalle_desactivada: str = "el consultor la ha desactivado",
+    medicion_cubre: bool = True,
 ) -> EscenarioPlan:
     """Aplica `entrada` a `plan` y re-simula el score con las acciones mantenidas.
 
     Orden de evaluación, precedencia de motivos y regla del presupuesto en el docstring del
     módulo. Lanza ValueError si `acciones_activas` o `costes_declarados` nombran acciones que no
     están en el plan. `intervalo` queda en None hasta que exista el IC del score (ADR 0008/0009).
+
+    `medicion_cubre=False` (lo usan los preajustes): una acción de palanca `medicion` no cuenta
+    como cobertura de sus hallazgos en `hallazgos_sin_cubrir`, porque no mueve la visibilidad.
     """
     acciones = plan.acciones
     ids = {a.id for a in acciones}
@@ -180,7 +189,12 @@ def build_scenario(
             usado += puntos
             gastado += coste or 0.0
 
-    cubiertos = {fid for a in acciones if a.id in mantenidas for fid in a.finding_ids}
+    cubiertos = {
+        fid
+        for a in acciones
+        if a.id in mantenidas and _cubre(a, medicion_cubre)
+        for fid in a.finding_ids
+    }
     costes_mantenidas = [costes[a.id] for a in acciones if a.id in mantenidas and a.id in costes]
     return EscenarioPlan(
         nombre=nombre,
@@ -223,7 +237,9 @@ def minimal_cover(plan: Plan, objetivos: Iterable[str]) -> list[str]:
     alguna de esas acciones y su cierre, así que la búsqueda es completa. Entre soluciones de igual
     esfuerzo gana la de menos acciones y, después, la de índices del plan menores en orden
     lexicográfico. Solo se usan acciones ejecutables (fuera de ciclos de dependencias). Los
-    objetivos que ninguna acción ejecutable cubre se ignoran. Devuelve ids en orden del plan.
+    objetivos que ninguna acción ejecutable cubre se ignoran. Las acciones de palanca `medicion` no
+    cubren ningún hallazgo (no mueven la visibilidad), pero entran si otra elegida depende de ellas.
+    Devuelve ids en orden del plan.
     """
     acciones = plan.acciones
     _, bloqueadas = _orden_de_evaluacion(acciones)
@@ -231,9 +247,9 @@ def minimal_cover(plan: Plan, objetivos: Iterable[str]) -> list[str]:
     ejecutables = [a for a in acciones if a.id in sin_ciclo]
     indice = {a.id: i for i, a in enumerate(acciones)}
     puntos = {a.id: PUNTOS_ESFUERZO[a.esfuerzo] for a in acciones}
-    cubre = {a.id: set(a.finding_ids) for a in acciones}
+    cubre = {a.id: set(a.finding_ids) if _cubre(a, False) else set() for a in acciones}
     cierre = _cierre(acciones)
-    cubribles = {fid for a in ejecutables for fid in a.finding_ids}
+    cubribles = {fid for a in ejecutables for fid in cubre[a.id]}
     pendientes = [f for f in dict.fromkeys(objetivos) if f in cubribles]
 
     def clave(sel: frozenset[str]) -> tuple[int, int, tuple[int, ...]]:
@@ -269,14 +285,14 @@ def preset_entrada(
     """Entrada de un preajuste y el detalle con que se aplazan las acciones que deja fuera.
 
     - `minimo_viable`: recubrimiento mínimo (`minimal_cover`) de los hallazgos del nivel de
-      impacto más alto (L > M > S) que el plan puede cubrir.
+      impacto más alto (L > M > S) que el plan puede cubrir sin acciones de medición.
     - `equilibrado`: recubrimiento mínimo de todos los hallazgos de impacto L y M.
     - `completo`: todas las acciones.
     Ningún preajuste fija presupuesto, costes, capacidad ni prioridad.
     """
     if nombre == "completo":
         return EntradaEscenario(), "no aplica"
-    cubribles = {fid for a in plan.acciones for fid in a.finding_ids}
+    cubribles = {fid for a in plan.acciones if _cubre(a, False) for fid in a.finding_ids}
     con_accion = [f for f in findings if f.id in cubribles]
     if nombre == "minimo_viable":
         tope = max((ORDEN_IMPACTO[f.impacto] for f in con_accion), default=0)
@@ -300,7 +316,9 @@ def build_preset(
 ) -> EscenarioPlan:
     """Escenario de un preajuste (`minimo_viable`, `equilibrado` o `completo`)."""
     entrada, detalle = preset_entrada(nombre, plan, findings)
-    return build_scenario(plan, findings, metrics, entrada, nombre, detalle_desactivada=detalle)
+    return build_scenario(
+        plan, findings, metrics, entrada, nombre, detalle_desactivada=detalle, medicion_cubre=False
+    )
 
 
 def build_presets(plan: Plan, findings: list[Finding], metrics: Metrics) -> list[EscenarioPlan]:

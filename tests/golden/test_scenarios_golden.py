@@ -31,18 +31,16 @@ def final(e: EscenarioPlan) -> tuple[float, float, float]:
 
 def test_minimo_viable(presets: dict[str, EscenarioPlan]) -> None:
     e = presets["minimo_viable"]
-    # Cubre los 3 hallazgos L con 4 puntos: A0-2 (motor débil), A1-2 (Barcelona), A0-1 (brecha).
-    assert e.mantenidas == ["A0-1", "A0-2", "A1-2"]
-    assert e.esfuerzo_total == 4
+    # Cubre los 3 hallazgos L con 5 puntos: A0-2 (motor débil), A1-2 (Barcelona) y A2-3 (brecha
+    # con el líder). La medición A0-1 también enlaza F-brecha-lider, pero en los preajustes la
+    # medición no cuenta como cobertura.
+    assert e.mantenidas == ["A0-2", "A1-2", "A2-3"]
+    assert e.esfuerzo_total == 5
     assert {a.action_id: a.motivo for a in e.aplazadas} == dict.fromkeys(
-        ["A1-1", "A2-1", "A2-2", "A2-3", "A3-1", "A3-2"], "desactivada"
+        ["A0-1", "A1-1", "A2-1", "A2-2", "A3-1", "A3-2"], "desactivada"
     )
-    assert e.hallazgos_sin_cubrir == [
-        "F-caida-embudo",
-        "F-asistida-vs-espontanea",
-        "F-recomendacion-debil",
-    ]
-    assert final(e) == (26.36, 27.17, 28.04)
+    assert e.hallazgos_sin_cubrir == ["F-caida-embudo", "F-recomendacion-debil"]
+    assert final(e) == (26.56, 27.67, 28.84)
 
 
 def test_equilibrado(presets: dict[str, EscenarioPlan]) -> None:

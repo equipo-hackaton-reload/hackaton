@@ -24,7 +24,8 @@ no se toca.
 ### Firmas
 
 ```python
-build_scenario(plan, findings, metrics, entrada, nombre="personalizado") -> EscenarioPlan
+build_scenario(plan, findings, metrics, entrada, nombre="personalizado",
+               *, detalle_desactivada=..., medicion_cubre=True) -> EscenarioPlan
 build_preset(nombre, plan, findings, metrics) -> EscenarioPlan  # minimo_viable | equilibrado | completo
 build_presets(plan, findings, metrics) -> list[EscenarioPlan]   # los tres, en ese orden
 minimal_cover(plan, objetivos: Iterable[str]) -> list[str]      # ids de acciones, en orden del plan
@@ -97,6 +98,10 @@ que cubre unos hallazgos objetivo, con todas sus dependencias. Es exacto, no vor
   hallazgos.
 - **Qué acciones entran:** solo las ejecutables, es decir, fuera de ciclos. Los objetivos que
   ninguna acción ejecutable cubre se ignoran y quedan en `hallazgos_sin_cubrir`.
+- **La medición no cubre:** una acción de palanca `medicion` no cuenta como cobertura de ningún
+  hallazgo, porque no mueve la visibilidad (la simulación le da efecto 0). Sí entra si otra acción
+  elegida depende de ella. Un hallazgo que solo enlazan acciones de medición no es objetivo de
+  ningún preajuste y queda en `hallazgos_sin_cubrir`.
 - **Tamaño:** la profundidad es como mucho el número de hallazgos (de 3 a 7 en una propuesta), así
   que el coste es trivial.
 
@@ -106,8 +111,14 @@ que cubre unos hallazgos objetivo, con todas sus dependencias. Es exacto, no vor
 | `equilibrado` | `minimal_cover` de **todos los hallazgos de impacto L y M**. Los S quedan fuera salvo que los cubra de paso una acción elegida. |
 | `completo` | Todas las acciones (entrada vacía). |
 
-**Cubrir** es la definición del contrato: una acción mantenida apunta al hallazgo. Una acción de
-medición también cubre su hallazgo, aunque la simulación le da efecto 0.
+**Qué es cubrir.** Hay dos reglas según quién decide las acciones:
+
+- **En un escenario personalizado** rige la definición del contrato: un hallazgo está cubierto si
+  una acción mantenida apunta a él, también si es de medición (`build_scenario`,
+  `medicion_cubre=True`).
+- **En los tres preajustes** (`completo` incluido) la medición no cubre: `hallazgos_sin_cubrir` se
+  calcula sin ella (`medicion_cubre=False`). Decir que la línea base «cubre» la brecha con el líder
+  sería engañoso.
 
 ### Ejemplos
 
@@ -132,17 +143,18 @@ actual 25,93). El score es el final (mínimo / esperado / máximo):
 
 | Preajuste | Mantenidas | Esfuerzo | Sin cubrir | Score final |
 |---|---|---|---|---|
-| `minimo_viable` | A0-1, A0-2, A1-2 | 4 | F-caida-embudo, F-asistida-vs-espontanea, F-recomendacion-debil | 26,36 / 27,17 / 28,04 |
+| `minimo_viable` | A0-2, A1-2, A2-3 | 5 | F-caida-embudo, F-recomendacion-debil | 26,56 / 27,67 / 28,84 |
 | `equilibrado` | A0-2, A1-1, A1-2, A2-3 | 7 | — | 26,83 / 28,20 / 29,78 |
 | `completo` | las 9 | 16 | — | 27,77 / 30,77 / 33,95 (= la canónica 25,9 → 30,8) |
 
 Cómo se llega a cada preajuste:
 
 - **`minimo_viable`:** los hallazgos L son F-motor-debil, F-ciudad-barcelona y F-brecha-lider, y el
-  mínimo son 4 puntos.
+  mínimo son 5 puntos.
   - Para F-motor-debil, A0-2 (M) empata con A3-2 (M) y gana A0-2 por orden del plan.
   - Para F-ciudad-barcelona, A1-2 (S).
-  - Para F-brecha-lider, A0-1 (S, medición) empata con A3-1 y gana por orden del plan.
+  - Para F-brecha-lider, A2-3 (M). También lo enlazan A0-1 y A3-1, pero son de medición y no
+    cubren. A2-3 cubre además F-asistida-vs-espontanea.
 - **`equilibrado`:** los 7 hallazgos son L o M y el mínimo son 7 puntos.
   - A1-1 es la única acción que cubre F-caida-embudo y F-recomendacion-debil, y arrastra A0-2.
   - A2-3 es la única que cubre F-asistida-vs-espontanea.
@@ -152,11 +164,14 @@ Cómo se llega a cada preajuste:
 ## Consecuencias
 
 - **Permite** a la API (zona C) ofrecer un endpoint de escenarios. La entrada sería un
-  `EntradaEscenario` o el nombre de un preajuste, y la salida un `EscenarioPlan`, sin LLM.
-- **Los preajustes optimizan la cobertura de hallazgos por esfuerzo, no el score.** Por eso el
-  mínimo viable de Alborada incluye la medición base (A0-1), que no mueve la simulación. Es
-  coherente con el contrato («cubrir» = enlazar un hallazgo) y con la metodología, que pide línea
-  base. Si se quisiera optimizar el score, sería otro preajuste.
+  `EntradaEscenario` o el nombre de un preajuste, y la salida un `EscenarioPlan`, sin LLM. Encaja
+  con la vista de la #24: cada `EscenarioPlan` se envuelve en `EscenarioGuardado(id, elegido,
+  escenario)` de `application/diferencial.py`.
+- **Los preajustes optimizan la cobertura de hallazgos por esfuerzo, no el score.** Al no contar
+  la medición como cobertura, ningún preajuste se llena de acciones que no mueven nada. La
+  contrapartida es que el mínimo viable y el equilibrado de Alborada dejan fuera la medición base
+  (A0-1). El consultor puede añadirla con un escenario personalizado. Si se quisiera optimizar el
+  score, sería otro preajuste.
 - **El llenado voraz por capacidad o presupuesto no es óptimo**, pero es predecible y explicable:
   sigue el orden del plan, que ya refleja la secuencia que propone el consultor.
 - **`intervalo` sigue en `None`** hasta que llegue el IC del score (ADR 0008).

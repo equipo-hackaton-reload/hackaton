@@ -281,6 +281,37 @@ def test_minimal_cover_evita_acciones_en_ciclo() -> None:
     assert minimal_cover(p, ["F1", "F2"]) == ["C"]
 
 
+def test_minimal_cover_la_medicion_no_cubre_pero_entra_como_dependencia() -> None:
+    p = plan(
+        [action("MED", ["F1", "F2"], palanca="medicion")],
+        [
+            action("X", ["F2"], esfuerzo="M", dependencias=["MED"]),
+            action("Y", ["F2"], esfuerzo="L"),
+        ],
+    )
+    # F1 solo lo enlaza la medición: se ignora. F2 lo cubre X con su dependencia MED (2 + 1 = 3)
+    # o Y (3): empatan en esfuerzo y gana Y por tener menos acciones.
+    assert minimal_cover(p, ["F1", "F2"]) == ["Y"]
+    sin_y = plan(p.fases[0].acciones, [p.fases[1].acciones[0]])
+    assert minimal_cover(sin_y, ["F1", "F2"]) == ["MED", "X"]
+    assert minimal_cover(sin_y, ["F1"]) == []
+
+
+def test_preajuste_la_medicion_no_cuenta_como_cobertura() -> None:
+    findings = [finding("F1", "L"), finding("F2", "L")]
+    p = plan(
+        [action("MED", ["F1", "F2"], palanca="medicion")],
+        [action("X", ["F2"], dependencias=["MED"])],
+    )
+    e = build_preset("minimo_viable", p, findings, metrics())
+    # MED se mantiene porque X depende de ella, pero F1 sigue sin cubrir.
+    assert e.mantenidas == ["MED", "X"] and e.hallazgos_sin_cubrir == ["F1"]
+    completo = build_preset("completo", p, findings, metrics())
+    assert completo.hallazgos_sin_cubrir == ["F1"]
+    # Con entrada del consultor rige la cobertura del contrato: la medición sí cubre.
+    assert build_scenario(p, findings, metrics(), EntradaEscenario()).hallazgos_sin_cubrir == []
+
+
 def test_preajustes() -> None:
     p, findings = preset_plan()
     minimo, equilibrado, completo = build_presets(p, findings, metrics())
