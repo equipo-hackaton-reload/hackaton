@@ -3,9 +3,9 @@
 Recorrido de las 5 pantallas con el brief de **Clínica Alborada Visión** en **modo kit** y
 `LLM_PROVIDER=fixture`. Sin red y sin claves. Si algo falla: [plan B](../plan-b.md).
 
-Ensayo del 2026-10-21, sobre `develop` en `59745d5`, con Playwright headless (Chrome, 1280×800).
-Hubo 3 pasadas y las dos que se cronometraron dieron lo mismo. Las cifras de abajo son las que se ven
-en pantalla.
+Ensayo del 2026-10-21 con Playwright headless (Chrome, 1280×800). Hubo 3 pasadas sobre `59745d5`
+y una más sobre `e0fa86a` (#16, el juez del fixture usa las etiquetas del kit). Las cifras de abajo
+son las que se ven en pantalla con `e0fa86a`, y coinciden con la deck.
 
 ## Checklist previa (5 min antes)
 
@@ -35,11 +35,11 @@ en pantalla.
 | Paso | Tiempo |
 |---|---|
 | 1 → 2 · Analizar → aparece el mercado propuesto | 3,4 s |
-| 2 → 3 · Confirmar y medir → diagnóstico listo | 6,4–6,9 s |
+| 2 → 3 · Confirmar y medir → diagnóstico listo | 6,4–8,5 s |
 | 3 → 4 · Revisar el plan → plan | 0,2 s |
 | 4 → 5 · Aprobar plan → propuesta | 3,4–3,9 s |
 | Descargar Word (45 KB) | 0,4 s |
-| **Total sin hablar** | **15,0 s** |
+| **Total sin hablar** | **15,0–17,6 s** |
 
 La web sondea cada 3 s, así que cada espera es de 1 o 2 ciclos. El resto de los 3 minutos es narración.
 
@@ -60,18 +60,19 @@ La web sondea cada 3 s, así que cada espera es de 1 o 2 ciclos. El resto de los
   puede añadir o quitar marcas y cambiar el líder. Es la primera revisión humana del grafo».
 - **Clic:** **Confirmar y medir**.
 
-### 3 · Diagnóstico (0:50–1:40) · espera 7 s
+### 3 · Diagnóstico (0:50–1:40) · espera 7–9 s
 
-- **Se ve:** Score de Citación **25,87** de 100 · **8.ª de 10** · a **39,97 puntos** de Valdecruz (65,84).
-  Desglose: aparición 11,62 · posición 4,72 · fuerza 3,88 · calidad de fuente 5,65.
-  Por motor: ChatGPT 11,38 · Gemini 38,46 · Perplexity 43,96 · Claude 9,68. Hay 7 hallazgos.
+- **Se ve:** Score de Citación **25,93** de 100 · **8.ª de 10** · a **40,53 puntos** de Valdecruz (66,46).
+  Desglose (marca / líder): aparición 11,62 / 27,25 · posición 4,72 / 16,39 · fuerza 3,92 / 9,62 ·
+  calidad de fuente 5,67 / 13,20. Por motor: ChatGPT 11,37 · Gemini 38,46 · Perplexity 44,22 ·
+  Claude 9,68. Hay 7 hallazgos.
 - **Decir:** «Alborada saca 25,9 sobre 100 y es octava de diez. Los motores la conocen: cuando la
   pregunta la nombra aparece el 100 % de las veces, pero cuando no la nombra solo el 39 %. Claude la
   menciona en el 15 % de las respuestas y Perplexity en el 65 %. En Barcelona aparece en el 4 %. Toda
   cifra la calcula código, no el LLM, y cada hallazgo enlaza a sus evaluaciones».
 - **Clic opcional:** «Ver evidencias» en un hallazgo, para enseñar la respuesta del motor y sus fuentes.
-- **Ojo:** en pantalla sale **25,87** (API en fixture, juez por reglas). La cifra canónica es
-  **25,93**, que en la deck es 25,9. Con un decimal las dos son 25,9, así que se **dice «25,9»**.
+- **Ojo:** la pantalla dice 25,93 y la deck dice 25,9. Es la misma cifra, así que se **dice «25,9»**.
+  El texto de un hallazgo dice «25.9 frente a 66.5», con punto decimal; no lo leas en voz alta.
 - **Clic:** **Revisar el plan**.
 
 ### 4 · Plan (1:40–2:20) · instantáneo
@@ -84,7 +85,8 @@ La web sondea cada 3 s, así que cada espera es de 1 o 2 ciclos. El resto de los
   terminar la fase 3, en un rango de 27,8 a 34,0».
 - **Ojo:** la **simulación no aparece en la web** (la API la devuelve, pero la web no la pinta) y la
   **calidad del plan tampoco**: en fixture, sin claves de juez, vale `null`. La proyección se cuenta
-  de palabra o con la diapositiva de la deck. En fixture la API calcula 25,87 → 30,71 (27,72–33,88).
+  de palabra o con la diapositiva de la deck. En fixture la API calcula 25,93 → 30,77 (27,77–33,95)
+  tras la fase 3, que redondeado da lo mismo que la deck: 25,9 → 30,8 (27,8–34,0).
 - **Clic:** **Aprobar plan**.
 
 ### 5 · Propuesta (2:20–2:55) · espera 4 s
@@ -94,7 +96,7 @@ La web sondea cada 3 s, así que cada espera es de 1 o 2 ciclos. El resto de los
 - **Decir:** «La propuesta va dirigida al comité. Cada llamada a un modelo queda trazada con su
   versión de prompt, sus tokens y su coste. En modo kit el coste es cero».
 - **Clic:** **Descargar Word** → `propuesta-<id>.docx`. Si da tiempo, ábrelo y enseña la tabla de
-  objetivos y el Score 25,9.
+  objetivos (25,93 → 35,00) y el Score 25,9.
 - **Ojo:** el resumen empieza con «DEMO SIN IA: textos y plan de ejemplo». Es el texto del
   `FixtureLLM`, así que conviene anticiparlo: «en la demo el redactor es un fixture; en real lo
   escribe DeepSeek con las mismas cifras».
