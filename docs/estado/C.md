@@ -24,6 +24,22 @@
 - README de arranque reproducible: requisitos, demo sin claves (API + web o `demo_kit.py`), claves,
   API, desarrollo y limitaciones. Comprobado desde cero en un worktree el 2026-10-21.
 
+## Diferencial v0.4.0 (en curso)
+- Base común: el checkpointer admite `stats_schemas`, `scenario_schemas`, `source_map_schemas`,
+  `accuracy_schemas` y `application/diferencial.py`. `GET /studies/{id}` ya trae los bloques
+  `rigor`, `escenarios`, `oportunidades_fuente`, `exactitud` y `mitigaciones`, en `null` hasta que
+  llegue el dominio de cada uno (`feature/A-rigor-estadistico`, `A-escenarios`, `A-mapa-fuentes`,
+  `A-exactitud-marca`).
+- Forma del JSON para la web y el Word:
+  - `rigor`: `{score_global: Intervalo|null, score_por_motor: {Motor: Intervalo},
+    aparicion_por_motor: {Motor: Intervalo}, hallazgos: {finding_id: Significancia},
+    deltas: {"score_global" | "tipo:dimension:valor": Significancia}}`.
+  - `escenarios`: `[{id, elegido, escenario: EscenarioPlan}]`; solo uno elegido.
+  - `oportunidades_fuente`: `[OportunidadFuente]`; `exactitud`: `[HallazgoExactitud]` (uno por
+    marca); `mitigaciones`: `[AccionMitigacion]`.
+- Pendiente, una PR por punto: (1) rigor y `JUDGE_VOTES`, (2) escenarios, (3) mapa de fuentes,
+  (4) exactitud.
+
 ## Falta
 - Estudio de Alborada con DeepSeek real → `docs/ejemplos/` (bloqueado: falta `DEEPSEEK_API_KEY`).
   Dos formas: completo (juez DeepSeek, ≈1–2,5 € y 20–30 min) o rápido con `JUDGE_PROVIDER=reglas`.

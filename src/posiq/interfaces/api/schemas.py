@@ -4,6 +4,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
+from posiq.application.diferencial import EscenarioGuardado, Rigor
+from posiq.domain.accuracy_schemas import AccionMitigacion, HallazgoExactitud
 from posiq.domain.quality_schemas import PlanQuality
 from posiq.domain.schemas import (
     BriefSummary,
@@ -19,6 +21,7 @@ from posiq.domain.schemas import (
     Study,
 )
 from posiq.domain.simulation_schemas import SimulationResult
+from posiq.domain.source_map_schemas import OportunidadFuente
 
 EstadoApi = Literal[
     "en_curso",
@@ -62,6 +65,12 @@ class StudyView(BaseModel):
     # y calidad por acción (None si no hay claves de juez).
     simulacion: SimulationResult | None = None
     calidad_plan: PlanQuality | None = None
+    # Diferencial (v0.4.0): None hasta que el dominio lo calcule para este estudio.
+    rigor: Rigor | None = None
+    escenarios: list[EscenarioGuardado] | None = None
+    oportunidades_fuente: list[OportunidadFuente] | None = None
+    exactitud: list[HallazgoExactitud] | None = None
+    mitigaciones: list[AccionMitigacion] | None = None
     proposal: Proposal | None = None
 
 

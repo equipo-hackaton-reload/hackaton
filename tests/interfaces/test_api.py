@@ -57,6 +57,9 @@ async def test_full_flow_with_both_reviews(client: httpx.AsyncClient) -> None:
     assert view["brief"]["marca"] == "Clínica Alborada Visión"
     assert view["market"]["confirmado_por_humano"] is False
     assert view["metrics"] is None and view["proposal"] is None
+    # Bloques del diferencial: presentes en el contrato, vacíos hasta que los calcule el dominio.
+    for bloque in ("rigor", "escenarios", "oportunidades_fuente", "exactitud", "mitigaciones"):
+        assert bloque in view and view[bloque] is None
 
     market = view["market"]
     market["marcas"] = market["marcas"][:6]

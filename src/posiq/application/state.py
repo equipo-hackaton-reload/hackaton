@@ -7,6 +7,8 @@ sustituye el nodo que las produce. `coste_acumulado_eur` es siempre la suma de `
 import operator
 from typing import Annotated, Literal, TypedDict
 
+from posiq.application.diferencial import EscenarioGuardado, Rigor
+from posiq.domain.accuracy_schemas import AccionMitigacion, HallazgoExactitud
 from posiq.domain.quality_schemas import PlanQuality
 from posiq.domain.schemas import (
     BriefSummary,
@@ -24,6 +26,7 @@ from posiq.domain.schemas import (
     Trace,
 )
 from posiq.domain.simulation_schemas import SimulationResult
+from posiq.domain.source_map_schemas import OportunidadFuente
 
 RevisionPendiente = Literal["none", "competidores", "plan"]
 
@@ -46,6 +49,12 @@ class StudyState(TypedDict, total=False):
     plan_violaciones: list[str]
     simulacion: SimulationResult | None
     calidad_plan: PlanQuality | None
+    # Diferencial (v0.4.0): cifras del dominio; las claves faltan hasta que su nodo las calcula.
+    rigor: Rigor | None
+    escenarios: list[EscenarioGuardado] | None
+    oportunidades_fuente: list[OportunidadFuente] | None
+    exactitud: list[HallazgoExactitud] | None
+    mitigaciones: list[AccionMitigacion] | None
     proposal: Proposal
     traces: Annotated[list[Trace], operator.add]
     coste_acumulado_eur: float
