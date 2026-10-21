@@ -21,6 +21,7 @@ from posiq.interfaces.api import wiring
 from posiq.interfaces.api.main import create_app
 from posiq.settings import Settings
 from tests.application.fakes import memory_repo
+from tests.auth_helpers import authenticate
 
 ROOT = Path(__file__).resolve().parents[2]
 BRIEF = ROOT / "data/kit/01_Briefings/Brief_de_ejemplo_Clinica_Alborada.md"
@@ -44,6 +45,7 @@ def con_claves(tmp_path: Path, **kw: Any) -> Settings:
         llm_provider="deepseek",
         database_url=f"sqlite:///{(tmp_path / 'study.db').as_posix()}",
         cache_enabled=False,
+        auth_dev_codes=True,  # login de test con LLM_PROVIDER=deepseek (ADR 0015)
         **{**CLAVES, **kw},
     )
 
@@ -73,6 +75,7 @@ def test_kit_con_claves_no_llama_a_nada_y_da_la_cifra_canonica(
     tmp_path: Path, llamadas: list[str]
 ) -> None:
     with TestClient(create_app(settings=con_claves(tmp_path))) as client:
+        authenticate(client)
         estimate = client.get("/estimate", params={"modo": "kit"}).json()
         assert estimate["coste_estimado_eur"] == 0 and estimate["juez"] == "kit"
 
