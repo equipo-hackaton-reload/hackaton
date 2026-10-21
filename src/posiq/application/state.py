@@ -37,6 +37,8 @@ class StudyState(TypedDict, total=False):
     prompts: list[PromptInstance]
     runs: list[Run]
     evaluations: list[Evaluation]
+    # Juez que evaluó las menciones: su nombre, o "reglas" si solo hubo detección por reglas.
+    juez: str
     metrics: Metrics
     metrics_delta: MetricsDelta | None
     findings: list[Finding]

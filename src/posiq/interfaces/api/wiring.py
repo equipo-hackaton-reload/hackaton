@@ -33,8 +33,9 @@ def judge_factory(settings: Settings, cache: DiskCache) -> JudgeFactory:
 
 
 def plan_guard_factory(settings: Settings, cache: DiskCache) -> PlanGuardFactory | None:
-    """PlanGuard sobre el juez de `build_judge`; None sin claves de juez (no se evalúa el plan)."""
-    if (
+    """PlanGuard sobre el juez de `build_judge`. None (no se evalúa el plan) sin claves de juez o
+    con `JUDGE_PROVIDER=reglas`, que excluye todo juicio por LLM."""
+    if settings.judge_provider == "reglas" or (
         not settings.typesafe_api_key.get_secret_value()
         and not settings.deepseek_api_key.get_secret_value()
     ):

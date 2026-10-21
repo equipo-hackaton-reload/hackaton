@@ -130,10 +130,18 @@ class DetectionJudge:
 class FakeGuard:
     """PlanGuard falso: una llamada de coste fijo apuntada en el presupuesto del estudio."""
 
-    def __init__(self, budget: Budget, coste: float = 0.01, *, sin_clave: bool = False) -> None:
+    def __init__(
+        self,
+        budget: Budget,
+        coste: float = 0.01,
+        *,
+        sin_clave: bool = False,
+        error: Exception | None = None,
+    ) -> None:
         self.budget = budget
         self.coste = coste
         self.sin_clave = sin_clave
+        self.error = error
         self.planes: list[Plan] = []
 
     async def aassess(
@@ -141,6 +149,8 @@ class FakeGuard:
     ) -> PlanQuality:
         if self.sin_clave:
             raise MissingCredentialError("TYPESAFE_API_KEY", "PlanGuard")
+        if self.error is not None:
+            raise self.error
         self.planes.append(plan)
         self.budget.record(trace(plan.study_id, "plan_guard:fake", self.coste))
         return PlanQuality(

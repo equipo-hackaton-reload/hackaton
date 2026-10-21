@@ -7,11 +7,14 @@ para que la persona las vea en la revisión.
 
 Junto al plan van dos ayudas para la revisión (`plan_checks`), que no bloquean nada:
 - `simulacion`: impacto proyectado sobre el Score de Citación (`domain.simulation`, código puro).
-- `calidad_plan`: juicio de PlanGuard por acción. Sin claves de juez queda en None y se anota.
+- `calidad_plan`: juicio de PlanGuard por acción. Si no hay claves de juez o la API falla, queda en
+  None y se anota; solo `BudgetExceeded` para el estudio.
 """
 
+import logging
 from typing import Any
 
+from posiq.adapters.budget import BudgetExceeded
 from posiq.adapters.errors import MissingCredentialError
 from posiq.application.deps import (
     Deps,
@@ -32,6 +35,8 @@ from posiq.domain.schemas import (
     validate_plan_against_brief,
 )
 from posiq.domain.simulation import simulate_plan
+
+log = logging.getLogger(__name__)
 
 
 def metrics_summary(metrics: Metrics) -> dict[str, Any]:
@@ -80,9 +85,15 @@ async def plan_checks(state: StudyState, deps: Deps, plan: Plan) -> dict[str, An
     errores: list[str] = []
     try:
         calidad = await guard.aassess(plan, state["findings"], state["brief"])
+    except BudgetExceeded:
+        raise  # el presupuesto sí para el estudio
     except MissingCredentialError as exc:
         calidad = None
         errores.append(f"plan_guard: {exc} Calidad del plan sin evaluar.")
+    except Exception as exc:  # PlanGuard orienta la revisión: un fallo de la API no la bloquea
+        log.warning("plan_guard falló en el estudio %s", state["study_id"], exc_info=True)
+        calidad = None
+        errores.append(f"plan_guard: {type(exc).__name__}: {exc}. Calidad del plan sin evaluar.")
     nuevas: list[Trace] = budget.traces[antes:]
     return {"simulacion": simulacion, "calidad_plan": calidad, "traces": nuevas, "errores": errores}
 
