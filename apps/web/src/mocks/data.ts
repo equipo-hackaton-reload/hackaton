@@ -5,7 +5,7 @@
  * brief, mercado, métricas, hallazgos y evidencias son los que calcula `posiq.domain`. El plan, la
  * propuesta y las trazas son de ejemplo, pero sus cifras actuales se leen de esas métricas.
  */
-import type { Evidence } from "../types/api";
+import type { Evidence, PlanQuality, SimulationResult } from "../types/api";
 import type {
   Action,
   BriefSummary,
@@ -57,6 +57,86 @@ export function metricsFor(studyId: string, market: Market): Metrics {
 
 export function findingsFor(studyId: string): Finding[] {
   return conEstudio(kitFindings, studyId);
+}
+
+export function simulationFor(studyId: string, m: Metrics, plan: Plan): SimulationResult {
+  const actual = m.score_global.score ?? 0;
+  return {
+    study_id: studyId,
+    marca_foco_id: m.marca_foco_id,
+    modelo_version: "simulation-1.0",
+    score_actual: actual,
+    tasa_espontanea_actual: tasa(m, "global", "global") / 100,
+    proyecciones: plan.fases.map((fase, indice) => ({
+      fase: fase.nombre,
+      indice,
+      acciones: fase.acciones.map((action) => action.id),
+      tasa_espontanea: {
+        minimo: Math.min(1, 0.12 + indice * 0.08),
+        esperado: Math.min(1, 0.16 + indice * 0.11),
+        maximo: Math.min(1, 0.2 + indice * 0.14),
+      },
+      score: {
+        minimo: Math.min(100, actual + 2 + indice * 4),
+        esperado: Math.min(100, actual + 5 + indice * 6),
+        maximo: Math.min(100, actual + 8 + indice * 8),
+      },
+    })),
+    segmentos: [
+      {
+        segmento: "Barcelona",
+        dimension: "ciudad",
+        n: 30,
+        tasa_actual: tasa(m, "ciudad", "Barcelona") / 100,
+        delta: { minimo: 0.04, esperado: 0.1, maximo: 0.16 },
+        acciones: ["A3", "A5"],
+      },
+      {
+        segmento: "Claude · descubrimiento",
+        dimension: "fase_motor",
+        n: 24,
+        tasa_actual: tasa(m, "motor", "Claude") / 100,
+        delta: { minimo: 0.03, esperado: 0.08, maximo: 0.13 },
+        acciones: ["A1", "A6"],
+      },
+    ],
+    acciones_sin_efecto: [{ action_id: "A2", motivo: "la palanca «medición» no mueve la visibilidad" }],
+    supuestos: [
+      "Las acciones se ejecutan en el plazo previsto y mantienen su impacto durante el plan.",
+      "La calidad de las menciones se mantiene igual que en la medición actual.",
+      "La estimación no es una predicción y debe validarse con re-mediciones.",
+    ],
+    advertencia: "Estimación orientativa con rangos conservadores; no es una promesa de resultados.",
+  };
+}
+
+export function qualityFor(studyId: string, plan: Plan): PlanQuality {
+  const acciones = plan.fases.flatMap((fase) => fase.acciones).map((action, index) => ({
+    action_id: action.id,
+    es_especifica: true,
+    coherente_con_hallazgo: action.finding_ids.length > 0,
+    respeta_restricciones: action.restricciones_revisadas.length === RESTRICCIONES.length,
+    realista_para_equipo: true,
+    calidad_global: action.id === "A4" ? 2 : 3,
+    probabilidades: { "0": 0.02, "1": 0.08, "2": action.id === "A4" ? 0.45 : 0.2, "3": 0.55 },
+    confianza: index === 3 ? 0.71 : 0.92,
+    por_debajo_umbral: action.id === "A4",
+    motivos: action.id === "A4" ? ["No declara todas las restricciones del brief."] : [],
+  }));
+  return {
+    study_id: studyId,
+    juez: "fixture-plan-guard",
+    modelo: "fixture",
+    acciones,
+    pct_especificas: 1,
+    pct_coherentes: 1,
+    pct_respetan_restricciones: 0.86,
+    pct_realistas: 1,
+    calidad_media: 2.86,
+    por_debajo_umbral: ["A4"],
+    baja_confianza: [],
+    nota: "El plan es accionable, pero conviene revisar A4 antes de aprobarlo.",
+  };
 }
 
 function tasa(m: Metrics, dimension: "global" | "motor" | "ciudad", valor: string): number {

@@ -65,6 +65,11 @@ export const handlers = [
     return new HttpResponse(null, { status: 202 });
   }),
 
+  http.post(u("/studies/:id/remeasure"), ({ params }) => {
+    const id = db.remeasure(String(params.id));
+    return id ? HttpResponse.json({ study_id: id }, { status: 202 }) : noEncontrado();
+  }),
+
   http.get(u("/studies/:id/evaluations"), ({ params, request }) => {
     if (!db.existe(String(params.id))) return noEncontrado();
     const ids = (new URL(request.url).searchParams.get("ids") ?? "").split(",").filter(Boolean);

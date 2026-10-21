@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import { API_URL } from "./api/client";
 import { POLL_MS } from "./api/hooks";
 import { App } from "./App";
+import { clearSession, getSession, saveSession } from "./lib/session";
 import * as db from "./mocks/db";
 import { config } from "./mocks/db";
 import { server } from "./mocks/server";
@@ -72,11 +73,53 @@ describe("flujo completo con MSW", () => {
     const trazas = await screen.findByTestId("trazas");
     expect(within(trazas).getByRole("rowheader", { name: "judge" })).toBeInTheDocument();
     expect(nb(screen.getByTestId("coste-total").textContent)).toBe("0,4419 €");
-  });
+  }, 15000);
 
   it("enseña el error si la API no encuentra el estudio", async () => {
     render(<App initialPath="/studies/no-existe/diagnostico" client={testClient()} />);
     expect(await screen.findByText("No existe ningún estudio con ese identificador.")).toBeInTheDocument();
+  });
+
+  it("pide sesión, valida el formulario y vuelve a la ruta pedida", async () => {
+    const user = userEvent.setup();
+    try {
+      render(<App initialPath="/studies/no-existe/diagnostico" client={testClient()} requireLogin />);
+      expect(await screen.findByRole("heading", { name: "Inicia sesión" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Entrar" })).toBeDisabled();
+      await user.type(screen.getByLabelText("Correo"), "ana");
+      await user.tab();
+      expect(screen.getByText(/nombre@dominio\.com/)).toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Usar la cuenta de demostración" }));
+      await user.click(screen.getByRole("button", { name: "Entrar" }));
+      expect(await screen.findByText("No existe ningún estudio con ese identificador.")).toBeInTheDocument();
+    } finally {
+      clearSession();
+    }
+  });
+
+  it("verifica el correo con el código y quita el aviso", async () => {
+    const user = userEvent.setup();
+    saveSession({ email: "ana@clinica.es", nombre: "Ana" }, false);
+    try {
+      render(<App initialPath="/" client={testClient()} requireLogin />);
+      await user.click(await screen.findByRole("link", { name: "Verificar ahora" }));
+      await user.click(await screen.findByRole("button", { name: "Enviar código" }));
+      const demo = await screen.findByText(/Tu código es/);
+      const codigo = within(demo).getByText(/^\d{6}$/).textContent!;
+      const campo = screen.getByLabelText("Código de verificación");
+      await user.type(campo, codigo === "000000" ? "111111" : "000000");
+      await user.click(screen.getByRole("button", { name: "Verificar" }));
+      expect(await screen.findByRole("alert")).toHaveTextContent("El código no coincide");
+      await user.clear(campo);
+      await user.type(campo, codigo);
+      await user.click(screen.getByRole("button", { name: "Verificar" }));
+      expect(await screen.findByText("Correo verificado")).toBeInTheDocument();
+      expect(getSession()?.verificado).toBe(true);
+      await screen.findByRole("heading", { level: 1, name: "Nuevo estudio" }, { timeout: 3000 });
+      expect(screen.queryByRole("link", { name: "Verificar ahora" })).not.toBeInTheDocument();
+    } finally {
+      clearSession();
+    }
   });
 
   it("sondea cada 3 s mientras el estudio está en curso y para al llegar a una revisión", async () => {

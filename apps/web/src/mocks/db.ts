@@ -3,7 +3,8 @@
  * brief → revisión de competidores → medición → revisión del plan → propuesta.
  */
 import type { Revision, StudyStatus } from "../types/api";
-import type { EstadoEstudio, Market, ModoEstudio, Plan, Study, Trace } from "../types/schemas";
+import type { EstadoEstudio, Market, MetricsDelta, ModoEstudio, Plan, Study, Trace } from "../types/schemas";
+import type { PlanQuality, SimulationResult } from "../types/api";
 import {
   findingsFor,
   kitBrief,
@@ -11,6 +12,8 @@ import {
   metricsFor,
   planFor,
   proposalFor,
+  qualityFor,
+  simulationFor,
   tracesFor,
   violaciones,
 } from "./data";
@@ -23,6 +26,9 @@ interface Registro {
   listoEn: number;
   market?: Market;
   plan?: Plan;
+  simulacion?: SimulationResult;
+  calidad_plan?: PlanQuality;
+  metrics_delta?: MetricsDelta;
 }
 
 const SIGUIENTE: Partial<Record<Etapa, Etapa>> = {
@@ -100,7 +106,12 @@ function avanzar(r: Registro): void {
   if (siguiente && Date.now() >= r.listoEn) {
     r.etapa = siguiente;
     if (siguiente === "competidores") r.market = structuredClone(kitMarket);
-    if (siguiente === "plan" && !r.plan) r.plan = planFor(r.study.id, metricsFor(r.study.id, r.market!));
+    if (siguiente === "plan" && !r.plan) {
+      r.plan = planFor(r.study.id, metricsFor(r.study.id, r.market!));
+      const metrics = metricsFor(r.study.id, r.market!);
+      r.simulacion = simulationFor(r.study.id, metrics, r.plan);
+      r.calidad_plan = qualityFor(r.study.id, r.plan);
+    }
     guardar();
   }
   r.study = { ...r.study, estado: ESTADO[r.etapa] };
@@ -145,6 +156,9 @@ export function estado(id: string): StudyStatus | undefined {
   out.metrics = metrics;
   out.findings = findings;
   out.plan = r.plan;
+  out.simulacion = r.simulacion;
+  out.calidad_plan = r.calidad_plan;
+  out.metrics_delta = r.metrics_delta;
   if (r.etapa === "plan") out.errores = violaciones(r.plan!, kitBrief);
   if (r.etapa === "completado") {
     out.proposal = proposalFor(id, r.study.modo, metrics, findings, r.plan!, r.study.creado_en);
@@ -165,11 +179,50 @@ export function reanudar(id: string, revision: Revision, payload: Market | Plan)
   } else {
     r.plan = payload as Plan;
     r.etapa = "propuesta";
+    const metrics = metricsFor(id, r.market ?? kitMarket);
+    r.simulacion = simulationFor(id, metrics, r.plan);
+    r.calidad_plan = qualityFor(id, r.plan);
   }
+
   r.listoEn = Date.now() + config.pasoMs;
   r.study = { ...r.study, estado: ESTADO[r.etapa] };
   guardar();
   return "ok";
+}
+
+export function remeasure(id: string): string | undefined {
+  const original = estudios.get(id);
+  if (!original) return undefined;
+  contador += 1;
+  const nuevoId = `${id}-remeasure-${contador}`;
+  const metrics = metricsFor(nuevoId, original.market ?? kitMarket);
+  const scoreAnterior = metricsFor(id, original.market ?? kitMarket).score_global.score;
+  estudios.set(nuevoId, {
+    study: { ...original.study, id: nuevoId, creado_en: new Date().toISOString(), estado: "completado" },
+    etapa: "completado",
+    listoEn: Date.now(),
+    market: structuredClone(original.market ?? kitMarket),
+    plan: original.plan,
+    simulacion: original.plan ? simulationFor(nuevoId, metrics, original.plan) : undefined,
+    calidad_plan: original.plan ? qualityFor(nuevoId, original.plan) : undefined,
+    metrics_delta: {
+      study_id: nuevoId,
+      comparado_con: id,
+      marca_foco_id: metrics.marca_foco_id,
+      score_actual: metrics.score_global.score,
+      score_anterior: scoreAnterior,
+      // El kit es fijo: la re-medición repite las mismas respuestas y el delta sale de restar.
+      score_delta:
+        metrics.score_global.score == null || scoreAnterior == null
+          ? null
+          : Math.round((metrics.score_global.score - scoreAnterior) * 100) / 100,
+      visibilidad_delta: [],
+      comparable: true,
+      avisos: ["Datos del kit: la re-medición repite las mismas respuestas, así que no hay cambio real."],
+    },
+  });
+  guardar();
+  return nuevoId;
 }
 
 export function listar(brandId: string | null): Study[] {

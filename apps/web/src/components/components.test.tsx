@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { describe, expect, it } from "vitest";
 import { nombres } from "../lib/study";
-import { findingsFor, kitBrief, kitMarket, metricsFor, planFor } from "../mocks/data";
+import { findingsFor, kitBrief, kitMarket, metricsFor, planFor, qualityFor, simulationFor } from "../mocks/data";
 import * as db from "../mocks/db";
 import { nb, renderUI } from "../test/utils";
 import type { Action } from "../types/schemas";
@@ -12,6 +12,8 @@ import { FindingsList } from "./FindingsList";
 import { RankingChart } from "./RankingChart";
 import { ScoreCard } from "./ScoreCard";
 import { VisibilityTables } from "./VisibilityTables";
+import { PlanQualityCard } from "./PlanQualityCard";
+import { SimulationCard } from "./SimulationCard";
 
 const ID = "S-test";
 const metrics = metricsFor(ID, kitMarket);
@@ -130,5 +132,26 @@ describe("ActionEditor", () => {
     expect(sinRevisar).not.toBeChecked();
     await user.click(sinRevisar);
     expect(sinRevisar).toBeChecked();
+  });
+
+  describe("SimulationCard", () => {
+    it("muestra la proyección por fase, los rangos y los límites del modelo", () => {
+      const plan = planFor(ID, metrics);
+      renderUI(<SimulationCard simulation={simulationFor(ID, metrics, plan)} quality={qualityFor(ID, plan)} />);
+      expect(screen.getByRole("heading", { name: "Proyección del plan" })).toBeInTheDocument();
+      expect(screen.getByText("Base de entidad y medición")).toBeInTheDocument();
+      expect(screen.getByText(/Estimación orientativa/)).toBeInTheDocument();
+      expect(screen.getByText("Supuestos y límites de la estimación")).toBeInTheDocument();
+    });
+  });
+
+  describe("PlanQualityCard", () => {
+    it("marca las acciones que requieren revisión", () => {
+      const plan = planFor(ID, metrics);
+      renderUI(<PlanQualityCard quality={qualityFor(ID, plan)} />);
+      expect(screen.getByText(/acciones A4/)).toBeInTheDocument();
+      expect(screen.getByText("Restricciones")).toBeInTheDocument();
+      expect(screen.getByText("86 %")).toBeInTheDocument();
+    });
   });
 });

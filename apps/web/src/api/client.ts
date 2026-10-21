@@ -4,6 +4,7 @@ import type {
   CreateStudyResponse,
   Evidence,
   FormatoExport,
+  RemeasureResponse,
   ResumeRequest,
   StudyStatus,
 } from "../types/api";
@@ -37,8 +38,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     headers: { "Content-Type": "application/json", ...init?.headers },
   });
   if (!res.ok) throw new ApiError(res.status, await detalle(res));
-  if (res.status === 202 || res.status === 204) return undefined as T;
-  return (await res.json()) as T;
+  // 202 puede venir con cuerpo (remeasure) o sin él (resume).
+  const texto = res.status === 204 ? "" : await res.text();
+  return (texto ? JSON.parse(texto) : undefined) as T;
 }
 
 export const api = {
@@ -51,6 +53,11 @@ export const api = {
     request<void>(`/studies/${encodeURIComponent(id)}/resume`, {
       method: "POST",
       body: JSON.stringify(body),
+    }),
+
+  remeasure: (id: string) =>
+    request<RemeasureResponse>(`/studies/${encodeURIComponent(id)}/remeasure`, {
+      method: "POST",
     }),
 
   listStudies: (brandId: string) =>

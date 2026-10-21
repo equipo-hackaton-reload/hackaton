@@ -4,7 +4,7 @@ const v = (name: string) => `var(--${name})`;
 
 export default {
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
-  darkMode: "media",
+  darkMode: ["selector", '[data-theme="dark"]'],
   theme: {
     extend: {
       colors: {
@@ -21,6 +21,7 @@ export default {
         primary: v("primary"),
         "on-primary": v("on-primary"),
         accent: v("accent"),
+        "on-accent": v("on-accent"),
         "accent-soft": v("accent-soft"),
         "accent-ink": v("accent-ink"),
         positive: v("positive"),
@@ -33,16 +34,20 @@ export default {
         "pill-warn-ink": v("pill-warning-ink"),
         "pill-warn-line": v("pill-warning-line"),
       },
-      fontFamily: { sans: ['"IBM Plex Sans"', "system-ui", "sans-serif"] },
+      fontFamily: {
+        sans: ['"Geist Variable"', "system-ui", "sans-serif"],
+        display: ['"Bricolage Grotesque Variable"', '"Geist Variable"', "system-ui", "sans-serif"],
+      },
       fontSize: {
         meta: ["12px", "16px"],
         body: ["14px", "20px"],
-        section: ["16px", "24px"],
+        section: ["17px", "24px"],
         kpi: ["24px", "30px"],
-        title: ["24px", "30px"],
+        title: ["30px", "36px"],
         answer: ["36px", "40px"],
       },
-      borderRadius: { card: "8px", control: "6px", chip: "4px" },
+      borderRadius: { card: "12px", control: "8px", chip: "5px" },
+      boxShadow: { panel: v("panel-shadow"), cta: v("cta-shadow") },
       maxWidth: { canvas: "1240px" },
     },
   },

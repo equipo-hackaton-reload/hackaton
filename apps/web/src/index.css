@@ -3,24 +3,26 @@
 @tailwind utilities;
 
 /*
- * Tokens de posiq. Un fondo, una tinta y un acento magenta que solo marca la marca foco y la
- * acción principal. Claro u oscuro según el sistema.
+ * Tokens de posiq. Un fondo cálido con resplandores de la marca, una tinta y un acento magenta que
+ * marca la marca foco y la acción principal. Claro u oscuro según `data-theme`, que fija el script
+ * de index.html (elección guardada o, si no, la del sistema).
  */
 :root {
   color-scheme: light;
-  --ground: #f6f5f4;
+  --ground: #f7f4f2;
   --surface: #ffffff;
-  --raised: #f1f0ee;
-  --active: #e9e7e5;
-  --border: #e4e2df;
-  --rule: #eeecea;
-  --control: #cdcac6;
-  --text: #171516;
-  --muted: #595557;
-  --faint: #6b6769;
-  --primary: #1b191a;
+  --raised: #f4f0ee;
+  --active: #ece6e4;
+  --border: #e8e1de;
+  --rule: #f0ebe8;
+  --control: #cfc7c4;
+  --text: #1a1418;
+  --muted: #5d555a;
+  --faint: #6e6569;
+  --primary: #1d171b;
   --on-primary: #ffffff;
   --accent: #c41d63;
+  --on-accent: #ffffff;
   --accent-soft: #fbe8f0;
   --accent-ink: #8f1347;
   --positive: #247b50;
@@ -32,40 +34,51 @@
   --pill-warning-bg: #fffbeb;
   --pill-warning-ink: #92400e;
   --pill-warning-line: #fde68a;
-  --track: #e9e7e5;
-  --bar: #a8a3a5;
+  --track: #ece6e4;
+  --bar: #aaa1a5;
+  --header: rgb(247 244 242 / 0.78);
+  --glow-a: rgb(196 29 99 / 0.11);
+  --glow-b: rgb(255 150 90 / 0.10);
+  --dots: rgb(26 20 24 / 0.07);
+  --panel-shadow: 0 1px 2px rgb(40 20 30 / 0.04), 0 10px 28px -14px rgb(40 20 30 / 0.14);
+  --cta-shadow: 0 1px 2px rgb(143 19 71 / 0.25), 0 6px 16px -6px rgb(196 29 99 / 0.45);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    color-scheme: dark;
-    --ground: #121112;
-    --surface: #1a191a;
-    --raised: #222022;
-    --active: #2b292b;
-    --border: #2d2b2d;
-    --rule: #242224;
-    --control: #4a474a;
-    --text: #f3f1f2;
-    --muted: #b5b1b3;
-    --faint: #9a9698;
-    --primary: #f3f1f2;
-    --on-primary: #121112;
-    --accent: #ff5e9c;
-    --accent-soft: #3a1828;
-    --accent-ink: #ff8fb9;
-    --positive: #3fc07a;
-    --negative: #f0657a;
-    --pill-positive-bg: #172a1d;
-    --pill-positive-ink: #5fd393;
-    --pill-negative-bg: #2c1a20;
-    --pill-negative-ink: #f0899a;
-    --pill-warning-bg: #2a2110;
-    --pill-warning-ink: #f5c46b;
-    --pill-warning-line: #5a4517;
-    --track: #2b292b;
-    --bar: #6d686b;
-  }
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ground: #130e16;
+  --surface: #1b1520;
+  --raised: #241c2a;
+  --active: #2f2636;
+  --border: #2f2636;
+  --rule: #271f2d;
+  --control: #4f4456;
+  --text: #f4eff3;
+  --muted: #bbb1b9;
+  --faint: #9f949d;
+  --primary: #f4eff3;
+  --on-primary: #130e16;
+  --accent: #ff5e9c;
+  --on-accent: #22060f;
+  --accent-soft: #3d1830;
+  --accent-ink: #ff94bd;
+  --positive: #3fc07a;
+  --negative: #f0657a;
+  --pill-positive-bg: #172a1f;
+  --pill-positive-ink: #5fd393;
+  --pill-negative-bg: #2e1a24;
+  --pill-negative-ink: #f0899a;
+  --pill-warning-bg: #2b2113;
+  --pill-warning-ink: #f5c46b;
+  --pill-warning-line: #5a4517;
+  --track: #2f2636;
+  --bar: #75697a;
+  --header: rgb(19 14 22 / 0.72);
+  --glow-a: rgb(255 94 156 / 0.16);
+  --glow-b: rgb(255 140 80 / 0.10);
+  --dots: rgb(244 239 243 / 0.06);
+  --panel-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04), 0 12px 32px -16px rgb(0 0 0 / 0.6);
+  --cta-shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 20px -8px rgb(255 94 156 / 0.5);
 }
 
 @layer base {
@@ -75,7 +88,32 @@
   }
   body {
     @apply bg-ground font-sans text-body text-ink antialiased;
-    font-feature-settings: "kern";
+    font-feature-settings: "kern", "ss01";
+    background-image:
+      radial-gradient(1100px 620px at 8% -12%, var(--glow-a), transparent 62%),
+      radial-gradient(900px 560px at 100% -6%, var(--glow-b), transparent 60%);
+    background-attachment: fixed;
+    background-repeat: no-repeat;
+  }
+  /* Trama de puntos que se desvanece hacia abajo: da textura sin competir con los datos. */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background-image: radial-gradient(var(--dots) 1px, transparent 1px);
+    background-size: 22px 22px;
+    mask-image: linear-gradient(to bottom, black, transparent 520px);
+  }
+  h1,
+  h2,
+  h3 {
+    @apply font-display;
+    text-wrap: balance;
+  }
+  h1 {
+    letter-spacing: -0.025em;
   }
   ::selection {
     background: var(--accent-soft);
@@ -102,13 +140,14 @@
 
 @layer components {
   .panel {
-    @apply rounded-card border border-line bg-surface;
+    @apply rounded-card border border-line bg-surface shadow-panel;
   }
+  /* 40 px de alto: objetivos grandes y fáciles de alcanzar (ley de Fitts, WCAG 2.5.8). */
   .btn {
-    @apply inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-control px-3.5 text-body font-medium transition-[background-color,color,transform] duration-150 ease-out active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 disabled:active:scale-100;
+    @apply inline-flex h-10 items-center justify-center gap-2 whitespace-nowrap rounded-control px-3.5 text-body font-medium transition-[background-color,color,box-shadow,transform,filter] duration-150 ease-out active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 disabled:active:scale-100;
   }
   .btn-primary {
-    @apply btn bg-primary text-on-primary hover:opacity-90;
+    @apply btn bg-accent text-on-accent shadow-cta hover:brightness-110;
   }
   .btn-secondary {
     @apply btn border border-control bg-surface text-ink hover:bg-raised;
@@ -117,7 +156,7 @@
     @apply btn text-ink hover:bg-raised;
   }
   .field {
-    @apply h-9 w-full rounded-control border border-line bg-surface px-2.5 text-body text-ink placeholder:text-faint hover:border-control;
+    @apply h-10 w-full rounded-control border border-line bg-surface px-2.5 text-body text-ink transition-[border-color,box-shadow] duration-150 placeholder:text-faint hover:border-control focus:border-accent focus:shadow-[0_0_0_3px_var(--accent-soft)] focus:outline-none;
   }
   .label {
     @apply mb-1.5 block text-body font-medium text-ink;
@@ -127,6 +166,33 @@
   }
   .pill {
     @apply inline-flex h-5 flex-none items-center whitespace-nowrap rounded-chip px-1.5 text-meta font-medium;
+  }
+
+  /* Campo con icono: la etiqueta va encima y el icono dentro, agrupados por proximidad (Gestalt). */
+  .field-icon {
+    @apply flex h-12 items-center gap-2.5 rounded-control border border-line bg-surface px-3.5 transition-[border-color,box-shadow] duration-150 hover:border-control focus-within:border-accent focus-within:shadow-[0_0_0_3px_var(--accent-soft)];
+  }
+  .field-icon input {
+    @apply h-full min-w-0 flex-1 bg-transparent text-[15px] text-ink placeholder:text-faint focus:outline-none focus-visible:outline-none;
+  }
+  .field-icon.is-invalid {
+    @apply border-negative focus-within:shadow-[0_0_0_3px_var(--pill-negative-bg)];
+  }
+  /* El error se dice con texto e icono, no solo con color (código redundante). */
+  .field-error {
+    @apply mt-1.5 flex items-center gap-1.5 text-meta text-pill-neg-ink;
+  }
+
+  .login-hero {
+    /* Una sola familia de color (frambuesa a vino): sin violetas ni azules en el degradado. */
+    background: linear-gradient(155deg, #d8335f 0%, #b01650 48%, #6e0f2f 100%);
+  }
+  .login-blob {
+    position: absolute;
+    border-radius: 9999px;
+    filter: blur(70px);
+    opacity: 0.55;
+    pointer-events: none;
   }
 }
 

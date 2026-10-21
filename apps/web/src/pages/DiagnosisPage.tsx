@@ -1,4 +1,6 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { ApiError } from "../api/client";
+import { useRemeasure } from "../api/hooks";
 import { FindingsList } from "../components/FindingsList";
 import { KitNotice } from "../components/KitNotice";
 import { PageTitle } from "../components/PageTitle";
@@ -9,12 +11,64 @@ import { Waiting } from "../components/States";
 import { VisibilityTables } from "../components/VisibilityTables";
 import { fmtNum, ordinal } from "../lib/format";
 import { nombres, scoreDe } from "../lib/study";
+import type { MetricsDelta } from "../types/schemas";
 import { useStudyContext } from "./studyContext";
+
+/** Signo, flecha y color a la vez: el sentido del cambio no depende solo del tono. Sin cambio, neutro. */
+function DeltaValor({ valor }: { valor: number | null }) {
+  if (valor == null) return <p className="num mt-1 text-xl font-semibold text-muted">—</p>;
+  const sube = valor > 0;
+  const baja = valor < 0;
+  const tono = sube ? "text-pill-pos-ink" : baja ? "text-pill-neg-ink" : "text-muted";
+  return (
+    <p className={`num mt-1 flex items-center gap-1.5 text-xl font-semibold ${tono}`}>
+      <svg aria-hidden="true" viewBox="0 0 16 16" className="size-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d={sube ? "M8 13V3M4 7l4-4 4 4" : baja ? "M8 3v10M4 9l4 4 4-4" : "M3 8h10"} />
+      </svg>
+      {`${sube ? "+" : ""}${fmtNum(valor, 2)} pts`}
+      <span className="sr-only">{sube ? "(sube)" : baja ? "(baja)" : "(sin cambio)"}</span>
+    </p>
+  );
+}
+
+function DeltaPanel({ delta }: { delta: MetricsDelta }) {
+  return (
+    <section aria-labelledby="delta-titulo" className="mb-6 rounded-card bg-raised px-5 py-4">
+      <div className="flex flex-wrap items-baseline justify-between gap-3">
+        <h2 id="delta-titulo" className="font-semibold">Delta frente a la medición anterior</h2>
+        <span className="text-meta text-muted">{delta.comparable ? "Comparación válida" : "Comparación orientativa"}</span>
+      </div>
+      <div className="mt-4 grid gap-4 sm:grid-cols-3">
+        <div>
+          <p className="text-meta text-muted">Score anterior</p>
+          <p className="num mt-1 text-xl">{fmtNum(delta.score_anterior, 2)}</p>
+        </div>
+        <div>
+          <p className="text-meta text-muted">Score actual</p>
+          <p className="num mt-1 text-xl">{fmtNum(delta.score_actual, 2)}</p>
+        </div>
+        <div>
+          <p className="text-meta text-muted">Cambio</p>
+          <DeltaValor valor={delta.score_delta} />
+        </div>
+      </div>
+      {delta.avisos.length > 0 && <p className="mt-4 text-meta text-muted">{delta.avisos.join(" ")}</p>}
+    </section>
+  );
+}
 
 export function DiagnosisPage() {
   const { id, status } = useStudyContext();
+  const navigate = useNavigate();
+  const remeasure = useRemeasure();
   const { metrics, findings, market } = status;
   const kit = status.study.modo === "kit";
+
+  function startRemeasure() {
+    remeasure.mutate(id, {
+      onSuccess: ({ study_id }) => navigate(`/studies/${study_id}/diagnostico`),
+    });
+  }
 
   if (!metrics || !findings) {
     return (
@@ -48,15 +102,30 @@ export function DiagnosisPage() {
         title="Diagnóstico"
         subtitle={resumen}
         actions={
-          status.plan && (
-            <Link to={`/studies/${id}/plan`} className="btn-primary">
-              {status.revision_pendiente === "plan" ? "Revisar el plan" : "Ver el plan"}
-            </Link>
-          )
+          <div className="flex flex-wrap gap-2">
+            {status.plan && (
+              <Link to={`/studies/${id}/plan`} className="btn-primary">
+                {status.revision_pendiente === "plan" ? "Revisar el plan" : "Ver el plan"}
+              </Link>
+            )}
+            {status.estado === "completado" && (
+              <button type="button" className="btn-secondary" onClick={startRemeasure} disabled={remeasure.isPending}>
+                {remeasure.isPending ? "Preparando…" : "Volver a medir"}
+              </button>
+            )}
+          </div>
         }
       >
         {kit && <KitNotice />}
       </PageTitle>
+
+      {remeasure.isError && (
+        <p role="alert" className="mb-6 rounded-control bg-pill-neg-bg px-4 py-3 text-pill-neg-ink">
+          {remeasure.error instanceof ApiError ? remeasure.error.message : "No se pudo iniciar la re-medición."}
+        </p>
+      )}
+
+      {status.metrics_delta && <DeltaPanel delta={status.metrics_delta} />}
 
       <div className="grid gap-6">
         <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
