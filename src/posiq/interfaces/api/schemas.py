@@ -4,6 +4,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
+from posiq.domain.quality_schemas import PlanQuality
 from posiq.domain.schemas import (
     BriefSummary,
     Evaluation,
@@ -16,6 +17,7 @@ from posiq.domain.schemas import (
     Proposal,
     Study,
 )
+from posiq.domain.simulation_schemas import SimulationResult
 
 EstadoApi = Literal[
     "en_curso",
@@ -46,6 +48,10 @@ class StudyView(BaseModel):
     metrics: Metrics | None = None
     findings: list[Finding] | None = None
     plan: Plan | None = None
+    # Ayudas a la revisión del plan: proyección del score (estimación con supuestos, no promesa)
+    # y calidad por acción (None si no hay claves de juez).
+    simulacion: SimulationResult | None = None
+    calidad_plan: PlanQuality | None = None
     proposal: Proposal | None = None
 
 

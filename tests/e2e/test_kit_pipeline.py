@@ -13,6 +13,7 @@ from posiq.adapters.repo.sql import SqlStudyRepo
 from posiq.application.graph import sqlite_checkpointer
 from posiq.application.runner import StudyRunner
 from posiq.domain.schemas import Proposal
+from posiq.domain.simulation_schemas import SimulationResult
 from tests.application.fakes import KIT_DIR, kit_llm, make_deps
 
 pytestmark = pytest.mark.anyio
@@ -54,6 +55,10 @@ async def test_kit_pipeline_end_to_end(tmp_path: Path) -> None:
     repo = SqlStudyRepo(url)
     async with sqlite_checkpointer(url) as checkpointer:
         runner = runner_for(repo, checkpointer)
+        # La simulación sobrevive al reinicio como modelo, no como dict suelto.
+        values, _ = await runner.state(study.id)
+        assert isinstance(values["simulacion"], SimulationResult)
+        assert values["simulacion"].study_id == study.id
         await runner.check_resume(study.id, "plan", {"aprobado": True})
         await runner.resume(study.id, {"aprobado": True})
         assert runner.fallos == {}

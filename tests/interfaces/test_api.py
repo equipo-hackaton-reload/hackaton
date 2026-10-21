@@ -72,6 +72,9 @@ async def test_full_flow_with_both_reviews(client: httpx.AsyncClient) -> None:
     assert len(view["market"]["marcas"]) == 6
     assert view["metrics"]["study_id"] == sid
     assert view["findings"] and view["plan"]["study_id"] == sid
+    assert view["simulacion"]["study_id"] == sid
+    assert len(view["simulacion"]["proyecciones"]) == len(view["plan"]["fases"])
+    assert view["calidad_plan"] is None
 
     response = await client.post(
         f"/studies/{sid}/resume", json={"revision": "plan", "payload": {"aprobado": True}}
@@ -135,6 +138,29 @@ async def approve_competitors(client: httpx.AsyncClient, sid: str) -> dict[str, 
     )
     assert response.status_code == 202, response.text
     return dict((await client.get(f"/studies/{sid}")).json())
+
+
+async def test_editing_the_plan_recomputes_the_simulation(client: httpx.AsyncClient) -> None:
+    sid = await create(client)
+    view = await approve_competitors(client, sid)
+    plan = view["plan"]
+    assert [p["fase"] for p in view["simulacion"]["proyecciones"]] == ["Fase 1"]
+    fase = plan["fases"][0]
+    segunda = {
+        **fase,
+        "nombre": "Fase 2",
+        "acciones": [{**a, "id": f"{a['id']}-bis"} for a in fase["acciones"]],
+    }
+    editado = {**plan, "fases": [fase, segunda]}
+
+    response = await client.post(
+        f"/studies/{sid}/resume", json={"revision": "plan", "payload": editado}
+    )
+    assert response.status_code == 202, response.text
+
+    view = (await client.get(f"/studies/{sid}")).json()
+    assert view["estado"] == "completado", view["errores"]
+    assert [p["fase"] for p in view["simulacion"]["proyecciones"]] == ["Fase 1", "Fase 2"]
 
 
 async def test_traces_lists_the_traces_of_the_study(client: httpx.AsyncClient) -> None:

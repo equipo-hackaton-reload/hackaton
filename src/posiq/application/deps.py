@@ -11,12 +11,15 @@ from pydantic import BaseModel
 
 from posiq.adapters.budget import Budget
 from posiq.application.state import StudyState
+from posiq.domain.quality_schemas import PlanQuality
 from posiq.domain.schemas import (
     Brand,
     BriefSummary,
     Evaluation,
+    Finding,
     Market,
     ModoEstudio,
+    Plan,
     Run,
     Study,
     Trace,
@@ -40,14 +43,27 @@ class AsyncJudge(Protocol):
     async def aevaluate_many(self, pairs: Sequence[tuple[Run, Brand]]) -> list[Evaluation]: ...
 
 
+class PlanAssessor(Protocol):
+    """Lo que el grafo necesita de PlanGuard: evaluar el plan sin bloquear.
+
+    Apunta sus llamadas en el presupuesto con el que se construye; de ahí salen sus trazas.
+    """
+
+    async def aassess(
+        self, plan: Plan, findings: Sequence[Finding], brief: BriefSummary
+    ) -> PlanQuality: ...
+
+
 JudgeFactory = Callable[[Market, Budget], AsyncJudge]
 BudgetFactory = Callable[[str], Budget]
+PlanGuardFactory = Callable[[Budget], PlanAssessor]
 
 
 @dataclass(frozen=True)
 class Deps:
     """`budget` crea el presupuesto de un estudio (con su `study_id`); `judge_factory` construye
-    el juez con el mercado confirmado y ese presupuesto."""
+    el juez con el mercado confirmado y ese presupuesto. Sin `plan_guard_factory` (sin claves de
+    juez), la calidad del plan no se evalúa."""
 
     llm: LLM
     engines: list[Engine]
@@ -56,6 +72,7 @@ class Deps:
     budget: BudgetFactory
     settings: Settings
     engine_factory: Callable[[list[str], Budget], list[Engine]] | None = None
+    plan_guard_factory: PlanGuardFactory | None = None
 
 
 def study_budget(deps: Deps, state: StudyState) -> Budget:

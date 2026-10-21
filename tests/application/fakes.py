@@ -10,10 +10,12 @@ from sqlalchemy.pool import StaticPool
 from sqlmodel import create_engine
 
 from posiq.adapters.budget import Budget
+from posiq.adapters.errors import MissingCredentialError
 from posiq.adapters.repo.sql import SqlStudyRepo
-from posiq.application.deps import Deps
+from posiq.application.deps import Deps, PlanGuardFactory
 from posiq.application.schemas_draft import ProposalDraft
 from posiq.domain.detection import detect_in_run, evaluation_from_detection
+from posiq.domain.quality_schemas import PlanQuality
 from posiq.domain.schemas import (
     Action,
     Brand,
@@ -125,6 +127,38 @@ class DetectionJudge:
         return out
 
 
+class FakeGuard:
+    """PlanGuard falso: una llamada de coste fijo apuntada en el presupuesto del estudio."""
+
+    def __init__(self, budget: Budget, coste: float = 0.01, *, sin_clave: bool = False) -> None:
+        self.budget = budget
+        self.coste = coste
+        self.sin_clave = sin_clave
+        self.planes: list[Plan] = []
+
+    async def aassess(
+        self, plan: Plan, findings: Sequence[Finding], brief: BriefSummary
+    ) -> PlanQuality:
+        if self.sin_clave:
+            raise MissingCredentialError("TYPESAFE_API_KEY", "PlanGuard")
+        self.planes.append(plan)
+        self.budget.record(trace(plan.study_id, "plan_guard:fake", self.coste))
+        return PlanQuality(
+            study_id=plan.study_id,
+            juez="fake",
+            modelo="fake",
+            acciones=[],
+            pct_especificas=None,
+            pct_coherentes=None,
+            pct_respetan_restricciones=None,
+            pct_realistas=None,
+            calidad_media=None,
+            por_debajo_umbral=[],
+            baja_confianza=[],
+            nota=f"{len(plan.acciones)} acciones evaluadas",
+        )
+
+
 KIT_DIR = Path(__file__).resolve().parents[2] / "data" / "kit" / "02_Datos" / "caso_oftalmologia"
 
 
@@ -147,6 +181,7 @@ def make_deps(
     settings: Settings | None = None,
     judge_factory: Callable[[Market, Budget], Any] | None = None,
     budget_max: float = 5.0,
+    plan_guard_factory: PlanGuardFactory | None = None,
 ) -> Deps:
     return Deps(
         llm=llm,
@@ -155,6 +190,7 @@ def make_deps(
         repo=repo,
         budget=lambda study_id: Budget(budget_max, study_id),
         settings=settings or kit_settings(),
+        plan_guard_factory=plan_guard_factory,
     )
 
 

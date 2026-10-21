@@ -4,13 +4,34 @@ El LLM recibe las cifras ya calculadas (resumen de métricas y hallazgos). Si el
 brief (`validate_plan_against_brief`) o enlaza hallazgos que no existen, se reintenta una vez con
 las violaciones en el `state`; si persisten, el plan se queda y las violaciones van a `errores`
 para que la persona las vea en la revisión.
+
+Junto al plan van dos ayudas para la revisión (`plan_checks`), que no bloquean nada:
+- `simulacion`: impacto proyectado sobre el Score de Citación (`domain.simulation`, código puro).
+- `calidad_plan`: juicio de PlanGuard por acción. Sin claves de juez queda en None y se anota.
 """
 
 from typing import Any
 
-from posiq.application.deps import Deps, cost_update, db, dump, persist_traces, structured
+from posiq.adapters.errors import MissingCredentialError
+from posiq.application.deps import (
+    Deps,
+    cost_update,
+    db,
+    dump,
+    persist_traces,
+    structured,
+    study_budget,
+)
 from posiq.application.state import StudyState
-from posiq.domain.schemas import BriefSummary, Finding, Metrics, Plan, validate_plan_against_brief
+from posiq.domain.schemas import (
+    BriefSummary,
+    Finding,
+    Metrics,
+    Plan,
+    Trace,
+    validate_plan_against_brief,
+)
+from posiq.domain.simulation import simulate_plan
 
 
 def metrics_summary(metrics: Metrics) -> dict[str, Any]:
@@ -43,6 +64,29 @@ def own_plan(plan: Plan, study_id: str) -> Plan:
     return plan if plan.study_id == study_id else plan.model_copy(update={"study_id": study_id})
 
 
+async def plan_checks(state: StudyState, deps: Deps, plan: Plan) -> dict[str, Any]:
+    """Simulación del impacto y calidad del plan, con las trazas nuevas de PlanGuard.
+
+    `state["traces"]` debe incluir ya las trazas de este nodo, para que el presupuesto las cuente.
+    Devuelve `simulacion`, `calidad_plan`, `traces` (solo las nuevas) y `errores`.
+    """
+    simulacion = simulate_plan(plan, state["metrics"], state["findings"])
+    if deps.plan_guard_factory is None:
+        return {"simulacion": simulacion, "calidad_plan": None, "traces": [], "errores": []}
+
+    budget = study_budget(deps, state)
+    antes = len(budget.traces)
+    guard = deps.plan_guard_factory(budget)
+    errores: list[str] = []
+    try:
+        calidad = await guard.aassess(plan, state["findings"], state["brief"])
+    except MissingCredentialError as exc:
+        calidad = None
+        errores.append(f"plan_guard: {exc} Calidad del plan sin evaluar.")
+    nuevas: list[Trace] = budget.traces[antes:]
+    return {"simulacion": simulacion, "calidad_plan": calidad, "traces": nuevas, "errores": errores}
+
+
 async def plan(state: StudyState, deps: Deps) -> dict[str, Any]:
     sid = state["study_id"]
     brief, findings = state["brief"], state["findings"]
@@ -70,6 +114,11 @@ async def plan(state: StudyState, deps: Deps) -> dict[str, Any]:
         traces.append(trace)
         violaciones = plan_violations(propuesto, brief, findings)
 
+    checks = await plan_checks(
+        {**state, "traces": [*state.get("traces", []), *traces]}, deps, propuesto
+    )
+    traces.extend(checks["traces"])
+
     await db(deps.repo.save_plan, sid, propuesto)
     study = await db(deps.repo.get_study, sid)
     await db(deps.repo.save_study, study.model_copy(update={"estado": "esperando_revision_plan"}))
@@ -77,7 +126,9 @@ async def plan(state: StudyState, deps: Deps) -> dict[str, Any]:
     return {
         "plan": propuesto,
         "plan_violaciones": violaciones,
+        "simulacion": checks["simulacion"],
+        "calidad_plan": checks["calidad_plan"],
         "revision_pendiente": "plan",
-        "errores": [f"plan: {v}" for v in violaciones],
+        "errores": [f"plan: {v}" for v in violaciones] + checks["errores"],
         **cost_update(state, traces),
     }
