@@ -6,19 +6,58 @@
 - Consume `/studies`, `/studies/{id}`, `/resume`, `/traces`, `/evaluations` y `GET /estimate`.
 - La tarjeta de simulación y calidad del plan ya están conectadas a los campos opcionales de C;
   el mock incluye rangos por fase y calidad por acción.
-- El diagnóstico ya ofrece re-medición mock y vista del delta; queda probarlo cuando C publique
-  `POST /studies/{id}/remeasure`.
+
+## En `feature/D-cuentas-seguimiento` (PR abierta, sin fusionar)
+- Rebasada sobre develop con #35, #36 y #37. Cuentas contra `/auth/*` de la API (mocks MSW con
+  los mismos `detail` en `src/mocks/auth.ts` y `handlers.ts`): registro → verificación con código (la web solo enseña
+  `codigo_dev` si la API lo devuelve) → login con token Bearer. Token en sessionStorage, o
+  localStorage con «Recordarme». `api/client.ts` envía `Authorization` y, ante un 401, limpia la
+  sesión y vuelve a `/login?next=<ruta>`. «Salir» llama a `POST /auth/logout`. La caché de TanStack
+  Query se vacía al cambiar de usuario.
+- Seguimiento: `/marcas` (`GET /brands`) y `/marcas/:brandId` (`GET /brands/{id}/serie`): gráfico
+  SVG del score con banda del intervalo y media de competidores (las líneas se cortan en los puntos
+  no comparables, marcados con círculo hueco y motivo), resumen, lista solo de
+  `cambios_significativos` («Sin cambios fuera del margen de error» si no hay), tabla de mediciones e
+  indicadores adelantados. No se calcula ninguna cifra: se pinta `SerieMarca`.
+- «Volver a medir» (diagnóstico y seguimiento): `GET /studies/{id}/remeasure/estimate`, diálogo con
+  el coste y `POST /remeasure {confirmado: true, coste_estimado_eur}`. Ante 409 vuelve a pedir la
+  estimación: si cambió, enseña el coste nuevo; si no, avisa de que ya hay una re-medición en curso.
+- Arreglos de la auditoría: estado `error` (aviso con `errores`, «Volver a comprobar», sin spinner
+  infinito), fallo puntual del sondeo sin tapar la pantalla, estimación también en kit y
+  confirmación explícita en real si supera el tope, KPI de fracción como porcentaje y borrador del
+  plan que sobrevive al cambio de pestaña (`lib/planDraft.ts`).
+- Degradación sin las rutas de seguimiento: un 404 «Not Found» de FastAPI (`rutaNoDisponible` en
+  `api/client.ts`) en `/brands` o `/brands/{id}/serie` muestra «Seguimiento no disponible todavía»
+  sin «Reintentar»; sin `/remeasure/estimate`, solo en modo kit (0 €) el diálogo usa `GET /estimate`
+  y lo avisa («estimación aproximada»); en modo real no deja confirmar (`RemedicionRealNoDisponible`)
+  porque `POST /remeasure` aún no valida `confirmado` ni el coste y no se lanza gasto de pago con una
+  cifra aproximada. TanStack Query ya no reintenta los 4xx. Estimación con el
+  desglose de #37 (motores, LLM, juez, PlanGuard; kit a 0 €).
+- Probado de punta a punta con la API real (fixture, kit, BD temporal, `VITE_USE_MOCKS=false`):
+  registro → verificación con `codigo_dev` → login → estudio kit → competidores → diagnóstico
+  (25,93; 8.ª de 10) → plan → propuesta, y «Volver a medir» crea la re-medición.
+- Tipos: `types/auth.ts`, `types/tracking.ts` (espejo de `domain/tracking_schemas.py`) y `EstadoApi = EstadoEstudio | "error"` en `types/api.ts`. `types/schemas.ts` vuelve a
+  estar alineado con `schemas.py` (`Encargo`, `PuntoBrief`, `posicionamiento_deseado`,
+  `atributos_deseados`); falta pintar el encargo.
 
 - Aviso del modo kit: `POST /studies` devuelve `aviso` (solo en kit); `NewStudyPage` lo guarda
   por estudio en sessionStorage (`lib/avisoKit.ts`) y `CompetitorsPage` lo enseña con
   `components/AvisoKit.tsx`. Hecho por zona C con autorización; los mocks aún no lo devuelven.
 
 ## Falta
-- Probar la integración con la API de C usando `LLM_PROVIDER=fixture`.
-- Pulir la interfaz, ejecutar build de producción y capturar la demo.
+- Integrar `/brands`, `/brands/{id}/serie` y `/studies/{id}/remeasure/estimate` cuando los publique
+  la etapa «Seguimiento API» (zona C; hoy responden 404 y la web degrada). `POST /remeasure` ya existe
+  pero ignora `{confirmado, coste_estimado_eur}`: el 409 por coste cambiado solo lo da el mock y la
+  única protección del gasto es la de la web. Zona C: validar `confirmado` y `coste_estimado_eur` en el
+  servidor y exigir un indicador explícito cuando supere `presupuesto_max_eur`; entonces se puede
+  reactivar «Volver a medir» en real sin la ruta de estimación propia; `types/tracking.ts` ya replica `domain/tracking_schemas.py` (#35).
+- `Objective` no trae `unidad`: la web la infiere (KPI de tasa con valores 0-1 → porcentaje). Si A
+  añade `unidad` al objetivo, la web ya la usa.
+- Mostrar `proposal.encargo` (ver abajo).
 
 ## Siguiente tarea
-- `feature/D-simulacion`: mock implementado; pendiente validación contra la API real y capturas.
+- Cuando C publique los endpoints de seguimiento, probar `/marcas` contra la API real y quitar el
+  respaldo de la estimación.
 
 ## No tocar
 - No calcular cifras en el front: se pintan las que da la API.

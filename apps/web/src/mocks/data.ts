@@ -169,21 +169,21 @@ export function planFor(studyId: string, m: Metrics): Plan {
     study_id: studyId,
     objetivos: [
       {
-        kpi: "Visibilidad espontánea global (%)",
-        valor_actual: tasa(m, "global", "global"),
-        valor_objetivo: 55,
+        kpi: "Visibilidad espontánea global",
+        valor_actual: tasa(m, "global", "global") / 100,
+        valor_objetivo: 0.55,
         plazo_semanas: 24,
       },
       {
-        kpi: "Visibilidad espontánea en Barcelona (%)",
-        valor_actual: tasa(m, "ciudad", "Barcelona"),
-        valor_objetivo: 20,
+        kpi: "Visibilidad espontánea en Barcelona",
+        valor_actual: tasa(m, "ciudad", "Barcelona") / 100,
+        valor_objetivo: 0.2,
         plazo_semanas: 24,
       },
       {
-        kpi: "Visibilidad espontánea en Claude (%)",
-        valor_actual: tasa(m, "motor", "Claude"),
-        valor_objetivo: 35,
+        kpi: "Visibilidad espontánea en Claude",
+        valor_actual: tasa(m, "motor", "Claude") / 100,
+        valor_objetivo: 0.35,
         plazo_semanas: 24,
       },
     ],
@@ -444,4 +444,27 @@ export function tracesFor(modo: ModoEstudio, fase: 1 | 2 | 3): TraceSeed[] {
   return t.slice(0, fase).flat();
 }
 
-export const ESTIMACION_REAL = { llamadas: 624, coste_estimado_eur: 3.55, presupuesto_max_eur: 5 };
+export const ESTIMACION_REAL = {
+  llamadas: 624,
+  coste_estimado_eur: 3.55,
+  coste_motores_eur: 3.05,
+  coste_juez_eur: 0.44,
+  coste_llm_eur: 0.06,
+  coste_plan_guard_eur: 0,
+  llamadas_llm: 6,
+  juez: "jev",
+  presupuesto_max_eur: 5,
+};
+
+/** El modo kit es gratis por defecto (ADR 0018): ni motores ni LLM ni juez de pago. */
+export const ESTIMACION_KIT = {
+  llamadas: 0,
+  coste_estimado_eur: 0,
+  coste_motores_eur: 0,
+  coste_juez_eur: 0,
+  coste_llm_eur: 0,
+  coste_plan_guard_eur: 0,
+  llamadas_llm: 0,
+  juez: "kit",
+  presupuesto_max_eur: 5,
+};

@@ -15,6 +15,9 @@ import type {
 } from "./schemas";
 
 export type Revision = "competidores" | "plan";
+
+/** Estado que da la API: el del dominio más `error` (el grafo se ha detenido; ver `errores`). */
+export type EstadoApi = EstadoEstudio | "error";
 export type FormatoExport = "docx" | "pdf";
 
 /** `POST /studies` */
@@ -28,14 +31,12 @@ export interface CreateStudyResponse {
   aviso?: string | null;
 }
 
-export interface RemeasureResponse {
-  study_id: string;
-}
+export type { RemeasureCreated as RemeasureResponse } from "./tracking";
 
 /** `GET /studies/{id}`: los bloques opcionales aparecen a medida que el grafo los produce. */
 export interface StudyStatus {
   study: Study;
-  estado: EstadoEstudio;
+  estado: EstadoApi;
   revision_pendiente: Revision | null;
   coste_acumulado_eur: number;
   errores: string[];
@@ -135,9 +136,20 @@ export interface Evidence {
   fuentes: string[];
 }
 
-/** `GET /estimate?modo=real` → estimación previa del coste de un estudio. */
+/**
+ * `GET /estimate?modo=kit|real` y `GET /studies/{id}/remeasure/estimate` → estimación previa del
+ * coste (motores + LLM de los nodos + juez + PlanGuard). El modo kit es gratis salvo con
+ * `KIT_IA_REAL=true` en la API; la web enseña lo que diga la estimación.
+ */
 export interface CostEstimate {
   llamadas: number;
   coste_estimado_eur: number;
+  coste_motores_eur?: number;
+  coste_juez_eur?: number;
+  /** LLM de los nodos (intake, market, prompts, plan, write). */
+  coste_llm_eur?: number;
+  coste_plan_guard_eur?: number;
+  llamadas_llm?: number;
+  juez?: string;
   presupuesto_max_eur: number;
 }

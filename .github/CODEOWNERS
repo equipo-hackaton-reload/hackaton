@@ -1,16 +1,26 @@
-# Una línea por zona. Sustituir @TODO por el handle de GitHub del dueño.
-/src/posiq/domain/                @TODO
-/tests/domain/                    @TODO
-/tests/golden/                    @TODO
-/src/posiq/adapters/engines/      @TODO
-/src/posiq/adapters/judge/        @TODO
-/src/posiq/adapters/llm/          @TODO
-/src/posiq/application/           @TODO
-/src/posiq/interfaces/api/        @TODO
-/apps/web/                        @TODO
-/src/posiq/adapters/export/       @TODO
-/src/posiq/prompts/               @TODO
-/docs/                            @TODO
+# Dueños de código por zona (handles de GitHub de los colaboradores del repo).
+# Zona A (Marco): dominio puro, tests de dominio y golden
+/src/posiq/domain/                @marcoaurelio-cabral
+/tests/domain/                    @marcoaurelio-cabral
+/tests/golden/                    @marcoaurelio-cabral
+
+# Zona B (Óscar): adaptadores de motores, juez y cliente LLM
+/src/posiq/adapters/engines/      @oscar-nosthas
+/src/posiq/adapters/judge/        @oscar-nosthas
+/src/posiq/adapters/llm/          @oscar-nosthas
+
+# Zona C (Walter): orquestación LangGraph y API FastAPI
+/src/posiq/application/           @walterandres-dybek-sanchez
+/src/posiq/interfaces/api/        @walterandres-dybek-sanchez
+
+# Zona D (Claudia): interfaz web (React + Vite)
+/apps/web/                        @claudia-pena-garciatalavera
+
+# Zona E (Tracy): exportación Word/PDF, prompts versionados y documentación
+/src/posiq/adapters/export/       @tracyesther-rosillo-garcia
+/src/posiq/prompts/               @tracyesther-rosillo-garcia
+/docs/                            @tracyesther-rosillo-garcia
+
 # Contratos compartidos: revisión de todos los dueños de zona
-/src/posiq/domain/schemas.py      @TODO
-/src/posiq/ports.py               @TODO
+/src/posiq/domain/schemas.py      @marcoaurelio-cabral @oscar-nosthas @walterandres-dybek-sanchez @claudia-pena-garciatalavera @tracyesther-rosillo-garcia
+/src/posiq/ports.py               @marcoaurelio-cabral @oscar-nosthas @walterandres-dybek-sanchez @claudia-pena-garciatalavera @tracyesther-rosillo-garcia
