@@ -8,6 +8,14 @@ Un estudio recorre `brief → mercado → [revisión humana] → preguntas → m
 plan → [revisión humana] → propuesta`. Las cifras las calcula el código (`src/posiq/domain/`); el
 LLM solo interpreta y redacta sobre ellas. Arquitectura y decisiones en [`docs/adr/`](docs/adr/).
 
+## Documentación para la presentación
+
+Los conceptos explicados para el equipo y el jurado (Score de Citación, kit frente a medición real,
+rigor y seguimiento, capa determinista, propuesta GEO, propuesta de valor y glosario), con su orden
+de lectura, están en [`docs/conceptos/README.md`](docs/conceptos/README.md). Regla de oro: toda
+cifra de Clínica Alborada Visión es nuestro método aplicado al **caso sintético** del reto; el modo
+real todavía no se ha ejecutado.
+
 ## Requisitos
 
 | Herramienta | Versión | Para qué |
