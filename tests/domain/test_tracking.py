@@ -17,8 +17,13 @@ from posiq.domain.scoring import SCORE_VERSION
 from posiq.domain.stats import Muestra
 from posiq.domain.stats_schemas import Intervalo, Significancia
 from posiq.domain.tracking import (
+    MOTIVO_COMPETIDORES,
     MOTIVO_LINEA_BASE,
+    NO_COMPARABLE,
+    RESUMEN_LINEA_BASE,
+    RESUMEN_SIN_MEDICIONES,
     SIN_CAMBIOS,
+    SIN_CAMBIOS_COMPARABLES,
     MedicionSerie,
     comparabilidad,
     construir_serie,
@@ -37,6 +42,11 @@ MARCAS = [
     f.brand(RIVAL, "Rival Visión", rol="lider", dominio="rival.example"),
 ]
 MERCADO = Market(marcas=MARCAS, confirmado_por_humano=True)
+TERCERA = "tercera"
+MERCADO_AMPLIO = Market(
+    marcas=[*MARCAS, f.brand(TERCERA, "Tercera Visión", rol="contexto", dominio="tercera.example")],
+    confirmado_por_humano=True,
+)
 PROMPTS = [
     f.prompt("P-1", texto="¿Qué clínica oftalmológica me recomiendas?"),
     f.prompt("P-2", texto="¿Dónde me opero de miopía?"),
@@ -56,16 +66,18 @@ def _medicion(
     prompts: list[PromptInstance] = PROMPTS,
     market: Market | None = None,
     exactitud: HallazgoExactitud | None = None,
+    mercado_metricas: Market = MERCADO,
 ) -> MedicionSerie:
     """Medición sintética: `n` ejecuciones espontáneas; la marca foco aparece en las primeras
-    `apariciones_foco` (1.ª, fuerza 3) y el rival en las primeras `apariciones_rival` (2.º)."""
+    `apariciones_foco` (1.ª, fuerza 3) y el rival en las primeras `apariciones_rival` (2.º).
+    Con `mercado_metricas` = `MERCADO_AMPLIO`, la tercera marca se evalúa y no aparece nunca."""
     runs: list[Run] = []
     evaluations: list[Evaluation] = []
     for i in range(n):
         run = f.run(
             f"{study_id}-R{i:03d}",
             "Respuesta sintética",
-            [FOCO, RIVAL],
+            [b.id for b in mercado_metricas.marcas],
             study_id=study_id,
             prompt_id=prompts[i % len(prompts)].id,
             motor=motores[i % len(motores)],
@@ -87,8 +99,12 @@ def _medicion(
                 fuerza=2 if rival else 0,
             ),
         ]
+        if any(b.id == TERCERA for b in mercado_metricas.marcas):
+            evaluations.append(f.evaluation(TERCERA, run.id, False, study_id=study_id))
     brief = f.brief()
-    metrics = compute_metrics(brief, MERCADO, prompts, runs, evaluations, [], study_id=study_id)
+    metrics = compute_metrics(
+        brief, mercado_metricas, prompts, runs, evaluations, [], study_id=study_id
+    )
     study = Study(
         id=study_id,
         brand_id=FOCO,
@@ -156,7 +172,11 @@ def test_no_comparable_con_motivo_explicito(cambio: dict[str, object], motivo: s
     assert any(motivo in m for m in b.motivos_no_comparable)
     # Sin comparabilidad no hay cambios, aunque el score se haya movido mucho.
     assert serie.cambios == [] and serie.cambios_significativos == []
-    assert serie.resumen == [SIN_CAMBIOS]
+    # Y el resumen no dice «Sin cambios»: dice que no es comparable y por qué.
+    assert len(serie.resumen) == 1 and SIN_CAMBIOS not in serie.resumen[0]
+    linea = serie.resumen[0]
+    assert linea.startswith(f"Del 15/01/2026 al 15/04/2026: {NO_COMPARABLE.lower()}: ")
+    assert motivo in linea
 
 
 def test_cambio_de_version_del_score_no_es_comparable() -> None:
@@ -351,3 +371,67 @@ def test_marca_que_no_aparece_tiene_score_cero_no_none() -> None:
     # Con 0 apariciones el score es 0 (hay población), no None: se mide, pero no aparece.
     assert p.score == 0 and p.posicion == 2
     assert serie.resumen == [SIN_CAMBIOS]
+
+
+# --- Resumen: línea base, no comparable y sin cambios ---------------------------------------------
+
+
+def test_un_solo_punto_es_linea_base_no_sin_cambios() -> None:
+    serie = _serie(_medicion("S-1", T1, 10))
+    assert serie.cambios == []
+    assert serie.resumen == [RESUMEN_LINEA_BASE]
+    assert construir_serie(FOCO, "x", [], replicas=REPLICAS).resumen == [RESUMEN_SIN_MEDICIONES]
+
+
+def test_no_comparable_y_luego_sin_cambios() -> None:
+    # S-1 → S-2 no comparable (otra metodología); S-2 → S-3 comparable y sin cambios reales.
+    serie = _serie(
+        _medicion("S-1", T1, 10),
+        _medicion("S-2", T2, 10, version_metodologia="metodo-2"),
+        _medicion("S-3", T3, 10, version_metodologia="metodo-2"),
+    )
+    assert serie.cambios and not serie.cambios_significativos
+    assert serie.resumen[0].startswith(f"Del 15/01/2026 al 15/04/2026: {NO_COMPARABLE.lower()}")
+    assert serie.resumen[1:] == [SIN_CAMBIOS_COMPARABLES]
+
+
+# --- Cambio de competidores -----------------------------------------------------------------------
+
+
+def test_cambio_de_competidores_no_compara_puesto_ni_diferencia() -> None:
+    # Mismas respuestas para la marca: el score es idéntico, pero entra una tercera marca que no
+    # aparece nunca. Antes salía un cambio «fuera del margen» en la diferencia vs competidores.
+    serie = _serie(
+        _medicion("S-1", T1, 10),
+        _medicion("S-2", T2, 10, mercado_metricas=MERCADO_AMPLIO),
+    )
+    a, b = serie.puntos
+    assert a.marcas_mercado == [FOCO, RIVAL]
+    assert b.marcas_mercado == [FOCO, RIVAL, TERCERA]
+    assert a.score == b.score
+    assert a.diferencia_vs_competidores != b.diferencia_vs_competidores
+    # Score y aparición siguen siendo comparables...
+    assert b.comparable_con_anterior and b.motivos_no_comparable == []
+    metricas = {c.metrica for c in serie.cambios}
+    assert "score" in metricas and "aparicion_espontanea:global" in metricas
+    # ...pero puesto y diferencia frente a competidores no se calculan como cambio.
+    assert not b.competidores_comparables
+    assert not {"posicion", "diferencia_vs_competidores"} & metricas
+    assert not any(c.relativo_a_competidores for c in serie.cambios)
+    assert serie.cambios_significativos == []
+    motivo = next(x for x in b.avisos if x.startswith(f"{MOTIVO_COMPETIDORES}: "))
+    assert "entran tercera" in motivo and "(2 → 3 marcas)" in motivo
+    assert serie.resumen == [f"Del 15/01/2026 al 15/04/2026: {motivo}", SIN_CAMBIOS_COMPARABLES]
+    comp = comparabilidad(a, b)
+    assert comp.comparable and not comp.competidores_comparables
+    assert comp.motivos_competidores == [motivo]
+
+
+def test_mismo_mercado_compara_competidores() -> None:
+    serie = _serie(_medicion("S-1", T1, 10), _medicion("S-2", T2, 10))
+    b = serie.puntos[1]
+    assert b.competidores_comparables
+    assert {"posicion", "diferencia_vs_competidores"} <= {c.metrica for c in serie.cambios}
+    # Si en un punto no consta el mercado (lista vacía), no se puede decir que cambie.
+    sin_mercado = b.model_copy(update={"marcas_mercado": []})
+    assert comparabilidad(serie.puntos[0], sin_mercado).competidores_comparables

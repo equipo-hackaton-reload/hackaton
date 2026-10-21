@@ -30,6 +30,10 @@ class PuntoSerie(_Model):
     - `comparable_con_anterior`: si se puede comparar con el punto anterior de la serie. El primero
       nunca lo es (es la línea base) y lo dice en `motivos_no_comparable`.
     - `avisos`: cosas que no rompen la comparabilidad pero hay que leer (p. ej. cambio de modelo).
+    - `marcas_mercado`: brand_ids del mercado del estudio, ordenados (vacío = no consta). Si
+      cambian respecto al punto anterior, el score y la aparición siguen siendo comparables, pero
+      el puesto y la diferencia frente a los competidores no: `competidores_comparables = False` y
+      el motivo («Cambian los competidores del mercado: …») va en `avisos`.
     """
 
     study_id: str
@@ -48,6 +52,8 @@ class PuntoSerie(_Model):
     comparable_con_anterior: bool
     motivos_no_comparable: list[str] = []
     avisos: list[str] = []
+    marcas_mercado: list[str] = []
+    competidores_comparables: bool = True
 
     @model_validator(mode="after")
     def _motivos(self) -> Self:
@@ -108,8 +114,11 @@ class SerieMarca(_Model):
     """Serie temporal de una marca: puntos ordenados por fecha, cambios y resumen.
 
     `cambios` solo existen entre puntos consecutivos comparables. `cambios_significativos` es el
-    subconjunto que sale del margen de error. `resumen` son sus textos, o «Sin cambios fuera del
-    margen de error» si no hay ninguno.
+    subconjunto que sale del margen de error. `resumen` (`tracking.construir_serie`): con un solo
+    punto, «Línea base: aún no hay con qué comparar.»; por cada par no comparable, «No comparable
+    con la medición anterior: <motivos>»; por cada cambio de competidores, su motivo; y los textos
+    de los cambios significativos. «Sin cambios fuera del margen de error» solo si se calculó algún
+    cambio y ninguno es significativo.
     """
 
     brand_id: str
