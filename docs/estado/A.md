@@ -21,7 +21,7 @@
     competidores: su problema es que aparece menos.
   - **Para que C lo enchufe:** falta `StudyRepo.list_by_sector`.
 
-- Trazabilidad brief → propuesta (ADR 0012):
+- Trazabilidad brief → propuesta (ADR 0013):
   - PR 1 (#29, en develop): contrato aditivo `Proposal.encargo` (`Encargo`, `PuntoBrief`),
     `BriefSummary.posicionamiento_deseado/atributos_deseados` y `ProposalDraft.cobertura_brief`.
   - PR 2: `domain/brief_coverage.py` con `puntos_del_brief`, `evaluar_cobertura` y `carencias`.

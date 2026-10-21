@@ -1,4 +1,4 @@
-# ADR 0012 · Trazabilidad brief → propuesta
+# ADR 0013 · Trazabilidad brief → propuesta
 
 - **Estado:** aceptado
 - **Fecha:** 2026-10-21
