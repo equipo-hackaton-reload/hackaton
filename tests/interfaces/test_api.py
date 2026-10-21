@@ -140,6 +140,68 @@ async def approve_competitors(client: httpx.AsyncClient, sid: str) -> dict[str, 
     return dict((await client.get(f"/studies/{sid}")).json())
 
 
+async def completed_study(client: httpx.AsyncClient) -> str:
+    sid = await create(client)
+    await approve_competitors(client, sid)
+    response = await client.post(
+        f"/studies/{sid}/resume", json={"revision": "plan", "payload": {"aprobado": True}}
+    )
+    assert response.status_code == 202, response.text
+    assert (await client.get(f"/studies/{sid}")).json()["estado"] == "completado"
+    return sid
+
+
+async def test_remeasure_reuses_the_confirmed_market_and_compares(
+    client: httpx.AsyncClient,
+) -> None:
+    original = await completed_study(client)
+    before = (await client.get(f"/studies/{original}")).json()
+
+    response = await client.post(f"/studies/{original}/remeasure")
+    assert response.status_code == 201, response.text
+    body = response.json()
+    nuevo = body["study_id"]
+    assert nuevo != original and body["remedicion_de"] == original
+
+    view = (await client.get(f"/studies/{nuevo}")).json()
+    # Sin repetir intake ni la revisión de competidores: va directo a la revisión del plan.
+    assert view["estado"] == "esperando_revision_plan", view["errores"]
+    assert view["market"] == before["market"]
+    assert view["brief"] == before["brief"]
+    assert view["metrics"]["comparado_con"] == original
+    delta = view["metrics_delta"]
+    assert delta["comparado_con"] == original and delta["study_id"] == nuevo
+    # El kit da las mismas respuestas: la re-medición mide repetibilidad, no una mejora.
+    assert delta["score_delta"] == 0
+    nodos = {t["nodo"] for t in (await client.get(f"/studies/{nuevo}/traces")).json()}
+    assert "intake.v1" not in nodos and "market.v1" not in nodos
+
+    response = await client.post(
+        f"/studies/{nuevo}/resume", json={"revision": "plan", "payload": {"aprobado": True}}
+    )
+    assert response.status_code == 202
+    assert (await client.get(f"/studies/{nuevo}")).json()["estado"] == "completado"
+
+    marca = before["study"]["brand_id"]
+    listed = (await client.get("/studies", params={"brand_id": marca})).json()
+    assert [s["id"] for s in listed] == [nuevo, original]
+
+
+async def test_remeasure_requires_a_completed_study(client: httpx.AsyncClient) -> None:
+    sid = await create(client)
+    response = await client.post(f"/studies/{sid}/remeasure")
+    assert response.status_code == 409
+    assert "completado" in response.json()["detail"]
+    assert (await client.post("/studies/nope/remeasure")).status_code == 404
+
+
+async def test_first_measurement_has_no_delta(client: httpx.AsyncClient) -> None:
+    sid = await create(client)
+    view = await approve_competitors(client, sid)
+    assert view["metrics"]["comparado_con"] is None
+    assert view["metrics_delta"] is None
+
+
 async def test_editing_the_plan_recomputes_the_simulation(client: httpx.AsyncClient) -> None:
     sid = await create(client)
     view = await approve_competitors(client, sid)
