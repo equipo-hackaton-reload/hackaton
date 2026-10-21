@@ -5,6 +5,7 @@ Formato [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); versionado 
 ## [Unreleased]
 
 ### Added
+- Endpoints que consume la web (zona C): `GET /studies/{id}/evaluations?ids=` (evidencias con motor, prompt, respuesta truncada a 2.000 caracteres y fuentes), `GET /studies/{id}/traces` y `GET /estimate` (coste previo de motores y juez con los precios de `settings`; 0 en modo kit sin claves).
 - Demo HTTP sin claves con `LLM_PROVIDER=fixture`, `FixtureLLM`, juez por detección, `ProposalDraft`, exportación real Word/PDF y `scripts/demo_kit.py`; subida multipart incluida (zona C, ADR 0005).
 - Dominio puro (zona A): esquemas, cargador del kit, detección, preguntas del juez, score de citación, métricas, hallazgos, tests golden y ADR 0001.
 - `Study` y `study_id` obligatorio en todos los resultados; `diff_metrics` para re-medición (ADR 0002).
@@ -18,7 +19,9 @@ Formato [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); versionado 
 - Orquestación (zona C): puerto `StudyRepo` y `SqlStudyRepo` (SQLModel), grafo LangGraph con revisiones humanas por `interrupt()` y checkpointer SQLite, API FastAPI (`/studies`, `/resume`, `/export`, `/health`) y e2e del modo kit sin APIs (ADR 0005).
 ### Changed
 - `Finding.unidad` y `Proposal.marcas` (contract-change aditivo, zona E); `pyyaml` como dependencia directa.
+- `GET /studies/{id}` devuelve `revision_pendiente: null` en lugar de `"none"` cuando no hay revisión pendiente (zona C; el estado interno del grafo no cambia).
 ### Fixed
+- Codificación del mensaje 409 de `/export` («la propuesta aún no está completada»).
 
 ## [0.1.0] - 2026-10-20
 

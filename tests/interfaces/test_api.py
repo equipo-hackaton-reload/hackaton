@@ -18,7 +18,7 @@ from posiq.adapters.repo.sql import SqlStudyRepo
 from posiq.application.graph import serializer
 from posiq.application.runner import StudyRunner
 from posiq.interfaces.api.main import DOCX, create_app
-from tests.application.fakes import KIT_DIR, FakeLLM, kit_llm, make_deps
+from tests.application.fakes import KIT_DIR, FakeLLM, kit_llm, kit_settings, make_deps
 
 pytestmark = pytest.mark.anyio
 
@@ -32,7 +32,7 @@ def build_runner(repo: SqlStudyRepo, llm: FakeLLM | None = None) -> StudyRunner:
 
 @pytest.fixture
 async def client(repo: SqlStudyRepo) -> AsyncIterator[httpx.AsyncClient]:
-    app = create_app(runner=build_runner(repo))
+    app = create_app(runner=build_runner(repo), settings=kit_settings())
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
         yield c
@@ -80,7 +80,7 @@ async def test_full_flow_with_both_reviews(client: httpx.AsyncClient) -> None:
 
     view = (await client.get(f"/studies/{sid}")).json()
     assert view["estado"] == "completado"
-    assert view["revision_pendiente"] == "none"
+    assert view["revision_pendiente"] is None
     assert view["coste_acumulado_eur"] == 0
     assert view["errores"] == []
     assert view["proposal"]["study_id"] == sid
@@ -125,8 +125,81 @@ async def test_export_requires_completed_proposal(client: httpx.AsyncClient) -> 
     sid = await create(client)
     response = await client.get(f"/studies/{sid}/export", params={"formato": "pdf"})
     assert response.status_code == 409
-    assert "completada" in response.json()["detail"]
+    assert response.json()["detail"] == "la propuesta aún no está completada"
     assert (await client.get(f"/studies/{sid}/export?formato=odt")).status_code == 422
+
+
+async def approve_competitors(client: httpx.AsyncClient, sid: str) -> dict[str, Any]:
+    response = await client.post(
+        f"/studies/{sid}/resume", json={"revision": "competidores", "payload": {"aprobado": True}}
+    )
+    assert response.status_code == 202, response.text
+    return dict((await client.get(f"/studies/{sid}")).json())
+
+
+async def test_traces_lists_the_traces_of_the_study(client: httpx.AsyncClient) -> None:
+    sid = await create(client)
+    traces = (await client.get(f"/studies/{sid}/traces")).json()
+    assert {t["study_id"] for t in traces} == {sid}
+    assert {"intake.v1", "market.v1"} <= {t["nodo"] for t in traces}
+
+    view = await approve_competitors(client, sid)
+    after = (await client.get(f"/studies/{sid}/traces")).json()
+    assert len(after) > len(traces)
+    assert sum(t["coste_eur"] for t in after) == view["coste_acumulado_eur"]
+
+
+async def test_evaluations_returns_evidence_in_the_requested_order(
+    client: httpx.AsyncClient,
+) -> None:
+    sid = await create(client)
+    before = await client.get(f"/studies/{sid}/evaluations", params={"ids": "x"})
+    assert before.status_code == 200 and before.json() == []
+
+    view = await approve_competitors(client, sid)
+    ids = list(reversed(view["findings"][0]["evaluation_ids"][:3]))
+    response = await client.get(
+        f"/studies/{sid}/evaluations", params={"ids": ",".join([*ids, "no-existe"])}
+    )
+    assert response.status_code == 200, response.text
+    evidence = response.json()
+    assert [e["evaluation"]["id"] for e in evidence] == ids
+    first = evidence[0]
+    assert first["motor"] in {"ChatGPT", "Gemini", "Perplexity", "Claude"}
+    assert first["prompt"] and first["texto_respuesta"]
+    assert len(first["texto_respuesta"]) <= 2000
+    assert all(isinstance(f, str) for f in first["fuentes"])
+    assert (await client.get(f"/studies/{sid}/evaluations")).json() == []
+
+
+async def test_estimate_kit_is_free_and_real_prices_the_engines(
+    client: httpx.AsyncClient,
+) -> None:
+    kit = (await client.get("/estimate", params={"modo": "kit"})).json()
+    assert kit["llamadas"] == 624
+    assert kit["coste_estimado_eur"] == 0
+    assert kit["presupuesto_max_eur"] == 5.0
+
+    real = (await client.get("/estimate", params={"modo": "real"})).json()
+    assert real["llamadas"] == 624 and real["coste_estimado_eur"] > 0
+
+    small = await client.get(
+        "/estimate", params={"modo": "real", "n_prompts": 10, "n_motores": 2, "repeticiones": 1}
+    )
+    assert small.json()["llamadas"] == 20
+    assert small.json()["coste_estimado_eur"] < real["coste_estimado_eur"]
+
+    assert (
+        await client.get("/estimate", params={"modo": "real", "n_prompts": 0})
+    ).status_code == 422
+    assert (await client.get("/estimate", params={"modo": "otro"})).status_code == 422
+
+
+async def test_web_endpoints_of_an_unknown_study_are_404(client: httpx.AsyncClient) -> None:
+    for path in ("/studies/nope/traces", "/studies/nope/evaluations?ids=a"):
+        response = await client.get(path)
+        assert response.status_code == 404
+        assert "nope" in response.json()["detail"]
 
 
 async def test_create_validates_the_body(client: httpx.AsyncClient) -> None:
