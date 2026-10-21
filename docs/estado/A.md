@@ -21,10 +21,13 @@
     competidores: su problema es que aparece menos.
   - **Para que C lo enchufe:** falta `StudyRepo.list_by_sector`.
 
-- Trazabilidad brief → propuesta (en curso, `feature/A-trazabilidad-*`): PR 1 contrato aditivo
-  (`Proposal.encargo`, `PuntoBrief`, `BriefSummary.posicionamiento_deseado/atributos_deseados`,
-  `ProposalDraft.cobertura_brief`). Siguen PR 2 (`domain/brief_coverage.py`) y PR 3 (cableado en
-  `write`, prompt y Word).
+- Trazabilidad brief → propuesta (ADR 0013):
+  - PR 1 (#29, en develop): contrato aditivo `Proposal.encargo` (`Encargo`, `PuntoBrief`),
+    `BriefSummary.posicionamiento_deseado/atributos_deseados` y `ProposalDraft.cobertura_brief`.
+  - PR 2: `domain/brief_coverage.py` con `puntos_del_brief`, `evaluar_cobertura` y `carencias`.
+    Con el kit, sin enlaces del redactor solo quedan cubiertas las 2 restricciones y el presupuesto
+    (22.000 € ≤ 27.000 €): 13 de 16 puntos pendientes. Con los enlaces del golden, 16 de 16.
+  - Falta PR 3: cableado en `write` (con reintento), prompt `write.v2` y sección del Word.
 
 ## Exactitud de marca (`feature/A-exactitud-marca`, ADR 0011)
 
