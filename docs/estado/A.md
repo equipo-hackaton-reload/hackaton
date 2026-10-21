@@ -9,6 +9,13 @@
   (`EscenarioPlan`, no `Escenario`, para no chocar con `simulation_schemas.Escenario`),
   `source_map_schemas` y `accuracy_schemas`. Las funciones llegan en `feature/A-rigor-estadistico`,
   `A-escenarios`, `A-mapa-fuentes` y `A-exactitud-marca` (ADR 0008–0011).
+- Rigor estadístico (`feature/A-rigor-estadistico`, ADR 0008): `domain/stats.py` (Wilson por
+  segmento, IC bootstrap del score con semilla fija, significancia de hallazgos y de la
+  re-medición, `informe_rigor`, formato español), `domain/consensus.py` y `ConsensusJudge` (zona B).
+  Alborada: **25,9 [21,6–30,1]**; aparición espontánea por motor ChatGPT 18 % ± 12 pp, Claude
+  15 % ± 11 pp, Gemini 57 % ± 13 pp, Perplexity 65 % ± 13 pp; 6 de 7 hallazgos contrastables y
+  significativos (ninguno «no significativo»), `F-fuente-lider` sin contraste. Remuestreando por
+  prompt, la caída del embudo deja de ser significativa (solo 4 prompts de decisión).
 
 - Mapa de fuentes del sector (`feature/A-mapa-fuentes`, ADR 0010): `source_map.mapa_fuentes`,
   `cuota_por_tipo`, `oportunidades_fuente`, `hallazgo_web_propia` y `punto_de_partida`. Con el kit:
@@ -87,6 +94,9 @@
   `brief_summary`/`marcas_candidatas` (C), o cambiar el prompt y el README de prompts (E).
 
 ## Falta
+- Integrar `informe_rigor` en el grafo y en `GET /studies/{id}` (zona C), y pintar «25,9 [21,6–30,1]»
+  y los márgenes en la web (D) y el Word (E). Decidir (B/C) si `build_judge` usa `ConsensusJudge`
+  (multiplica por N el coste del juez).
 - Que la web (D) y el Word (E) muestren la simulación. La calidad del plan solo existe con claves de juez.
 
 ## Ensayo de la demo (2026-10-21, `develop` en `59745d5`; repetido sobre `e0fa86a`)
