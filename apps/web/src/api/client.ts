@@ -81,8 +81,8 @@ async function request<T>(path: string, init?: Opciones): Promise<T> {
 const json = (body: unknown) => JSON.stringify(body);
 const study = (id: string) => `/studies/${encodeURIComponent(id)}`;
 
-/** Cuerpo opcional de `POST /auth/verify/reenviar` (202): puede traer `codigo_dev` en modo demo. */
-export type ReenvioResponse = { verificacion?: VerificacionEnviada; codigo_dev?: string } | undefined;
+/** Cuerpo de `POST /auth/verify/reenviar` (202): `{enviado, codigo_dev?}`; `codigo_dev` solo en modo demo. */
+export type ReenvioResponse = (Partial<VerificacionEnviada> & { verificacion?: VerificacionEnviada }) | undefined;
 
 export const api = {
   // --- Cuentas -----------------------------------------------------------------------------------

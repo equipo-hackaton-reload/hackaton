@@ -9,16 +9,32 @@ import { ErrorState, Skeleton } from "../components/States";
 import { fmtDay, fmtNum, fmtSigned, fmtUnidad, ordinal } from "../lib/format";
 import { SIN_CAMBIOS, type CambioSerie, type SerieMarca } from "../types/tracking";
 
-const METRICA: Record<string, string> = {
-  score: "Score",
-  score_global: "Score",
-  diferencia_vs_competidores: "Diferencia con competidores",
-};
+/**
+ * Nombre y unidad de `CambioSerie.metrica` (domain/tracking_schemas.py): el delta va en puntos de
+ * score, en fracción para las tasas de aparición y en puestos para la posición.
+ */
+function metrica(clave: string): { nombre: string; fmt: (n: number) => string } {
+  const pts = (n: number) => `${fmtSigned(n)} pts`;
+  if (clave === "score" || clave === "score_global") return { nombre: "Score", fmt: pts };
+  if (clave === "diferencia_vs_competidores") return { nombre: "Diferencia con competidores", fmt: pts };
+  if (clave === "posicion") return { nombre: "Puesto", fmt: (n) => `${fmtSigned(n, 0)} puestos` };
+  if (clave.startsWith("aparicion_espontanea")) {
+    const ambito = clave.split(":")[1];
+    return {
+      nombre: `Aparición espontánea${ambito && ambito !== "global" ? ` en ${ambito}` : ""}`,
+      fmt: (n) => `${fmtSigned(n * 100, 1)} pp`,
+    };
+  }
+  return { nombre: clave, fmt: (n) => fmtSigned(n) };
+}
 
 function Cambio({ c, fechas }: { c: CambioSerie; fechas: Map<string, string> }) {
   const sube = c.delta > 0;
-  const tono = sube ? "text-pill-pos-ink" : c.delta < 0 ? "text-pill-neg-ink" : "text-muted";
+  // En la posición, bajar de puesto (delta negativo) es mejorar.
+  const mejora = c.metrica === "posicion" ? c.delta < 0 : sube;
+  const tono = c.delta === 0 ? "text-muted" : mejora ? "text-pill-pos-ink" : "text-pill-neg-ink";
   const ic = c.significancia?.intervalo;
+  const m = metrica(c.metrica);
   const desde = fechas.get(c.desde_study_id);
   const hasta = fechas.get(c.hasta_study_id);
   return (
@@ -29,8 +45,8 @@ function Cambio({ c, fechas }: { c: CambioSerie; fechas: Map<string, string> }) 
       <div className="min-w-0">
         <p>{c.texto}</p>
         <p className="num mt-0.5 text-meta text-muted">
-          {METRICA[c.metrica] ?? c.metrica} {fmtSigned(c.delta)}
-          {ic && ` · IC ${fmtNum(ic.nivel * 100, 0)} % del cambio: ${fmtSigned(ic.inf)} a ${fmtSigned(ic.sup)}`}
+          {m.nombre} {m.fmt(c.delta)}
+          {ic && ` · IC ${fmtNum(ic.nivel * 100, 0)} % del cambio: ${m.fmt(ic.inf)} a ${m.fmt(ic.sup)}`}
           {desde && hasta && ` · ${desde} → ${hasta}`}
           {c.relativo_a_competidores && (
             <span className="pill ml-2 bg-raised text-muted">frente a competidores</span>

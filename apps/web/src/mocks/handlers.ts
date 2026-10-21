@@ -71,7 +71,7 @@ const authHandlers = [
       return HttpResponse.json({ detail: `la contraseña necesita al menos ${MIN_PASSWORD} caracteres` }, { status: 422 });
     }
     const r = auth.registrar(email, body.password!, body.nombre);
-    if (r === "existe") return HttpResponse.json({ detail: "ya existe una cuenta con ese correo" }, { status: 409 });
+    if (r === "existe") return HttpResponse.json({ detail: "correo_ya_registrado" }, { status: 409 });
     // El código va al log del servidor; en modo demo además en la respuesta.
     return HttpResponse.json({ user: r.user, verificacion: { enviado: true, codigo_dev: r.codigo } }, { status: 201 });
   }),
@@ -82,10 +82,10 @@ const authHandlers = [
     const r = auth.verificar(email, codigo);
     if (typeof r === "object") return HttpResponse.json({ user: r });
     if (r === "bloqueado") {
-      return HttpResponse.json({ detail: "demasiados intentos; pide un código nuevo" }, { status: 429 });
+      return HttpResponse.json({ detail: "demasiados_intentos" }, { status: 429 });
     }
-    if (r === "caducado") return HttpResponse.json({ detail: "el código ha caducado" }, { status: 400 });
-    return HttpResponse.json({ detail: "código incorrecto" }, { status: 400 });
+    // La API no distingue código malo de caducado: los dos son 400 `codigo_no_valido`.
+    return HttpResponse.json({ detail: "codigo_no_valido" }, { status: 400 });
   }),
 
   http.post(u("/auth/verify/reenviar"), async ({ request }) => {
@@ -94,7 +94,7 @@ const authHandlers = [
     const e = email.trim().toLowerCase();
     // Misma respuesta exista o no la cuenta, para no revelar qué correos están registrados.
     const codigo = auth.existeCuenta(e) ? auth.nuevoCodigo(e) : undefined;
-    return HttpResponse.json({ verificacion: { enviado: true, codigo_dev: codigo } }, { status: 202 });
+    return HttpResponse.json({ enviado: true, codigo_dev: codigo }, { status: 202 });
   }),
 
   http.post(u("/auth/login"), async ({ request }) => {
@@ -102,7 +102,7 @@ const authHandlers = [
     const { email = "", password = "" } = (await request.json()) as { email?: string; password?: string };
     await delay(80);
     const r = auth.login(email, password);
-    if (r === "credenciales") return HttpResponse.json({ detail: "credenciales incorrectas" }, { status: 401 });
+    if (r === "credenciales") return HttpResponse.json({ detail: "credenciales_invalidas" }, { status: 401 });
     if (r === "no_verificado") return HttpResponse.json({ detail: "correo_no_verificado" }, { status: 403 });
     return HttpResponse.json({ token: r.token, expira_en: new Date(r.expira).toISOString(), user: r.user });
   }),

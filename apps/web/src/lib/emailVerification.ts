@@ -18,10 +18,10 @@ export function limpiarCodigo(valor: string): string {
 /** Mensaje para el error de `POST /auth/verify`. */
 export function mensajeVerificacion(e: unknown): string {
   if (!(e instanceof ApiError)) return "No se pudo conectar con la API. Inténtalo de nuevo.";
+  // La API responde 400 `codigo_no_valido` tanto si el código no coincide como si ha caducado.
   if (e.status === 429) return "Demasiados intentos. Pide un código nuevo para seguir.";
-  if (/caduc|expir/i.test(e.message)) return "El código ha caducado. Pide uno nuevo.";
-  if (e.status === 400 || e.status === 401 || e.status === 422) {
-    return "El código no coincide. Revísalo e inténtalo otra vez.";
+  if (e.status === 400 || e.status === 422) {
+    return "El código no coincide o ha caducado. Revísalo o pide uno nuevo.";
   }
   if (e.status === 404) return "No hay ninguna cuenta pendiente de verificar con ese correo.";
   return `La API respondió ${e.status}: ${e.message}`;

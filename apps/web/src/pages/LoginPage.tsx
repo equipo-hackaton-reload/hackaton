@@ -56,6 +56,9 @@ export function LoginPage() {
       navigate(destino, { replace: true });
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) setFallo({ tipo: "credenciales" });
+      else if (err instanceof ApiError && err.status === 429) {
+        setFallo({ tipo: "otro", mensaje: "Demasiados intentos seguidos. Espera un minuto y vuelve a probar." });
+      }
       else if (err instanceof ApiError && err.status === 403 && err.message === "correo_no_verificado") {
         setFallo({ tipo: "no_verificado" });
       } else {
