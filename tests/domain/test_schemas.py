@@ -237,3 +237,76 @@ def test_study() -> None:
         Study.model_validate(study.model_dump() | {"modo": "sintetico"})
     with pytest.raises(ValidationError):
         Study.model_validate(study.model_dump() | {"estado": "pausado"})
+
+
+def test_brief_identidad_deseada_opcional() -> None:
+    b = brief()
+    assert b.posicionamiento_deseado == ""
+    assert b.atributos_deseados == []
+    con = brief(
+        posicionamiento_deseado="Referente en miopía infantil", atributos_deseados=["rigor"]
+    )
+    assert con.atributos_deseados == ["rigor"]
+
+
+def _encargo(**punto: object) -> dict[str, object]:
+    return {
+        "objetivos": ["Recomendación espontánea"],
+        "restricciones": ["No prometer resultados"],
+        "servicios_prioritarios": [],
+        "ciudades": ["Madrid"],
+        "publicos": [],
+        "competidores_declarados": [],
+        "presupuesto_anual_eur": (18000, 27000),
+        "cobertura": [
+            {"id": "objetivo-1", "tipo": "objetivo", "texto": "Recomendación espontánea"}
+            | {"accion_ids": ["A1"], "estado": "cubierto"}
+            | punto
+        ],
+    }
+
+
+def test_punto_brief_cubierto_exige_enlace() -> None:
+    from posiq.domain.schemas import PuntoBrief
+
+    with pytest.raises(ValidationError, match="cubierto sin acciones"):
+        PuntoBrief(id="ciudad-1", tipo="ciudad", texto="Madrid", estado="cubierto")
+    # Restricciones y presupuesto se comprueban contra el plan entero, sin enlace explícito.
+    assert PuntoBrief(id="presupuesto", tipo="presupuesto", texto="x", estado="cubierto")
+    assert PuntoBrief(id="ciudad-1", tipo="ciudad", texto="Madrid", estado="pendiente")
+
+
+def test_encargo_ids_unicos_y_pendientes() -> None:
+    from posiq.domain.schemas import Encargo
+
+    encargo = Encargo.model_validate(_encargo())
+    assert encargo.pendientes == []
+    data = _encargo()
+    data["cobertura"] = [*data["cobertura"], *data["cobertura"]]  # type: ignore[misc]
+    with pytest.raises(ValidationError, match="ids repetidos"):
+        Encargo.model_validate(data)
+    pendiente = Encargo.model_validate(_encargo(accion_ids=[], estado="pendiente"))
+    assert [p.id for p in pendiente.pendientes] == ["objetivo-1"]
+
+
+def test_proposal_encargo_opcional_y_enlazado() -> None:
+    from posiq.domain.schemas import Proposal
+
+    assert Proposal.model_validate(_proposal(["F1"])).encargo is None
+    con = Proposal.model_validate(_proposal(["F1"]) | {"encargo": _encargo(hallazgo_ids=["F2"])})
+    assert con.encargo is not None and con.encargo.cobertura[0].accion_ids == ["A1"]
+    # Ida y vuelta por JSON (lo que guarda el repositorio).
+    assert Proposal.model_validate_json(con.model_dump_json()) == con
+    with pytest.raises(ValidationError, match="ids inexistentes"):
+        Proposal.model_validate(_proposal(["F1"]) | {"encargo": _encargo(accion_ids=["A9"])})
+    with pytest.raises(ValidationError, match="ids inexistentes"):
+        Proposal.model_validate(_proposal(["F1"]) | {"encargo": _encargo(hallazgo_ids=["F9"])})
+
+
+def test_ignora_restriccion() -> None:
+    from posiq.domain.schemas import ignora_restriccion
+
+    assert ignora_restriccion(action(restricciones_revisadas=[]), "No prometer resultados")
+    assert not ignora_restriccion(
+        action(restricciones_revisadas=["No prometer resultados"]), "No prometer resultados"
+    )

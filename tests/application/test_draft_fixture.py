@@ -116,3 +116,7 @@ def test_runner_does_not_report_review_until_graph_is_paused(repo: Any) -> None:
     study = runner.create("kit").model_copy(update={"estado": "esperando_revision_competidores"})
     runner.en_marcha.add(study.id)
     assert runner.estado(study) == "en_curso"
+
+
+def test_proposal_draft_cobertura_opcional() -> None:
+    assert ProposalDraft.model_fields["cobertura_brief"].default == {}
