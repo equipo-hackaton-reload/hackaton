@@ -39,6 +39,23 @@
     marca); `mitigaciones`: `[AccionMitigacion]`.
 - Pendiente, una PR por punto: (1) rigor y `JUDGE_VOTES`, (2) escenarios, (3) mapa de fuentes,
   (4) exactitud.
+- **Nota de A (competidores declarados, ADR 0012), por enganchar en `application/diferencial.py`:**
+  `posiq.domain.competitor_gap.brecha_competidores(brief, market, metrics) -> BrechaCompetidores`
+  (`domain/competitor_gap_schemas.py`). Es puro y se llama tras `compute_metrics`. Forma:
+  `{study_id, marca_foco_id, puesto_foco, score_foco, tasa_foco, n_marcas,
+  declarados: [CompetidorMedido], no_resueltos: [str],
+  no_declarados_por_delante: [CompetidorMedido], sorpresas: [brand_id],
+  declarados_poco_mencionados: [brand_id], umbral_ventaja_puntos, umbral_tasa,
+  hallazgos: [Finding]}`, con
+  `CompetidorMedido = {brand_id, nombre, declarado, nombre_declarado, puesto, score,
+  ventaja_puntos, tasa_espontanea, n_espontaneo}`. Propuesta: un bloque `competidores` en
+  `GET /studies/{id}`. Los `hallazgos` (`F-competidor-no-declarado`, `F-declarado-poco-visible`)
+  pueden sumarse a los de `detect_findings` antes del plan, respetando el máximo de 7 de la
+  propuesta. Hay que añadir el modelo al checkpointer.
+- **Aviso de A sobre `nodes/market.py`:** envía `{"brief", "candidatos"}`, pero
+  `prompts/market.v1.md` espera `brief_summary` y `marcas_candidatas`. Con DeepSeek, el LLM puede
+  tratar los candidatos como ausentes y dejar fuera del mercado las marcas de contexto. Detalle en
+  `docs/estado/A.md`.
 
 ## Falta
 - Estudio de Alborada con DeepSeek real → `docs/ejemplos/` (bloqueado: falta `DEEPSEEK_API_KEY`).

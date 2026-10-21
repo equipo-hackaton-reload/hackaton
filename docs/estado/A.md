@@ -59,6 +59,29 @@
   30,77. `intervalo` en None hasta el IC del score (`feature/A-rigor-estadistico`). Falta que C
   rellene `escenarios` (`EscenarioGuardado`, #24) con `build_presets`, más un endpoint para el
   escenario personalizado, y que D lo pinte.
+- Competidores declarados frente a los que pone la IA (`feature/A-competidores-declarados`,
+  ADR 0012): `competitor_gap.brecha_competidores(brief, market, metrics)` → `BrechaCompetidores`
+  (en `competitor_gap_schemas.py`), con los hallazgos `F-competidor-no-declarado` (ventaja ≥ 5
+  puntos; L ≥ 10) y `F-declarado-poco-visible` (tasa espontánea < max(10 %, 50 % de la foco)).
+  Con el kit:
+  - **Declarados por Alborada:** Valdecruz (1.º, 66,5), Tramuntana (2.º, 47,2) y Láser Nítida
+    (4.º, 37,0). Ninguno queda «poco visible».
+  - **No declarados por delante:** Oftalmos Centro (3.º, +13,1 → hallazgo L), Cervantes (+1,7),
+    Santa Eulalia (+1,2) y Vistalia (+0,4). Alborada es 8.ª de 10.
+  - **Contrato que haría falta (no se ha tocado):** `Finding.brand_ids: list[str] = []`, para
+    enlazar el hallazgo con las marcas que nombra sin parsear el texto.
+  - Sin conectar al grafo: nota para C en `docs/estado/C.md`.
+- **Posible fallo de nombres en `market` (zona C/E, no arreglado):** `prompts/market.v1.md` dice
+  que el estado trae `brief_summary` y `marcas_candidatas`, pero `application/nodes/market.py`
+  envía `{"brief": ..., "candidatos": ...}`. `OpenAICompatLLM` manda el `state` tal cual como
+  JSON en el mensaje de usuario, así que el LLM sí recibe los candidatos, aunque con otra clave.
+  El riesgo es que el prompt busque `marcas_candidatas`, no la encuentre y aplique la regla 6
+  («si está vacía, construye el mercado solo con el brief»). Entonces las marcas de contexto
+  del kit (Oftalmos Centro, Cervantes…) no entran en el mercado y no se miden, porque
+  `reconcile` solo mapea las marcas que el LLM propone. Esto afectaría también a este hallazgo.
+  En fixture no se nota, porque el `FixtureLLM` ignora el estado y devuelve
+  `kit.brands_in_runs()`. Arreglo propuesto: renombrar las claves en `market.py` a
+  `brief_summary`/`marcas_candidatas` (C), o cambiar el prompt y el README de prompts (E).
 
 ## Falta
 - Que la web (D) y el Word (E) muestren la simulación. La calidad del plan solo existe con claves de juez.
