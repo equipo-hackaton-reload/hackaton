@@ -5,6 +5,7 @@ from collections.abc import Sequence
 from posiq.adapters.budget import Budget
 from posiq.adapters.cache import DiskCache
 from posiq.adapters.judge.base import SystemOneJudge
+from posiq.adapters.judge.consensus import ConsensusJudge
 from posiq.adapters.judge.jev import JevJudge
 from posiq.adapters.judge.llm_fallback import LLMJudge
 from posiq.domain.schemas import Brand
@@ -30,4 +31,4 @@ def build_judge(
     return fallback
 
 
-__all__ = ["JevJudge", "LLMJudge", "SystemOneJudge", "build_judge"]
+__all__ = ["ConsensusJudge", "JevJudge", "LLMJudge", "SystemOneJudge", "build_judge"]
