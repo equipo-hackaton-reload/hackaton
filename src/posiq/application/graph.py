@@ -27,7 +27,7 @@ from pydantic import BaseModel
 from posiq.application import nodes
 from posiq.application.deps import Deps
 from posiq.application.state import StudyState
-from posiq.domain import schemas
+from posiq.domain import quality_schemas, schemas, simulation_schemas
 
 Node = Callable[[StudyState, Deps], Awaitable[dict[str, Any]]]
 
@@ -71,12 +71,18 @@ def build_graph(deps: Deps, checkpointer: BaseCheckpointSaver[Any] | None) -> St
     return builder.compile(checkpointer=checkpointer)
 
 
+# Módulos del dominio cuyos modelos viajan en el estado (simulación y calidad viven fuera de
+# `schemas.py` para no tocar el contrato).
+STATE_MODULES = (schemas, simulation_schemas, quality_schemas)
+
+
 def serializer() -> JsonPlusSerializer:
     """Serializador del checkpointer con los modelos del dominio permitidos explícitamente."""
     allowed = [
-        (schemas.__name__, name)
-        for name, obj in inspect.getmembers(schemas, inspect.isclass)
-        if issubclass(obj, BaseModel) and obj.__module__ == schemas.__name__
+        (module.__name__, name)
+        for module in STATE_MODULES
+        for name, obj in inspect.getmembers(module, inspect.isclass)
+        if issubclass(obj, BaseModel) and obj.__module__ == module.__name__
     ]
     return JsonPlusSerializer(allowed_msgpack_modules=allowed)
 

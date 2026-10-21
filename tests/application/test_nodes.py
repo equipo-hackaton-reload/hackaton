@@ -23,6 +23,7 @@ from tests.application.fakes import (
     RESTRICCIONES,
     DetectionJudge,
     FakeEngine,
+    FakeGuard,
     FakeLLM,
     brief_alborada,
     kit_llm,
@@ -335,6 +336,45 @@ async def test_plan_keeps_persistent_violations_for_the_human(repo: SqlStudyRepo
     assert update["plan_violaciones"]
     assert all(e.startswith("plan: ") for e in update["errores"])
     assert update["plan"] is not None
+
+
+async def test_plan_simulates_its_impact_without_a_guard(repo: SqlStudyRepo) -> None:
+    state = await analyzed_state(repo)
+    update = await nodes.plan(state, make_deps(kit_llm(), [], repo))
+
+    simulacion = update["simulacion"]
+    assert simulacion.study_id == state["study_id"]
+    assert simulacion.score_actual == state["metrics"].score_global.score
+    assert [p.fase for p in simulacion.proyecciones] == [f.nombre for f in update["plan"].fases]
+    assert update["calidad_plan"] is None
+    assert [t.nodo for t in update["traces"]] == ["plan.v1"]
+
+
+async def test_plan_quality_is_assessed_when_a_guard_is_available(repo: SqlStudyRepo) -> None:
+    state = await analyzed_state(repo)
+    guards: list[FakeGuard] = []
+
+    def factory(budget: Budget) -> FakeGuard:
+        guards.append(FakeGuard(budget, coste=0.01))
+        return guards[-1]
+
+    update = await nodes.plan(state, make_deps(kit_llm(), [], repo, plan_guard_factory=factory))
+
+    assert guards[0].planes == [update["plan"]]
+    assert update["calidad_plan"].nota == f"{len(update['plan'].acciones)} acciones evaluadas"
+    assert [t.nodo for t in update["traces"]] == ["plan.v1", "plan_guard:fake"]
+    assert update["coste_acumulado_eur"] == pytest.approx(state["coste_acumulado_eur"] + 0.01)
+    assert "plan_guard:fake" in {t.nodo for t in repo.get_traces(state["study_id"])}
+
+
+async def test_plan_guard_without_credentials_does_not_block(repo: SqlStudyRepo) -> None:
+    state = await analyzed_state(repo)
+    deps = make_deps(kit_llm(), [], repo, plan_guard_factory=lambda b: FakeGuard(b, sin_clave=True))
+    update = await nodes.plan(state, deps)
+
+    assert update["plan"] is not None and update["simulacion"] is not None
+    assert update["calidad_plan"] is None
+    assert any("TYPESAFE_API_KEY" in e and "sin evaluar" in e for e in update["errores"])
 
 
 async def test_parse_plan_accepts_approval_or_an_edited_plan(repo: SqlStudyRepo) -> None:

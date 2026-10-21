@@ -7,6 +7,7 @@ sustituye el nodo que las produce. `coste_acumulado_eur` es siempre la suma de `
 import operator
 from typing import Annotated, Literal, TypedDict
 
+from posiq.domain.quality_schemas import PlanQuality
 from posiq.domain.schemas import (
     BriefSummary,
     Evaluation,
@@ -22,6 +23,7 @@ from posiq.domain.schemas import (
     Study,
     Trace,
 )
+from posiq.domain.simulation_schemas import SimulationResult
 
 RevisionPendiente = Literal["none", "competidores", "plan"]
 
@@ -40,6 +42,8 @@ class StudyState(TypedDict, total=False):
     findings: list[Finding]
     plan: Plan
     plan_violaciones: list[str]
+    simulacion: SimulationResult | None
+    calidad_plan: PlanQuality | None
     proposal: Proposal
     traces: Annotated[list[Trace], operator.add]
     coste_acumulado_eur: float

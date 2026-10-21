@@ -191,6 +191,8 @@ def create_app(runner: StudyRunner | None = None, settings: Settings | None = No
             metrics=values.get("metrics"),
             findings=values.get("findings"),
             plan=values.get("plan"),
+            simulacion=values.get("simulacion"),
+            calidad_plan=values.get("calidad_plan"),
             proposal=values.get("proposal"),
         )
 
