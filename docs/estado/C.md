@@ -29,6 +29,17 @@
   `borrador_anterior`; lo que siga pendiente va a `contexto.limitaciones` («Puntos del brief sin
   tratar…»). Forma del JSON en `docs/estado/D.md`.
 
+- Cuentas (ADR 0015, `feature/C-cuentas`): `/auth/register|verify|verify/reenviar|login|logout|me`
+  en `interfaces/api/auth.py`; reglas en `application/accounts.py` (`AccountService`, puerto
+  `AccountRepo`) y `application/security.py` (scrypt, tokens, códigos); tablas `user`, `session`,
+  `verification` y `study_owner` en `adapters/repo/accounts.py` sobre el motor de `SqlStudyRepo`.
+  Dependencia `current_user` (`CurrentUser`) en todas las rutas salvo `/health` y el alta; estudios
+  ajenos → 404 en lectura, resume, remeasure, evaluations, traces y export; la re-medición hereda
+  el propietario. Estudios sin propietario: ocultos, o del correo `AUTH_DEMO_USER`. 415 sin JSON
+  en `/auth/*` y `resume`, 413 por encima de `BRIEF_MAX_BYTES`, rate limit en memoria. Los tests de
+  API se autentican con `tests/auth_helpers.py`; `demo_kit.py` entra como `demo@posiq.local`.
+  **La web necesita login (zona D)**: sin él, contra la API real todo da 401.
+
 ## Diferencial v0.4.0 (en curso)
 - Base común: el checkpointer admite `stats_schemas`, `scenario_schemas`, `source_map_schemas`,
   `accuracy_schemas` y `application/diferencial.py`. `GET /studies/{id}` ya trae los bloques
@@ -70,6 +81,8 @@
   10,56 € y `BUDGET_EUR_MAX` es 5 €: hay que subir el tope o reducir el estudio.
 
 ## Siguiente tarea
+- Endpoints de seguimiento sobre las cuentas: `GET /brands`, `GET /brands/{id}/serie`,
+  `GET /studies/{id}/remeasure/estimate` y `remeasure` con confirmación de coste.
 - Estudio de Alborada con DeepSeek en cuanto haya `DEEPSEEK_API_KEY`.
 - Persistir `StudyRunner.fallos` para que el estado `error` sobreviva a un reinicio.
 

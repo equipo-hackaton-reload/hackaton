@@ -19,10 +19,16 @@ from posiq.application.graph import serializer
 from posiq.application.runner import StudyRunner
 from posiq.interfaces.api.main import DOCX, create_app
 from tests.application.fakes import KIT_DIR, FakeLLM, kit_llm, kit_settings, make_deps
+from tests.auth_helpers import authenticate_async
 
 pytestmark = pytest.mark.anyio
 
 BRIEF = "# Brief\n\n**Marca:** Clínica Alborada Visión"
+
+
+def api_settings() -> Any:
+    """Kit con códigos de verificación en la respuesta y scrypt barato (tests rápidos)."""
+    return kit_settings(auth_dev_codes=True, auth_scrypt_n=2**10)
 
 
 def build_runner(repo: SqlStudyRepo, llm: FakeLLM | None = None) -> StudyRunner:
@@ -32,9 +38,10 @@ def build_runner(repo: SqlStudyRepo, llm: FakeLLM | None = None) -> StudyRunner:
 
 @pytest.fixture
 async def client(repo: SqlStudyRepo) -> AsyncIterator[httpx.AsyncClient]:
-    app = create_app(runner=build_runner(repo), settings=kit_settings())
+    app = create_app(runner=build_runner(repo), settings=api_settings())
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
+        await authenticate_async(c)
         yield c
 
 
@@ -334,10 +341,13 @@ async def test_graph_failure_is_reported_as_error(repo: SqlStudyRepo) -> None:
     def boom(_: dict[str, Any]) -> Any:
         raise RuntimeError("LLM caído")
 
-    app = create_app(runner=build_runner(repo, FakeLLM({"intake.v1": boom})))
+    app = create_app(
+        runner=build_runner(repo, FakeLLM({"intake.v1": boom})), settings=api_settings()
+    )
     async with httpx.AsyncClient(
         transport=httpx.ASGITransport(app=app), base_url="http://test"
     ) as c:
+        await authenticate_async(c)
         sid = await create(c)
         view = (await c.get(f"/studies/{sid}")).json()
     assert view["estado"] == "error"

@@ -1,6 +1,10 @@
 """Demo HTTP de Alborada. Servidor: LLM_PROVIDER=fixture uv run uvicorn ...
 
 Ejecutar: uv run python scripts/demo_kit.py --base-url http://127.0.0.1:8000
+
+La API exige sesión (ADR 0015): el script registra el usuario de demo, lo verifica con el
+`codigo_dev` que devuelve la API en modo fixture y hace login. Si el usuario ya existe, solo hace
+login (y, si no estaba verificado, pide otro código).
 """
 
 import argparse
@@ -13,6 +17,38 @@ import httpx
 
 ROOT = Path(__file__).resolve().parents[1]
 BRIEF = ROOT / "data/kit/01_Briefings/Brief_de_ejemplo_Clinica_Alborada.md"
+DEMO_EMAIL = "demo@posiq.local"
+DEMO_PASSWORD = "posiq-demo-alborada"
+
+
+def dev_code(response: httpx.Response) -> str:
+    body = response.json()
+    codigo = body.get("codigo_dev") or body.get("verificacion", {}).get("codigo_dev")
+    if not codigo:
+        raise RuntimeError(
+            "La API no devuelve codigo_dev: arranca con LLM_PROVIDER=fixture o AUTH_DEV_CODES=true"
+        )
+    return str(codigo)
+
+
+def login(client: httpx.Client, email: str = DEMO_EMAIL, password: str = DEMO_PASSWORD) -> None:
+    """Registra (si hace falta), verifica y abre sesión; deja el token en las cabeceras."""
+    credenciales = {"email": email, "password": password}
+    codigo = ""
+    response = client.post("/auth/register", json={**credenciales, "nombre": "Demo posiq."})
+    if response.status_code == 201:
+        codigo = dev_code(response)
+    elif response.status_code != 409:
+        response.raise_for_status()
+    response = client.post("/auth/login", json=credenciales)
+    if response.status_code == 403:  # registrado pero sin verificar
+        if not codigo:
+            codigo = dev_code(client.post("/auth/verify/reenviar", json={"email": email}))
+        client.post("/auth/verify", json={"email": email, "codigo": codigo}).raise_for_status()
+        response = client.post("/auth/login", json=credenciales)
+    response.raise_for_status()
+    client.headers["Authorization"] = f"Bearer {response.json()['token']}"
+    print(f"Sesión iniciada como {email}", flush=True)
 
 
 def wait_for(client: httpx.Client, study_id: str, estado: str, timeout: float) -> dict[str, Any]:
@@ -32,6 +68,7 @@ def wait_for(client: httpx.Client, study_id: str, estado: str, timeout: float) -
 
 def demo(client: httpx.Client, output: Path, timeout: float = 120) -> Path:
     client.get("/health").raise_for_status()
+    login(client)
     response = client.post(
         "/studies", json={"brief_texto": BRIEF.read_text(encoding="utf-8"), "modo": "kit"}
     )
