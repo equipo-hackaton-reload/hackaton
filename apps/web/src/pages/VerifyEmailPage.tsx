@@ -1,29 +1,30 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
-import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
-import { AppShell } from "../components/AppShell";
-import {
-  CODIGO_LONGITUD,
-  ESPERA_REENVIO_S,
-  MENSAJE,
-  limpiarCodigo,
-  verifier,
-  type EnvioCodigo,
-} from "../lib/emailVerification";
-import { destinoSeguro, getSession, markVerified } from "../lib/session";
+import { Link, Navigate, useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { api, ApiError } from "../api/client";
+import { AlertaFormulario, AuthLayout } from "../components/AuthLayout";
+import { CODIGO_LONGITUD, ESPERA_REENVIO_S, limpiarCodigo, mensajeVerificacion, VIGENCIA_MIN } from "../lib/emailVerification";
+import { destinoSeguro } from "../lib/session";
+import type { EstadoVerificacion } from "./RegisterPage";
 
+/** Verificación del correo con el código que envía la API (`POST /auth/verify`). */
 export function VerifyEmailPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [params] = useSearchParams();
-  const destino = destinoSeguro(params.get("next"));
-  const sesion = getSession();
+  const email = (params.get("email") ?? "").trim().toLowerCase();
+  const next = params.get("next");
   const id = useId();
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const [envio, setEnvio] = useState<EnvioCodigo | null>(null);
+  const [codigoDev, setCodigoDev] = useState<string | undefined>(
+    () => (location.state as EstadoVerificacion | null)?.codigoDev,
+  );
   const [codigo, setCodigo] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [enviando, setEnviando] = useState(false);
+  const [bloqueado, setBloqueado] = useState(false);
+  const [aviso, setAviso] = useState<string | null>(null);
   const [comprobando, setComprobando] = useState(false);
+  const [reenviando, setReenviando] = useState(false);
   const [espera, setEspera] = useState(0);
   const [hecho, setHecho] = useState(false);
 
@@ -34,22 +35,25 @@ export function VerifyEmailPage() {
     return () => clearTimeout(t);
   }, [espera]);
 
-  if (!sesion) return <Navigate to="/login" replace />;
-  if (sesion.verificado && !hecho) return <Navigate to={destino} replace />;
-  const email = sesion.email;
+  if (!email) return <Navigate to="/registro" replace />;
+  const loginTras = `/login?verificado=1&email=${encodeURIComponent(email)}${next ? `&next=${encodeURIComponent(destinoSeguro(next))}` : ""}`;
 
-  async function enviar() {
-    setEnviando(true);
+  async function reenviar() {
+    setReenviando(true);
     setError(null);
+    setAviso(null);
     setCodigo("");
     try {
-      setEnvio(await verifier.sendCode(email));
+      const r = await api.resendCode(email);
+      setCodigoDev(r?.verificacion?.codigo_dev ?? r?.codigo_dev);
+      setBloqueado(false);
+      setAviso(`Te hemos enviado un código nuevo. Vale ${VIGENCIA_MIN} minutos.`);
       setEspera(ESPERA_REENVIO_S);
       requestAnimationFrame(() => inputRef.current?.focus());
-    } catch {
-      setError("No se pudo enviar el código. Inténtalo de nuevo en unos segundos.");
+    } catch (e) {
+      setError(e instanceof ApiError ? `No se pudo reenviar el código: ${e.message}` : "No se pudo conectar con la API.");
     } finally {
-      setEnviando(false);
+      setReenviando(false);
     }
   }
 
@@ -57,112 +61,100 @@ export function VerifyEmailPage() {
     e.preventDefault();
     if (codigo.length !== CODIGO_LONGITUD) return;
     setComprobando(true);
+    setAviso(null);
     try {
-      const r = await verifier.confirm(email, codigo);
-      if (r === "ok") {
-        markVerified();
-        setHecho(true);
-        setTimeout(() => navigate(destino, { replace: true }), 900);
-        return;
+      await api.verify({ email, codigo });
+      setHecho(true);
+      setTimeout(() => navigate(loginTras, { replace: true }), 900);
+    } catch (err) {
+      setError(mensajeVerificacion(err));
+      if (err instanceof ApiError && err.status === 429) {
+        setBloqueado(true);
+        setCodigoDev(undefined);
       }
-      setError(MENSAJE[r]);
-      if (r === "caducado" || r === "bloqueado") setEnvio(null);
       inputRef.current?.select();
     } finally {
       setComprobando(false);
     }
   }
 
-  const caducaA = envio
-    ? new Date(envio.caducaEn).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" })
-    : null;
-
   return (
-    <AppShell>
-      <div className="mx-auto max-w-[440px] pt-4 sm:pt-10">
-        <div className="panel px-6 py-7 sm:px-8">
-          <span aria-hidden="true" className="grid size-12 place-items-center rounded-full bg-accent-soft text-accent-ink">
-            <svg viewBox="0 0 20 20" className="size-6" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-              {hecho ? <path d="M4.5 10.5l3.5 3.5 7.5-8" /> : <path d="M3 5.5h14v9H3zM3.5 6l6.5 5 6.5-5" />}
-            </svg>
-          </span>
+    <AuthLayout>
+      <span aria-hidden="true" className="grid size-12 place-items-center rounded-full bg-accent-soft text-accent-ink">
+        <svg viewBox="0 0 20 20" className="size-6" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+          {hecho ? <path d="M4.5 10.5l3.5 3.5 7.5-8" /> : <path d="M3 5.5h14v9H3zM3.5 6l6.5 5 6.5-5" />}
+        </svg>
+      </span>
 
-          {hecho ? (
-            <div role="status">
-              <h1 className="mt-5 font-display text-[26px] font-bold tracking-[-0.025em]">Correo verificado</h1>
-              <p className="mt-2 text-muted">Gracias. Te llevamos de vuelta…</p>
-            </div>
-          ) : (
-            <>
-              <h1 className="mt-5 font-display text-[26px] font-bold tracking-[-0.025em]">Verifica tu correo</h1>
-              <p className="mt-2 text-muted">
-                Te enviaremos un código de {CODIGO_LONGITUD} cifras a <strong className="text-ink">{email}</strong>.
-                Sirve para que las propuestas lleguen a la persona correcta.
-              </p>
-
-              {!envio ? (
-                <button type="button" onClick={enviar} disabled={enviando} aria-busy={enviando} className="btn-primary mt-6 h-12 w-full text-[15px]">
-                  {enviando ? "Enviando…" : "Enviar código"}
-                </button>
-              ) : (
-                <form onSubmit={confirmar} noValidate className="mt-6">
-                  <label htmlFor={`${id}-codigo`} className="label">Código de verificación</label>
-                  <input
-                    ref={inputRef}
-                    id={`${id}-codigo`}
-                    inputMode="numeric"
-                    autoComplete="one-time-code"
-                    pattern="[0-9]*"
-                    maxLength={CODIGO_LONGITUD + 2}
-                    value={codigo}
-                    onChange={(e) => {
-                      setCodigo(limpiarCodigo(e.target.value));
-                      setError(null);
-                    }}
-                    placeholder={"0".repeat(CODIGO_LONGITUD)}
-                    aria-invalid={Boolean(error)}
-                    aria-describedby={`${id}-ayuda${error ? ` ${id}-error` : ""}`}
-                    className={`field num h-14 text-center font-display text-[26px] font-semibold tracking-[0.5em] placeholder:tracking-[0.5em] ${error ? "border-negative" : ""}`}
-                  />
-                  <p id={`${id}-ayuda`} className="mt-1.5 text-meta text-muted">
-                    Válido hasta las {caducaA}. Puedes pegarlo tal cual.
-                  </p>
-                  {envio.codigoDemo && (
-                    <p className="mt-3 rounded-control bg-pill-warn-bg px-3 py-2 text-meta text-pill-warn-ink">
-                      Modo demo: no se envían correos. Tu código es <strong className="num">{envio.codigoDemo}</strong>.
-                    </p>
-                  )}
-
-                  <button
-                    type="submit"
-                    disabled={codigo.length !== CODIGO_LONGITUD || comprobando}
-                    aria-busy={comprobando}
-                    className="btn-primary mt-5 h-12 w-full text-[15px]"
-                  >
-                    {comprobando ? "Comprobando…" : "Verificar"}
-                  </button>
-                  <button type="button" onClick={enviar} disabled={espera > 0 || enviando} className="btn-ghost mt-2 w-full">
-                    {espera > 0 ? `Reenviar código en ${espera} s` : "Reenviar código"}
-                  </button>
-                </form>
-              )}
-
-              {error && (
-                <p id={`${id}-error`} role="alert" className="field-error mt-3">
-                  <svg aria-hidden="true" viewBox="0 0 20 20" className="size-[18px] flex-none" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M10 6.5v4M10 13.5h.01M10 2.5l7.5 13h-15z" />
-                  </svg>
-                  {error}
-                </p>
-              )}
-
-              <Link to={destino} className="mt-6 block text-center text-meta text-muted underline hover:text-ink">
-                Ahora no, verificar más tarde
-              </Link>
-            </>
-          )}
+      {hecho ? (
+        <div role="status">
+          <h1 className="mt-5 font-display text-[26px] font-bold tracking-[-0.025em]">Correo verificado</h1>
+          <p className="mt-2 text-muted">Gracias. Ahora inicia sesión…</p>
         </div>
-      </div>
-    </AppShell>
+      ) : (
+        <>
+          <h1 className="mt-5 font-display text-[26px] font-bold tracking-[-0.025em]">Verifica tu correo</h1>
+          <p className="mt-2 text-muted">
+            Escribe el código de {CODIGO_LONGITUD} cifras que hemos enviado a <strong className="text-ink">{email}</strong>.
+            Caduca a los {VIGENCIA_MIN} minutos.
+          </p>
+
+          {codigoDev && (
+            <p className="mt-4 rounded-control bg-pill-warn-bg px-3 py-2 text-meta text-pill-warn-ink" data-testid="codigo-dev">
+              Modo demo: la API no envía correos. Tu código es <strong className="num">{codigoDev}</strong>.
+            </p>
+          )}
+
+          <form onSubmit={confirmar} noValidate className="mt-6">
+            <label htmlFor={`${id}-codigo`} className="label">Código de verificación</label>
+            <input
+              ref={inputRef}
+              id={`${id}-codigo`}
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              autoFocus
+              pattern="[0-9]*"
+              maxLength={CODIGO_LONGITUD + 2}
+              value={codigo}
+              disabled={bloqueado}
+              onChange={(e) => {
+                setCodigo(limpiarCodigo(e.target.value));
+                setError(null);
+              }}
+              placeholder={"0".repeat(CODIGO_LONGITUD)}
+              aria-invalid={Boolean(error)}
+              aria-describedby={`${id}-ayuda${error ? ` ${id}-error` : ""}`}
+              className={`field num h-14 text-center font-display text-[26px] font-semibold tracking-[0.5em] placeholder:tracking-[0.5em] ${error ? "border-negative" : ""}`}
+            />
+            <p id={`${id}-ayuda`} className="mt-1.5 text-meta text-muted">Puedes pegarlo tal cual.</p>
+
+            {error && (
+              <div className="mt-3" id={`${id}-error`}>
+                <AlertaFormulario>{error}</AlertaFormulario>
+              </div>
+            )}
+            {aviso && (
+              <p role="status" className="mt-3 text-meta text-muted">{aviso}</p>
+            )}
+
+            <button
+              type="submit"
+              disabled={codigo.length !== CODIGO_LONGITUD || comprobando || bloqueado}
+              aria-busy={comprobando}
+              className="btn-primary mt-5 h-12 w-full text-[15px]"
+            >
+              {comprobando ? "Comprobando…" : "Verificar"}
+            </button>
+            <button type="button" onClick={reenviar} disabled={espera > 0 || reenviando} className="btn-ghost mt-2 w-full">
+              {reenviando ? "Enviando…" : espera > 0 ? `Reenviar código en ${espera} s` : "Pedir un código nuevo"}
+            </button>
+          </form>
+
+          <Link to="/login" className="mt-6 block text-center text-meta text-muted underline hover:text-ink">
+            Volver a iniciar sesión
+          </Link>
+        </>
+      )}
+    </AuthLayout>
   );
 }

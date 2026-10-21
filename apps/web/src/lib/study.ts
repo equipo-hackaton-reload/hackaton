@@ -1,11 +1,12 @@
-import type { StudyStatus } from "../types/api";
-import type { EstadoEstudio, FaseEmbudo, Market, Metrics, Palanca, Rol } from "../types/schemas";
+import type { EstadoApi, StudyStatus } from "../types/api";
+import type { FaseEmbudo, Market, Metrics, Palanca, Rol } from "../types/schemas";
 
-export const ESTADO_LABEL: Record<EstadoEstudio, string> = {
+export const ESTADO_LABEL: Record<EstadoApi, string> = {
   en_curso: "En curso",
   esperando_revision_competidores: "Esperando revisión de competidores",
   esperando_revision_plan: "Esperando revisión del plan",
   completado: "Completado",
+  error: "Detenido por un error",
 };
 
 export const ROL_LABEL: Record<Rol, string> = { foco: "Foco", contexto: "Contexto", lider: "Líder" };
