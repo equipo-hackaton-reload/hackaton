@@ -37,7 +37,7 @@ async def test_draft_cannot_replace_metrics_or_reference_unknown_findings(repo: 
     deps = make_deps(kit_llm(), [], repo)
     state = await analyzed_state(repo)
     state = merge(state, await nodes.plan(state, deps))
-    draft = deps.llm.handlers["write.v1"](
+    draft = deps.llm.handlers["write.v2"](
         {"hallazgos": [f.model_dump() for f in state["findings"]]}
     )
     assert isinstance(draft, ProposalDraft)

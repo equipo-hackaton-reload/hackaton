@@ -23,6 +23,11 @@
 - Demo sin claves: `LLM_PROVIDER=fixture` + `scripts/demo_kit.py`.
 - README de arranque reproducible: requisitos, demo sin claves (API + web o `demo_kit.py`), claves,
   API, desarrollo y limitaciones. Comprobado desde cero en un worktree el 2026-10-21.
+- Trazabilidad brief → propuesta (zona A, ADR 0013): el nodo `write` usa `write.v2`, manda
+  `puntos_brief` al redactor y rellena `proposal.encargo` con `domain.brief_coverage`. Si falta un
+  punto enlazable (no restricciones ni presupuesto), reintenta una vez con `carencias_cobertura` y
+  `borrador_anterior`; lo que siga pendiente va a `contexto.limitaciones` («Puntos del brief sin
+  tratar…»). Forma del JSON en `docs/estado/D.md`.
 
 ## Diferencial v0.4.0 (en curso)
 - Base común: el checkpointer admite `stats_schemas`, `scenario_schemas`, `source_map_schemas`,

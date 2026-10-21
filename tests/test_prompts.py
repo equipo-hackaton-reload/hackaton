@@ -65,3 +65,12 @@ def test_prompt_set_separa_y_no_repite_ids() -> None:
     assert ps.espontaneos == [esp] and ps.asistidos == [asi]
     with pytest.raises(ValueError, match="repetidos"):
         PromptSet(prompts=[esp, esp])
+
+
+def test_write_v2_enlaza_el_brief() -> None:
+    spec = load_prompt("write", 2)
+    assert spec.version_tag == "write.v2" and spec.schema_name == "ProposalDraft"
+    assert {"puntos_brief", "carencias_cobertura", "borrador_anterior"} <= set(spec.state)
+    assert "cobertura_brief" in spec.texto and "no inventes cifras" in spec.texto.lower()
+    contenido = (PROMPTS_DIR / "write.v2.md").read_text(encoding="utf-8")
+    assert "{" not in contenido and "}" not in contenido

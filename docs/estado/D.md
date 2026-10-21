@@ -18,3 +18,29 @@
 
 ## No tocar
 - No calcular cifras en el front: se pintan las que da la API.
+
+## Para Claudia: «Lo que nos habéis pedido» (trazabilidad brief → propuesta, ADR 0013)
+`GET /studies/{id}` → `proposal.encargo` (no se ha tocado `apps/web/`). Es `null` en propuestas
+antiguas.
+
+```json
+"encargo": null | {
+  "objetivos": ["..."], "restricciones": ["..."], "servicios_prioritarios": ["..."],
+  "ciudades": ["Madrid", "Barcelona"], "publicos": ["..."], "competidores_declarados": ["..."],
+  "presupuesto_anual_eur": [18000, 27000] | null,
+  "cobertura": [
+    {"id": "ciudad-1", "tipo": "ciudad", "texto": "Madrid",
+     "accion_ids": ["A0-1", "A2-1"], "hallazgo_ids": [],
+     "estado": "cubierto" | "pendiente", "motivo": ""}
+  ]
+}
+```
+
+- `tipo`: `objetivo`, `restriccion`, `servicio_prioritario`, `ciudad`, `publico`, `competidor`,
+  `presupuesto`. Los ids de `accion_ids` y `hallazgo_ids` existen en `proposal.plan` y en
+  `proposal.hallazgos` (lo valida el esquema).
+- En restricciones y presupuesto, `motivo` explica la comprobación («La declaran todas las acciones
+  del plan.», «Plan de 22.000 €, dentro del máximo de 27.000 €.»). En los pendientes dice por qué.
+- Propuesta para la web: un bloque al principio de la propuesta con las listas literales y una
+  tabla punto → dónde se trata (enlazando a la acción o al hallazgo), con «pendiente» en ámbar.
+  Las cifras no se recalculan en el front.

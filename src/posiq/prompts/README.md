@@ -6,7 +6,8 @@ Prompts versionados en Markdown, uno por nodo: `<nodo>.v1.md` (Zona E).
 | `market.v1.md` | `Market` | `brief_summary`, `marcas_candidatas` |
 | `prompts.v1.md` | `PromptSet` (en este paquete) | `brief_summary`, `market`, `banco_plantillas` |
 | `plan.v1.md` | `Plan` | `brief_summary`, `metrics`, `findings` |
-| `write.v1.md` | `Proposal` | `study`, `brief_summary`, `market`, `prompt_set`, `metrics`, `findings`, `plan` |
+| `write.v1.md` | `ProposalDraft` | `brief`, `market`, `contexto`, `metrics`, `metricas`, `diferencia_anterior`, `hallazgos`, `plan`, `errores` |
+| `write.v2.md` | `ProposalDraft` (+ `cobertura_brief`) | las de v1 + `puntos_brief`; en el reintento, `borrador_anterior` y `carencias_cobertura` |
 | `claims.v1.md` | `AfirmacionesLLM` (`domain/accuracy.py`) | `marca`, `otras_marcas`, `respuesta`, `tipos` |
 
 Cada fichero empieza por una cabecera YAML (`name`, `version`, `schema`, `state`) y sigue con las

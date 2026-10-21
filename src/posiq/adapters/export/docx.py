@@ -16,8 +16,10 @@ from posiq.adapters.export.branding import AgencyBrandKit
 from posiq.adapters.export.template import TEMPLATE_PATH
 from posiq.domain.schemas import (
     Action,
+    Encargo,
     Metrics,
     Proposal,
+    PuntoBrief,
     TipoVisibilidad,
     UnidadCifra,
     VisibilityCell,
@@ -53,6 +55,21 @@ PALANCAS = {
     "medicion": "Medición",
 }
 TIPOS: dict[TipoVisibilidad, str] = {"espontaneo": "Espontánea", "asistido": "Asistida"}
+TIPOS_PUNTO = {
+    "objetivo": "Objetivo",
+    "restriccion": "Restricción",
+    "servicio_prioritario": "Servicio prioritario",
+    "ciudad": "Ciudad",
+    "publico": "Público",
+    "competidor": "Competidor declarado",
+    "presupuesto": "Presupuesto",
+}
+PENDIENTE = "Pendiente"
+INTRO_ENCARGO = (
+    "Esto es lo que nos pedisteis en el brief, tal cual, y dónde lo trata esta propuesta. "
+    "La cobertura la comprueba el sistema contra el plan y los hallazgos, no la redacción."
+)
+SIN_ENCARGO = "Esta propuesta no registra el encargo del brief."
 ORIGENES = {"kit": "Kit del reto (datos grabados)", "api": "APIs de los motores"}
 
 
@@ -251,6 +268,53 @@ def _accion(a: Action) -> dict[str, str]:
     }
 
 
+def _donde(p: PuntoBrief) -> str:
+    if p.estado == "pendiente":
+        return f"pendiente: {p.motivo}" if p.motivo else "pendiente"
+    if p.tipo in ("restriccion", "presupuesto"):
+        return p.motivo
+    partes = []
+    if p.accion_ids:
+        partes.append("Acciones " + _lista(p.accion_ids))
+    if p.hallazgo_ids:
+        partes.append("Hallazgos " + _lista(p.hallazgo_ids))
+    return " · ".join(partes)
+
+
+def _encargo(e: Encargo | None) -> dict[str, Any]:
+    """El encargo literal y su cobertura; solo formatea lo que decidió `domain.brief_coverage`."""
+    if e is None:
+        return {
+            "intro": SIN_ENCARGO,
+            "listas": [],
+            "cobertura": [_vacia("tipo", "texto", "donde", "estado")],
+        }
+    presupuesto = [p.texto for p in e.cobertura if p.tipo == "presupuesto"]
+    listas = [
+        ("Objetivos", e.objetivos),
+        ("Restricciones", e.restricciones),
+        ("Servicios prioritarios", e.servicios_prioritarios),
+        ("Ciudades", e.ciudades),
+        ("Públicos", e.publicos),
+        ("Competidores declarados", e.competidores_declarados),
+        ("Presupuesto", presupuesto),
+    ]
+    return {
+        "intro": INTRO_ENCARGO,
+        "listas": [{"titulo": t, "puntos": items} for t, items in listas if items],
+        "cobertura": [
+            {
+                "tipo": TIPOS_PUNTO[p.tipo],
+                "texto": p.texto,
+                "donde": _donde(p),
+                "estado": "Cubierto" if p.estado == "cubierto" else PENDIENTE,
+            }
+            for p in e.cobertura
+        ]
+        or [_vacia("tipo", "texto", "donde", "estado")],
+    }
+
+
 def build_context(
     proposal: Proposal, tpl: DocxTemplate, marca_agencia: AgencyBrandKit | None = None
 ) -> dict[str, Any]:
@@ -278,6 +342,7 @@ def build_context(
         "fecha": fecha,
         "aviso_sintetico": AVISO_SINTETICO if c.datos_sinteticos else "",
         "resumen": _parrafos(p.resumen_ejecutivo),
+        "encargo": _encargo(p.encargo),
         "ctx": {
             "marca": c.marca,
             "sector": c.sector,

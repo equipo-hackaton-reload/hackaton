@@ -283,7 +283,15 @@ def proposal_draft(state: dict[str, Any]) -> ProposalDraft:
         riesgos=[Riesgo(riesgo="Cambios de modelo", mitigacion="Re-medir")],
         supuestos=["Muestra pequeña"],
         hoja_ruta="Mensual",
+        cobertura_brief=cobertura_primera_accion(state),
     )
+
+
+def cobertura_primera_accion(state: dict[str, Any]) -> dict[str, list[str]]:
+    """Enlaza cada punto del brief con la primera acción del plan (un redactor obediente)."""
+    plan = state.get("plan") or {"fases": []}
+    acciones = [a["id"] for fase in plan["fases"] for a in fase["acciones"]]
+    return {p["id"]: acciones[:1] for p in state.get("puntos_brief", [])}
 
 
 def kit_llm() -> FakeLLM:
@@ -292,6 +300,6 @@ def kit_llm() -> FakeLLM:
             "intake.v1": lambda _: brief_alborada(),
             "market.v1": market_from_candidates,
             "plan.v1": plan_from_findings,
-            "write.v1": proposal_draft,
+            "write.v2": proposal_draft,
         }
     )
