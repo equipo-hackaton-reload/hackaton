@@ -133,7 +133,12 @@
   `PuntuacionBloque`, `AuditoriaWeb`, `RecursoConsultado`; `CATALOGO` (24 comprobaciones en 5
   bloques), `PESO_BLOQUE` (contenido 35, descubrimiento 25, acceso de bots 25, rendimiento 10,
   agentes/API 5), `BOT_MOTOR` (11 bots), `RECURSOS`, `puntuar_bloque` y `puntuar_total`.
-- `ports.WebFetcher` (`contract-change`): `get(url, *, accept=None) -> RespuestaWeb`, sin lanzar.
+- `ports.WebFetcher` (`contract-change`): `get(url, *, dominio, accept=None) -> RespuestaWeb`, sin
+  lanzar. Requisitos de seguridad en el contrato: `url_permitida` (http/https, puerto por defecto,
+  host = dominio o subdominio; también `Sitemap:` y cada `Location`), `ip_permitida` (SSRF: sin
+  privadas, loopback, link-local, CGNAT, ULA, multicast ni IPv4 mapeadas; conexión a la IP
+  validada contra DNS rebinding), `MAX_REDIRECCIONES`=5 a mano, `MAX_BYTES_DESCARGA`=2 MB tras
+  descomprimir en streaming y `TIMEOUT_TOTAL_RECURSO_S`=10 s total. B debe probarlos.
 - **Siguiente (A):** `domain/web_audit.py` (parseo de robots.txt RFC 9309, sitemap, JSON-LD,
   texto visible, Content-Signal; `auditar(...)` y `hallazgos_web(...)`), con golden sobre
   respuestas fijas. Luego B (`adapters/web` httpx + fixture), C (nodo `web_audit` entre `judge` y

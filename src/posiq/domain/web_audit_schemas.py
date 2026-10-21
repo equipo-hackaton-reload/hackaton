@@ -16,8 +16,10 @@ en los motores afectados. La prueba de la web (línea de robots.txt, tipos JSON-
 `Comprobacion.evidencia`, literal.
 """
 
+import ipaddress
 from datetime import datetime
 from typing import Final, Literal, Self
+from urllib.parse import urlsplit
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -74,6 +76,16 @@ CABECERAS_RELEVANTES: Final[tuple[str, ...]] = (
 
 # Cuerpo máximo que guarda el adaptador (caracteres); lo que pase se trunca y se marca `truncado`.
 MAX_CONTENIDO_CHARS: Final = 500_000
+# Bytes máximos que el adaptador LEE de un recurso, contados tras descomprimir (gzip/br/deflate).
+# La lectura es en streaming y se corta al llegar aquí (`truncado=True`): nunca `resp.text` entero.
+MAX_BYTES_DESCARGA: Final = 2_000_000
+# Tiempo TOTAL por recurso (conexión + redirecciones + lectura completa del cuerpo), en segundos.
+# No es un timeout por lectura: un servidor que envía un byte cada 9 s se corta a los 10 s.
+TIMEOUT_TOTAL_RECURSO_S: Final = 10.0
+# Saltos de redirección que el adaptador sigue (a mano, revalidando cada `Location`).
+MAX_REDIRECCIONES: Final = 5
+# Puertos admitidos en las URLs que se descargan (None = el del esquema).
+PUERTOS_PERMITIDOS: Final[tuple[int | None, ...]] = (None, 80, 443)
 # Longitud máxima de `Comprobacion.evidencia` (fragmento literal del recurso).
 MAX_EVIDENCIA_CHARS: Final = 500
 # Páginas del sitemap (además de la portada) en las que se buscan los tipos JSON-LD.
@@ -82,6 +94,69 @@ MAX_PAGINAS_SITEMAP: Final = 3
 MIN_TEXTO_VISIBLE_CHARS: Final = 500
 # Tiempo de respuesta de la portada hasta el cual `tiempo_respuesta` está «ok».
 UMBRAL_TIEMPO_RESPUESTA_MS: Final = 2000
+
+
+def _normalizar_host(host: str) -> str:
+    return host.strip().lower().rstrip(".")
+
+
+def url_permitida(url: str, dominio: str) -> bool:
+    """¿Puede el adaptador descargar `url` para la auditoría de `dominio` (`Brand.dominio`)?
+
+    Solo `http`/`https`, sin credenciales en la URL, con puerto por defecto (`PUERTOS_PERMITIDOS`)
+    y con host igual a `dominio` o subdominio suyo. Se aplica a las rutas fijas, a las URLs
+    `Sitemap:` de robots.txt, a las páginas del sitemap y a cada `Location` de una redirección.
+    Puro (sin DNS): la resolución y `ip_permitida` son cosa del adaptador.
+    """
+    base = _normalizar_host(dominio)
+    if not base:
+        return False
+    try:
+        partes = urlsplit(url.strip())
+        puerto = partes.port
+    except ValueError:
+        return False
+    if partes.scheme.lower() not in ("http", "https") or puerto not in PUERTOS_PERMITIDOS:
+        return False
+    if partes.username is not None or partes.password is not None or "\\" in partes.netloc:
+        return False
+    host = _normalizar_host(partes.hostname or "")
+    return bool(host) and (host == base or host.endswith("." + base))
+
+
+# Rangos IPv6 que encapsulan una IPv4 (NAT64, 6to4, Teredo): se rechazan enteros.
+_IPV6_ENCAPSULADAS: Final = (
+    ipaddress.IPv6Network("64:ff9b::/96"),
+    ipaddress.IPv6Network("64:ff9b:1::/48"),
+    ipaddress.IPv6Network("2002::/16"),
+    ipaddress.IPv6Network("2001::/32"),
+)
+
+
+def ip_permitida(ip: str) -> bool:
+    """¿Puede el adaptador conectar a `ip` (ya resuelta)? Protección SSRF del ADR 0019.
+
+    Rechaza privadas, loopback, link-local (169.254/16, fe80::/10), CGNAT (100.64/10), ULA
+    (fc00::/7), multicast, reservadas, no especificadas, las IPv4 mapeadas en IPv6 que caigan en
+    alguno de esos rangos y las IPv6 que encapsulan IPv4 (NAT64, 6to4, Teredo). Solo admite
+    direcciones globales. Un texto que no es IP también se rechaza.
+    """
+    try:
+        addr: ipaddress.IPv4Address | ipaddress.IPv6Address = ipaddress.ip_address(
+            ip.strip().strip("[]")
+        )
+    except ValueError:
+        return False
+    if isinstance(addr, ipaddress.IPv6Address):
+        if addr.scope_id is not None:
+            return False
+        if addr.ipv4_mapped is not None:
+            addr = addr.ipv4_mapped
+        elif any(addr in red for red in _IPV6_ENCAPSULADAS):
+            return False
+    return addr.is_global and not (
+        addr.is_multicast or addr.is_reserved or addr.is_unspecified or addr.is_loopback
+    )
 
 
 class Recurso(BaseModel):
@@ -96,6 +171,8 @@ class Recurso(BaseModel):
 
 # Rutas fijas. Además, el adaptador sigue las URLs `Sitemap:` de robots.txt (si no hay, usa
 # `/sitemap.xml`) y descarga hasta `MAX_PAGINAS_SITEMAP` páginas del mismo dominio del sitemap.
+# Toda URL (fija, `Sitemap:`, página del sitemap o `Location` de una redirección) pasa antes por
+# `url_permitida(url, dominio)`, y toda IP resuelta por `ip_permitida` (ADR 0019, «Seguridad»).
 RECURSOS: Final[tuple[Recurso, ...]] = (
     Recurso(id="robots", ruta="/robots.txt"),
     Recurso(id="sitemap", ruta="/sitemap.xml"),
@@ -291,7 +368,9 @@ class RespuestaWeb(_Model):
       `error` lo explica. Un 4xx/5xx NO es un error del fetcher: llega con su `estado_http`.
     - `url_final`: la URL tras seguir redirecciones (None si no hubo respuesta).
     - `accept`: la cabecera Accept pedida (None = la del adaptador por defecto).
-    - `contenido`: cuerpo como texto, sin ejecutar JavaScript, truncado a `MAX_CONTENIDO_CHARS`.
+    - `contenido`: cuerpo como texto, sin ejecutar JavaScript, leído en streaming hasta
+      `MAX_BYTES_DESCARGA` bytes (tras descomprimir) y truncado a `MAX_CONTENIDO_CHARS`;
+      `truncado` es True si se cortó por cualquiera de los dos límites.
     - `cabeceras`: solo las de `CABECERAS_RELEVANTES`, con el nombre en minúsculas.
     - `duracion_ms`: tiempo hasta tener la respuesta completa (None si no hubo respuesta).
     """

@@ -12,8 +12,12 @@ from posiq.domain.web_audit_schemas import (
     BOT_MOTOR,
     BOTS_IA,
     CATALOGO,
+    MAX_BYTES_DESCARGA,
+    MAX_CONTENIDO_CHARS,
+    MAX_REDIRECCIONES,
     PESO_BLOQUE,
     RECURSOS,
+    TIMEOUT_TOTAL_RECURSO_S,
     AccesoBot,
     AuditoriaWeb,
     Comprobacion,
@@ -23,8 +27,10 @@ from posiq.domain.web_audit_schemas import (
     RecursoConsultado,
     RespuestaWeb,
     SenalContenido,
+    ip_permitida,
     puntuar_bloque,
     puntuar_total,
+    url_permitida,
 )
 from posiq.ports import WebFetcher
 
@@ -323,7 +329,8 @@ def test_auditoria_sin_respuesta_de_la_web() -> None:
 
 
 class _FakeFetcher:
-    """Fetcher en memoria: 404 para lo desconocido y error de red para `caido.example`."""
+    """Fetcher en memoria: 404 para lo desconocido, error de red para `caido.example` y
+    `url_no_permitida` fuera del dominio (como exige el contrato)."""
 
     name = "fake"
 
@@ -331,7 +338,9 @@ class _FakeFetcher:
         self.paginas = paginas
         self.pedidas: list[tuple[str, str | None]] = []
 
-    def get(self, url: str, *, accept: str | None = None) -> RespuestaWeb:
+    def get(self, url: str, *, dominio: str, accept: str | None = None) -> RespuestaWeb:
+        if not url_permitida(url, dominio):
+            return RespuestaWeb(url=url, accept=accept, error="url_no_permitida", obtenido_en=AHORA)
         self.pedidas.append((url, accept))
         if "caido.example" in url:
             return RespuestaWeb(url=url, accept=accept, error="ConnectError", obtenido_en=AHORA)
@@ -352,24 +361,132 @@ class _FakeFetcher:
 
 
 def _descarga(fetcher: WebFetcher, url: str) -> RespuestaWeb:
-    return fetcher.get(url, accept="text/markdown")
+    return fetcher.get(url, dominio="a.example", accept="text/markdown")
 
 
 def test_fake_cumple_el_protocolo_y_no_lanza() -> None:
     fake = _FakeFetcher({"https://a.example/robots.txt": "User-agent: *\nAllow: /"})
     fetcher: WebFetcher = fake
     assert fetcher.name == "fake"
-    assert fetcher.get("https://a.example/robots.txt").ok
+    assert fetcher.get("https://a.example/robots.txt", dominio="a.example").ok
     assert _descarga(fetcher, "https://a.example/llms.txt").estado_http == 404
-    caida = fetcher.get("https://caido.example/")
+    caida = fetcher.get("https://caido.example/", dominio="caido.example")
     assert caida.estado_http is None and caida.error
+    fuera = fetcher.get("http://169.254.169.254/latest/meta-data/", dominio="a.example")
+    assert fuera.estado_http is None and fuera.error == "url_no_permitida"
+    assert len(fake.pedidas) == 3
     assert fake.pedidas[1] == ("https://a.example/llms.txt", "text/markdown")
 
 
 def test_firma_del_protocolo() -> None:
     proto = inspect.signature(WebFetcher.get)
     fake = inspect.signature(_FakeFetcher.get)
-    assert list(proto.parameters) == list(fake.parameters) == ["self", "url", "accept"]
+    assert list(proto.parameters) == list(fake.parameters) == ["self", "url", "dominio", "accept"]
+    assert proto.parameters["dominio"].kind is inspect.Parameter.KEYWORD_ONLY
+    assert proto.parameters["dominio"].default is inspect.Parameter.empty
     assert proto.parameters["accept"].kind is inspect.Parameter.KEYWORD_ONLY
     assert proto.parameters["accept"].default is None
     assert "name" in WebFetcher.__annotations__
+
+
+def test_requisitos_del_contrato_en_el_docstring() -> None:
+    doc = WebFetcher.get.__doc__ or ""
+    for requisito in (
+        "url_permitida",
+        "ip_permitida",
+        "MAX_REDIRECCIONES",
+        "MAX_BYTES_DESCARGA",
+        "TIMEOUT_TOTAL_RECURSO_S",
+        "streaming",
+        "DNS rebinding",
+    ):
+        assert requisito in doc
+    assert MAX_BYTES_DESCARGA >= 2 * MAX_CONTENIDO_CHARS  # caben los caracteres (UTF-8 multibyte)
+    assert 0 < TIMEOUT_TOTAL_RECURSO_S <= 10 and 0 < MAX_REDIRECCIONES <= 5
+
+
+# --- Seguridad: url_permitida e ip_permitida (SSRF) -----------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://alborada.example/",
+        "http://alborada.example/robots.txt",
+        "https://www.alborada.example/sitemap.xml",
+        "https://ALBORADA.example./blog?x=1",
+        "https://blog.alborada.example:443/a",
+    ],
+)
+def test_url_permitida_dentro_del_dominio(url: str) -> None:
+    assert url_permitida(url, "alborada.example")
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "http://169.254.169.254/latest/meta-data/iam/",
+        "http://127.0.0.1:8000/studies",
+        "http://localhost/",
+        "https://alborada.example.evil.com/",
+        "https://evilalborada.example/",
+        "https://alborada.example:8080/",
+        "ftp://alborada.example/",
+        "file:///etc/passwd",
+        "gopher://alborada.example/",
+        "https://evil.com@alborada.example/",
+        "https://alborada.example@evil.com/",
+        "https://evil.com\\@alborada.example/",
+        "https://alborada.example:99999/",
+        "//alborada.example/",
+        "/sitemap.xml",
+        "",
+    ],
+)
+def test_url_no_permitida_fuera_del_dominio(url: str) -> None:
+    assert not url_permitida(url, "alborada.example")
+
+
+def test_url_permitida_sin_dominio() -> None:
+    assert not url_permitida("https://alborada.example/", "")
+
+
+@pytest.mark.parametrize("ip", ["93.184.216.34", "1.1.1.1", "2606:4700:4700::1111"])
+def test_ip_publica_permitida(ip: str) -> None:
+    assert ip_permitida(ip)
+
+
+@pytest.mark.parametrize(
+    "ip",
+    [
+        "10.0.0.5",
+        "172.16.3.4",
+        "192.168.1.1",
+        "127.0.0.1",
+        "169.254.169.254",
+        "100.64.0.1",
+        "0.0.0.0",
+        "224.0.0.1",
+        "239.255.255.250",
+        "240.0.0.1",
+        "255.255.255.255",
+        "::1",
+        "::",
+        "fe80::1",
+        "fe80::1%eth0",
+        "fc00::1",
+        "fd12:3456::1",
+        "ff02::1",
+        "::ffff:127.0.0.1",
+        "::ffff:10.0.0.1",
+        "::ffff:169.254.169.254",
+        "64:ff9b::a00:1",
+        "2002:a00:1::1",
+        "2001:0:4136:e378::1",
+        "[::1]",
+        "no-es-ip",
+        "",
+    ],
+)
+def test_ip_no_permitida(ip: str) -> None:
+    assert not ip_permitida(ip)

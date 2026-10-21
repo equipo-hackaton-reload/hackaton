@@ -136,13 +136,29 @@ class WebFetcher(Protocol):
 
     name: str
 
-    def get(self, url: str, *, accept: str | None = None) -> RespuestaWeb:
-        """Descarga `url` (GET, sin ejecutar JavaScript, siguiendo redirecciones).
+    def get(self, url: str, *, dominio: str, accept: str | None = None) -> RespuestaWeb:
+        """Descarga `url` (GET, sin ejecutar JavaScript) para la auditoría de `dominio`.
 
         `accept` fija la cabecera Accept (p. ej. `text/markdown`); None usa la del adaptador.
         No lanza por errores de red ni por 4xx/5xx: un 4xx/5xx llega en `estado_http`, y un fallo
-        sin respuesta (DNS, conexión, TLS, timeout) llega con `estado_http=None` y `error`.
-        Registra `duracion_ms`, `url_final` y las cabeceras de `CABECERAS_RELEVANTES`
-        (content-type, link...), y trunca el cuerpo a `MAX_CONTENIDO_CHARS`.
+        sin respuesta (DNS, conexión, TLS, timeout, URL o IP rechazada) llega con
+        `estado_http=None` y `error`. Registra `duracion_ms`, `url_final` y las cabeceras de
+        `CABECERAS_RELEVANTES` (content-type, link...).
+
+        Requisitos de seguridad del contrato (ADR 0019; la implementación real los prueba):
+        - **Destino:** `url` y cada `Location` deben cumplir
+          `web_audit_schemas.url_permitida(url, dominio)` (http/https, puerto por defecto, host =
+          `dominio` o subdominio suyo). Si no, no se conecta: `error="url_no_permitida"`.
+        - **Redirecciones:** se siguen a mano, como mucho `MAX_REDIRECCIONES`, revalidando cada
+          salto (destino e IP). Pasado el máximo: `error="demasiadas_redirecciones"`.
+        - **IP (SSRF y DNS rebinding):** el host se resuelve una vez por salto; si alguna IP no
+          cumple `ip_permitida` (privadas, loopback, link-local, CGNAT, ULA, multicast, IPv4
+          mapeadas en IPv6...) se rechaza con `error="ip_no_permitida"`, y la conexión se hace a
+          la IP ya validada (no se vuelve a resolver), con el `Host`/SNI del nombre original.
+        - **Tamaño:** el cuerpo se lee en streaming y se corta a `MAX_BYTES_DESCARGA` bytes
+          contados tras descomprimir (`truncado=True`); nunca se carga entero en memoria. Luego se
+          trunca el texto a `MAX_CONTENIDO_CHARS`.
+        - **Tiempo:** `TIMEOUT_TOTAL_RECURSO_S` es el tope TOTAL del recurso (conexión,
+          redirecciones y lectura), no por lectura; al pasarlo: `error="timeout"`.
         """
         ...

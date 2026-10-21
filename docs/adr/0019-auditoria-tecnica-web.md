@@ -42,7 +42,8 @@ el plan con las cifras ya calculadas.
 - **`RespuestaWeb`**: lo que devuelve `WebFetcher.get`. Lleva:
   - `url` y `url_final`;
   - `accept` pedido y `estado_http` (None si no hubo respuesta; entonces `error` es obligatorio);
-  - `contenido`, truncado a `MAX_CONTENIDO_CHARS` = 500.000, y `truncado`;
+  - `contenido`, truncado a `MAX_CONTENIDO_CHARS` = 500.000, y `truncado` (también si la lectura
+    se cortó en `MAX_BYTES_DESCARGA`);
   - `cabeceras`, solo las de `CABECERAS_RELEVANTES` (`content-type`, `link`, `x-robots-tag`,
     `content-signal`, `last-modified`) y en minúsculas;
   - `duracion_ms` y `obtenido_en`.
@@ -73,12 +74,15 @@ el plan con las cifras ya calculadas.
 class WebFetcher(Protocol):
     name: str
 
-    def get(self, url: str, *, accept: str | None = None) -> RespuestaWeb: ...
+    def get(self, url: str, *, dominio: str, accept: str | None = None) -> RespuestaWeb: ...
 ```
 
 - No lanza por errores de red ni por 4xx/5xx: los devuelve en `estado_http` y `error`.
-- Hace GET sin ejecutar JavaScript, sigue redirecciones y registra el tiempo de respuesta y las
-  cabeceras relevantes.
+- Hace GET sin ejecutar JavaScript, sigue redirecciones (a mano y revalidadas) y registra el
+  tiempo de respuesta y las cabeceras relevantes.
+- `dominio` es `Brand.dominio`: el fetcher solo descarga ese host y sus subdominios. Los requisitos
+  de seguridad (destino, IP, redirecciones, tamaño y tiempo) son parte del contrato y están en
+  «Grafo, trazas y API → Seguridad».
 
 ### Recursos que se descargan (`RECURSOS`)
 
@@ -95,9 +99,11 @@ siete rutas `/.well-known/`:
 
 Además:
 
-- Se siguen las URLs `Sitemap:` de robots.txt (si no hay ninguna, se usa `/sitemap.xml`).
-- Se descargan hasta `MAX_PAGINAS_SITEMAP` = 3 páginas del mismo dominio del sitemap, para buscar
-  JSON-LD. Se eligen en el orden del sitemap.
+- Se siguen las URLs `Sitemap:` de robots.txt (si no hay ninguna, se usa `/sitemap.xml`), pero
+  solo las que cumplen `url_permitida(url, Brand.dominio)`: un `Sitemap:` a otro host (p. ej.
+  `http://169.254.169.254/...`) se ignora y no se descarga.
+- Se descargan hasta `MAX_PAGINAS_SITEMAP` = 3 páginas del sitemap que cumplan `url_permitida`,
+  para buscar JSON-LD. Se eligen en el orden del sitemap.
 
 En total son unas 16 descargas por auditoría.
 
@@ -204,11 +210,37 @@ no cambian. Los genera `web_audit.hallazgos_web(auditoria, evaluaciones, runs, b
 - **`GET /studies/{id}`:** añade `auditoria_web: AuditoriaWeb | null`. Contenedor en
   `application/diferencial.py`.
 - **Checkpointer:** admite los modelos de `web_audit_schemas`.
-- **Seguridad:**
-  - Solo se descarga el dominio de la marca foco (y las URLs del sitemap del mismo dominio).
-  - Hay timeout (10 s por recurso), un límite de tamaño y un user-agent propio (`posiq-audit/1`).
-  - No se descargan IPs privadas (protección SSRF en el adaptador).
-  - El contenido es DATO: nunca entra en instrucciones de un LLM.
+- **Seguridad (requisitos del contrato `WebFetcher.get`; los tests del PR de B los prueban):**
+  `Brand.dominio` lo escribe cualquier usuario registrado, así que el dominio y su DNS se tratan
+  como hostiles (SSRF hacia la red interna o los metadatos de la nube, y denegación de servicio).
+  - **Destino:** `get(url, *, dominio, accept)` solo conecta si
+    `web_audit_schemas.url_permitida(url, dominio)`: esquema `http`/`https`, sin credenciales en
+    la URL, puerto por defecto (80/443) y host = `Brand.dominio` o un subdominio suyo. Vale para
+    las rutas fijas, las URLs `Sitemap:`, las páginas del sitemap y **cada `Location`**. Si no se
+    cumple: `estado_http=None`, `error="url_no_permitida"`, sin conexión.
+  - **Redirecciones:** se siguen a mano (no con `follow_redirects` del cliente), como mucho
+    `MAX_REDIRECCIONES` = 5 saltos, revalidando en cada uno el destino y la IP. Pasado el máximo:
+    `error="demasiadas_redirecciones"`.
+  - **IP y DNS rebinding:** en cada salto el host se resuelve **una vez**; si alguna de las IPs no
+    cumple `web_audit_schemas.ip_permitida` se rechaza (`error="ip_no_permitida"`). Se rechazan
+    privadas, loopback, link-local (incluido 169.254.169.254), CGNAT (100.64/10), ULA (fc00::/7),
+    multicast, reservadas, no especificadas, las IPv4 mapeadas en IPv6 (`::ffff:10.0.0.1`) y las
+    IPv6 que encapsulan IPv4 (NAT64, 6to4, Teredo). La conexión se hace **a la IP ya validada**
+    (transporte con la IP fijada y `Host`/SNI del nombre original), sin segunda resolución.
+  - **Tamaño:** el cuerpo se lee en streaming y se corta a `MAX_BYTES_DESCARGA` = 2 MB **contados
+    tras descomprimir** (una bomba gzip se corta igual), con `truncado=True`. Nunca `resp.text` del
+    cuerpo entero. Después el texto se trunca a `MAX_CONTENIDO_CHARS`.
+  - **Tiempo:** `TIMEOUT_TOTAL_RECURSO_S` = 10 s es el tope **total** por recurso (conexión,
+    redirecciones y lectura completa), no por lectura: un servidor que manda un byte cada 9 s se
+    corta a los 10 s (`error="timeout"`). Con unas 16 descargas, una auditoría dura como mucho
+    unos 160 s.
+  - User-agent propio (`posiq-audit/1`).
+  - El contenido es DATO: nunca entra en instrucciones de un LLM. Lo que vuelve al usuario
+    (`evidencia`, `detalle`) sale solo de respuestas que pasaron todos estos filtros.
+  - **Tests exigidos en el PR de B:** `Sitemap:` y `Location` a otro host o a una IP interna no se
+    descargan; más de 5 redirecciones; DNS que resuelve a 10.x / 127.0.0.1 / `::ffff:127.0.0.1`;
+    la conexión usa la IP validada; cuerpo comprimido que descomprime por encima del límite;
+    servidor lento cortado por el tope total.
 
 ### Web (D)
 
@@ -246,7 +278,10 @@ comparable** en ese indicador.
 ## Consecuencias
 
 - **`contract-change` aditivo:** `ports.py` gana `WebFetcher` e importa `RespuestaWeb`. Ningún
-  dependiente existente cambia.
+  dependiente existente cambia. Las reglas de destino e IP (`url_permitida`, `ip_permitida`) y los
+  límites (`MAX_BYTES_DESCARGA`, `TIMEOUT_TOTAL_RECURSO_S`, `MAX_REDIRECCIONES`) viven en
+  `domain/web_audit_schemas.py`, puros y probados, para que el adaptador y su fixture los
+  compartan.
 - **Dependencias:** B añadirá `httpx` (ya transitiva) como dependencia directa al implementar el
   adaptador. El dominio no la necesita.
 - **Guía GEO como checklist:** la guía se usa para decidir qué comprobar. Sus estadísticas no se
