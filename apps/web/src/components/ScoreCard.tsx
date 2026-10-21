@@ -4,10 +4,10 @@ import { Panel } from "./Panel";
 
 /** Los cuatro componentes del Score de Citación y su peso máximo (metodología del kit). */
 const COMPONENTES = [
-  { key: "aparicion", label: "Aparición", peso: 30 },
-  { key: "posicion", label: "Posición", peso: 20 },
-  { key: "fuerza", label: "Fuerza", peso: 30 },
-  { key: "calidad_fuente", label: "Calidad de fuente", peso: 20 },
+  { key: "aparicion", label: "Aparición", peso: 30, dot: "bg-brand-magenta" },
+  { key: "posicion", label: "Posición", peso: 20, dot: "bg-brand-cyan" },
+  { key: "fuerza", label: "Fuerza", peso: 30, dot: "bg-brand-yellow" },
+  { key: "calidad_fuente", label: "Calidad de fuente", peso: 20, dot: "bg-brand-coral" },
 ] as const;
 
 const MOTORES = ["ChatGPT", "Gemini", "Perplexity", "Claude"] as const;
@@ -35,7 +35,7 @@ export function ScoreCard({ metrics, nombre }: Props) {
       meta={<span className="num">n = {s.n_evaluaciones} evaluaciones espontáneas</span>}
     >
       <div className="flex flex-wrap items-baseline gap-x-3">
-        <p className="num text-answer font-semibold tracking-[-0.02em]" data-testid="score-global">
+        <p className="num text-answer font-light tracking-[-0.03em]" data-testid="score-global">
           {fmtNum(s.score)}
         </p>
         <p className="text-muted">
@@ -75,7 +75,12 @@ export function ScoreCard({ metrics, nombre }: Props) {
             return (
               <tr key={c.key}>
                 <th scope="row" className="py-1.5 pr-3 text-left font-normal">
-                  {c.label} <span className="num text-meta text-muted">{c.peso}</span>
+                  <span className="inline-flex items-center gap-2">
+                    <span aria-hidden className={`dot size-2 ${c.dot}`} />
+                    <span>
+                      {c.label} <span className="num text-meta text-muted">{c.peso}</span>
+                    </span>
+                  </span>
                 </th>
                 <td className="py-1.5">
                   <div className="relative h-2 rounded-full bg-[var(--track)]" aria-hidden>

@@ -1,7 +1,8 @@
 import { useState, type KeyboardEvent, type ReactNode, type Ref } from "react";
 import { ICONOS } from "./iconos";
+import { RegistrationMarks } from "./RegistrationMarks";
 import { ThemeToggle } from "./ThemeToggle";
-import { Wordmark } from "./Wordmark";
+import { LogoMark, Wordmark } from "./Wordmark";
 
 /** Tres pasos, no más: lo que el producto hace cabe de un vistazo (ley de Miller). */
 const PASOS = [
@@ -9,6 +10,8 @@ const PASOS = [
   ["Mide la visibilidad", "en ChatGPT, Gemini, Perplexity y Claude."],
   ["Hace el seguimiento", "cada trimestre, con el mismo método, y solo avisa de cambios fuera del margen de error."],
 ] as const;
+/** Los aros del logotipo, de fuera adentro: magenta, cian, amarillo. */
+const DOTS = ["bg-brand-magenta", "bg-brand-cyan", "bg-brand-yellow"] as const;
 
 export function Icono({ d, className = "" }: { d: string; className?: string }) {
   return (
@@ -144,41 +147,42 @@ export function AuthLayout({ children }: { children: ReactNode }) {
   return (
     <div className="grid min-h-dvh lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]">
       {/* Panel de marca: en móvil se reduce a una franja para que el formulario quede a mano. */}
-      <aside className="login-hero relative flex flex-col justify-between overflow-hidden px-6 pb-8 pt-6 text-white sm:px-10 lg:px-14 lg:py-12">
-        <div aria-hidden="true" className="login-blob left-[-8%] top-[-10%] size-[340px] bg-[#ff9a7a]" />
-        <div aria-hidden="true" className="login-blob bottom-[-14%] right-[-10%] size-[420px] bg-[#4a0a20]" />
+      <aside className="login-hero relative flex flex-col justify-between overflow-hidden px-6 pb-8 pt-6 sm:px-10 lg:px-14 lg:py-12">
+        {/* La diana del logotipo a gran tamaño, recortada en la esquina y atenuada: decorativa. */}
+        <LogoMark className="pointer-events-none absolute -bottom-24 -right-24 hidden size-[420px] opacity-80 lg:block" />
 
-        <span className="relative text-white [&_span_span]:text-[#ffc9b0]">
-          <Wordmark className="text-[26px]" />
+        <span className="relative">
+          <Wordmark className="text-[30px]" />
         </span>
 
-        <div className="relative mt-8 max-w-[34rem] lg:mt-0">
-          <p className="font-display text-[32px] font-bold leading-[1.08] tracking-[-0.03em] sm:text-[42px] lg:text-[52px]">
-            ¿Te recomiendan los asistentes de IA?
-          </p>
-          <p className="mt-4 max-w-[30rem] text-[15px] leading-relaxed text-white/90 sm:text-base">
-            posiq. mide cuánto aparece tu marca cuando alguien pregunta a una IA, la compara con tu competencia y
-            sigue su evolución con método.
+        <div className="relative mt-8 max-w-[36rem] lg:mt-0">
+          <p className="font-display text-[56px] font-normal uppercase leading-[1.02] tracking-[0.01em] sm:text-[76px] lg:text-[96px]">¿Te recomienda la IA?</p>
+          <p className="tracked mt-6 text-white/85">Lo que hace posiq.</p>
+          <p className="mt-2 max-w-[28rem] text-[15px] leading-relaxed text-white/80 sm:text-base">
+            Mide cuánto aparece tu marca cuando alguien pregunta a ChatGPT, Gemini, Perplexity o Claude, la compara con
+            tu competencia y sigue su evolución con método.
           </p>
 
-          <ol className="mt-8 hidden gap-3 sm:grid">
+          <ol className="mt-8 hidden max-w-[22rem] gap-5 sm:grid">
             {PASOS.map(([titulo, texto], i) => (
-              <li key={titulo} className="flex gap-3 rounded-[14px] bg-white/12 px-4 py-3 ring-1 ring-white/20 backdrop-blur-sm">
-                <span className="grid size-7 flex-none place-items-center rounded-full bg-white text-[13px] font-semibold text-[#8f1347]">
-                  {i + 1}
-                </span>
-                <p className="text-[14px] leading-snug text-white/90">
-                  <strong className="font-semibold text-white">{titulo}</strong> {texto}
+              <li key={titulo} className="flex gap-3.5">
+                <span aria-hidden="true" className={`dot mt-1.5 ${DOTS[i]}`} />
+                <p className="text-[14px] leading-snug text-white/80">
+                  <strong className="block text-[16px] font-bold text-white">
+                    {i + 1}. {titulo}
+                  </strong>
+                  {texto}
                 </p>
               </li>
             ))}
           </ol>
         </div>
 
-        <p className="relative mt-8 hidden text-meta text-white/80 lg:block">Hackatón · Zona D</p>
+        <p className="tracked relative mt-8 hidden text-white/60 lg:block">Hackatón EPS UFV · Zona D</p>
       </aside>
 
       <main id="contenido" className="relative flex items-center justify-center px-4 py-10 sm:px-8">
+        <RegistrationMarks className="!absolute" />
         <div className="absolute right-4 top-4 sm:right-6">
           <ThemeToggle />
         </div>

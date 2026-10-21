@@ -31,6 +31,8 @@ const PASOS = [
   ["Revisas el plan", "de acción, enlazado a los hallazgos que lo justifican."],
   ["Redacta la propuesta", "para el comité, en Word o PDF."],
 ] as const;
+/** Los aros del logotipo como viñetas; el número del paso dice el orden, el color solo acompaña. */
+const DOTS = ["bg-brand-magenta", "bg-brand-cyan", "bg-brand-yellow", "bg-brand-coral"] as const;
 
 export function NewStudyPage() {
   const navigate = useNavigate();
@@ -86,7 +88,8 @@ export function NewStudyPage() {
         subtitle="Pega el brief de la marca: posiq. medirá cuánto la recomiendan los asistentes de IA frente a su competencia."
       />
       <form onSubmit={onSubmit} className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
-        <div className="panel p-5">
+        <div className="panel overflow-hidden p-5 pt-6">
+          <div aria-hidden="true" className="brand-stripe -mx-5 -mt-6 mb-5 h-1" />
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
             <label htmlFor={briefId} className="text-body font-medium">
               Brief de la marca
@@ -148,9 +151,14 @@ export function NewStudyPage() {
                 <label
                   key={m.value}
                   className={`flex h-8 cursor-pointer items-center justify-center rounded-[5px] transition-colors has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-accent ${
-                    modo === m.value ? "bg-surface font-medium text-ink" : "text-muted hover:text-ink"
+                    modo === m.value ? "bg-primary font-semibold text-on-primary" : "text-muted hover:text-ink"
                   }`}
                 >
+                  {modo === m.value && (
+                    <svg aria-hidden="true" viewBox="0 0 12 12" className="mr-1.5 size-3" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M2.5 6.3 5 8.7l4.5-5.2" />
+                    </svg>
+                  )}
                   <input
                     type="radio"
                     name="modo"
@@ -195,7 +203,7 @@ export function NewStudyPage() {
           <div>
             <button
               type="submit"
-              className="btn-primary h-10 w-full"
+              className="btn-primary h-12 w-full text-[15px]"
               disabled={!brief.trim() || create.isPending || bloqueadoPorCoste}
             >
               {create.isPending ? "Creando el estudio…" : "Analizar"}
@@ -213,10 +221,16 @@ export function NewStudyPage() {
             <h2 id="que-hace" className="text-body font-semibold">
               Qué pasa al analizar
             </h2>
-            <ol className="mt-2 space-y-2 text-muted">
-              {PASOS.map(([accion, resto]) => (
-                <li key={accion}>
-                  <span className="font-medium text-ink">{accion}</span> {resto}
+            <ol className="mt-3 space-y-3 text-muted">
+              {PASOS.map(([accion, resto], i) => (
+                <li key={accion} className="flex gap-3">
+                  <span aria-hidden="true" className={`dot mt-[5px] ${DOTS[i % DOTS.length]}`} />
+                  <span>
+                    <span className="font-semibold text-ink">
+                      {i + 1}. {accion}
+                    </span>{" "}
+                    {resto}
+                  </span>
                 </li>
               ))}
             </ol>
