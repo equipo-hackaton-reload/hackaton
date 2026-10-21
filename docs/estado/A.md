@@ -127,6 +127,19 @@
   `kit.brands_in_runs()`. Arreglo propuesto: renombrar las claves en `market.py` a
   `brief_summary`/`marcas_candidatas` (C), o cambiar el prompt y el README de prompts (E).
 
+## Auditoría técnica GEO de la web: contrato (`feature/A-auditoria-web-contrato`, ADR 0019)
+
+- `domain/web_audit_schemas.py`: `RespuestaWeb`, `AccesoBot`, `SenalContenido`, `Comprobacion`,
+  `PuntuacionBloque`, `AuditoriaWeb`, `RecursoConsultado`; `CATALOGO` (24 comprobaciones en 5
+  bloques), `PESO_BLOQUE` (contenido 35, descubrimiento 25, acceso de bots 25, rendimiento 10,
+  agentes/API 5), `BOT_MOTOR` (11 bots), `RECURSOS`, `puntuar_bloque` y `puntuar_total`.
+- `ports.WebFetcher` (`contract-change`): `get(url, *, accept=None) -> RespuestaWeb`, sin lanzar.
+- **Siguiente (A):** `domain/web_audit.py` (parseo de robots.txt RFC 9309, sitemap, JSON-LD,
+  texto visible, Content-Signal; `auditar(...)` y `hallazgos_web(...)`), con golden sobre
+  respuestas fijas. Luego B (`adapters/web` httpx + fixture), C (nodo `web_audit` entre `judge` y
+  `analyze`, `Settings.web_audit=off` por defecto, trazas `http:<fetcher>`), D (tarjeta) y E (plan
+  y Word). Todo en el ADR 0019.
+
 ## Falta
 - Integrar `informe_rigor` en el grafo y en `GET /studies/{id}` (zona C), y pintar «25,9 [21,6–30,1]»
   y los márgenes en la web (D) y el Word (E). Decidir (B/C) si `build_judge` usa `ConsensusJudge`

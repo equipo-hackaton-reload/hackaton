@@ -23,6 +23,7 @@ from posiq.domain.schemas import (
     Study,
     Trace,
 )
+from posiq.domain.web_audit_schemas import RespuestaWeb
 
 if TYPE_CHECKING:
     from posiq.adapters.export.branding import AgencyBrandKit
@@ -124,3 +125,24 @@ class Exporter(Protocol):
         formato: Literal["docx", "pdf"],
         marca_agencia: "AgencyBrandKit | None" = None,
     ) -> bytes: ...
+
+
+class WebFetcher(Protocol):
+    """Descarga recursos de la web de la marca para la auditoría técnica GEO (ADR 0019).
+
+    Solo descarga: no interpreta nada (eso es `domain.web_audit`). El cuerpo es DATO y nunca va a
+    las instrucciones de un LLM. Implementaciones: `httpx` (real) y fixture (modo kit, `.example`).
+    """
+
+    name: str
+
+    def get(self, url: str, *, accept: str | None = None) -> RespuestaWeb:
+        """Descarga `url` (GET, sin ejecutar JavaScript, siguiendo redirecciones).
+
+        `accept` fija la cabecera Accept (p. ej. `text/markdown`); None usa la del adaptador.
+        No lanza por errores de red ni por 4xx/5xx: un 4xx/5xx llega en `estado_http`, y un fallo
+        sin respuesta (DNS, conexión, TLS, timeout) llega con `estado_http=None` y `error`.
+        Registra `duracion_ms`, `url_final` y las cabeceras de `CABECERAS_RELEVANTES`
+        (content-type, link...), y trunca el cuerpo a `MAX_CONTENIDO_CHARS`.
+        """
+        ...
