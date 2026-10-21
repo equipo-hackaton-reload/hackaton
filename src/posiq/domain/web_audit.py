@@ -271,10 +271,15 @@ def parsear_robots(texto: str) -> Robots:
             if token:
                 agentes.append(token)
                 lineas_agente.append(linea)
-        elif clave in ("allow", "disallow"):
+            continue
+        # Toda línea con clave distinta de `User-agent` (Allow, Disallow, Sitemap,
+        # Crawl-delay, Content-Signal o desconocida) cierra la secuencia de agentes,
+        # como hace el parser de referencia de Google (google/robotstxt).
+        if agentes:
+            con_reglas = True
+        if clave in ("allow", "disallow"):
             if not agentes:
                 continue  # regla fuera de un grupo: se ignora (RFC 9309)
-            con_reglas = True
             if valor:  # `Disallow:` vacío no prohíbe nada
                 reglas.append(ReglaRobots(clave == "allow", valor, linea))
         elif clave == "sitemap":

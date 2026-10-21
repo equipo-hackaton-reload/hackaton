@@ -296,6 +296,24 @@ def test_robots_el_grupo_propio_sustituye_al_comodin() -> None:
     assert (bloqueado.permitido, bloqueado.regla) == (False, "Disallow: /")
 
 
+@pytest.mark.parametrize(
+    "intermedia",
+    [
+        "Crawl-delay: 5",
+        "Sitemap: https://ejemplo.com/sitemap.xml",
+        "Content-Signal: search=yes",
+        "X-Desconocida: 1",
+    ],
+)
+def test_robots_una_linea_no_regla_cierra_el_grupo(intermedia: str) -> None:
+    r = parsear_robots(f"User-agent: *\n{intermedia}\n\nUser-agent: GPTBot\nDisallow: /\n")
+    assert [g.agentes for g in r.grupos] == [("*",), ("gptbot",)]
+    claude = acceso_bot(r, "ClaudeBot")
+    assert claude.permitido is True
+    assert claude.regla is None
+    assert acceso_bot(r, "GPTBot").permitido is False
+
+
 def test_robots_combina_grupos_repetidos_del_mismo_agente() -> None:
     r = parsear_robots("User-agent: GPTBot\nAllow: /blog\n\nUser-agent: gptbot\nDisallow: /\n")
     assert acceso_bot(r, "GPTBot").permitido is False

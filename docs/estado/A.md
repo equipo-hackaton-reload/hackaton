@@ -190,6 +190,9 @@ Todo aditivo en `tracking.py`/`tracking_schemas.py` (ADR 0016 actualizado):
     (sin variante markdown); `content_signal` también se evalúa desde la cabecera aunque no haya
     robots.txt; un bot sin motor (CCBot) bloqueado hace fallar `bots_ia_sin_bloqueo` pero no da
     `F-web-bots-bloqueados`.
+  - robots.txt: toda línea con clave distinta de `User-agent` (Allow, Disallow, Sitemap,
+    Crawl-delay, Content-Signal o desconocida) cierra la secuencia de agentes, como
+    google/robotstxt; así `User-agent: *` + `Crawl-delay` no se funde con el grupo siguiente.
   - Hallazgos según el ADR: un único `F-web-bots-bloqueados` (cifra = nº de motores) y uno por
     bloque < 50. No hay hallazgos por comprobación (`F-web-sin-schema`...): la descripción del de
     bloque lista los ids que fallan.
