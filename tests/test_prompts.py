@@ -74,3 +74,15 @@ def test_write_v2_enlaza_el_brief() -> None:
     assert "cobertura_brief" in spec.texto and "no inventes cifras" in spec.texto.lower()
     contenido = (PROMPTS_DIR / "write.v2.md").read_text(encoding="utf-8")
     assert "{" not in contenido and "}" not in contenido
+
+
+def test_intake_v2_extrae_la_identidad_deseada_sin_inventarla() -> None:
+    spec = load_prompt("intake", 2)
+    assert spec.version_tag == "intake.v2" and spec.schema_name == "BriefSummary"
+    assert set(spec.state) == {"brief"}
+    assert {"posicionamiento_deseado", "atributos_deseados"} <= set(
+        re.findall(r"`(\w+)`", spec.texto)
+    )
+    assert "no inventes cifras" in spec.texto.lower() and "nunca los inventes" in spec.texto
+    contenido = (PROMPTS_DIR / "intake.v2.md").read_text(encoding="utf-8")
+    assert "{" not in contenido and "}" not in contenido

@@ -8,6 +8,8 @@
   `JEV_MODEL=jev-1.13` fijado (sin temperatura ni semilla en la API); la `Trace` guarda el modelo
   que respondió. Falta comprobar con clave que la API acepta `jev-1.13` (`client.models.list()`).
 - LLM `openai_compat` (DeepSeek) y `FixtureLLM` para la demo sin claves.
+- `FixtureLLM` (cambio de E, `intake.v2`): para Alborada añade posicionamiento y atributos
+  deseados solo si aparecen tal cual en el brief recibido (`identidad_deseada_alborada`).
 - `LLMOutputError.trace` (ADR 0018, cambio de C): tokens y coste de todos los intentos fallidos;
   si la API falla tras un intento cobrado, también sale como `LLMOutputError` con su traza.
   `MissingCredentialError` dice «falta X (ni en el entorno ni en .env)».

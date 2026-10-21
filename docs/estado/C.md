@@ -21,6 +21,8 @@
   limitaciones; la demo en fixture explica en sus supuestos que usa etiquetas del kit y reglas.
   PlanGuard ya no bloquea el plan si su API falla.
 - Demo sin claves: `LLM_PROVIDER=fixture` + `scripts/demo_kit.py`.
+- El nodo `intake` usa `intake.v2` (zona E): `brief.posicionamiento_deseado` y
+  `brief.atributos_deseados` llegan rellenos en `GET /studies/{id}` si el brief los trae.
 - README de arranque reproducible: requisitos, demo sin claves (API + web o `demo_kit.py`), claves,
   API, desarrollo y limitaciones. Comprobado desde cero en un worktree el 2026-10-21.
 - Trazabilidad brief → propuesta (zona A, ADR 0013): el nodo `write` usa `write.v2`, manda

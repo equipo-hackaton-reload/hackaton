@@ -3,6 +3,7 @@ Prompts versionados en Markdown, uno por nodo: `<nodo>.v1.md` (Zona E).
 | Prompt | Esquema de salida | Claves de `state` |
 |---|---|---|
 | `intake.v1.md` | `BriefSummary` | `brief` |
+| `intake.v2.md` | `BriefSummary` (+ `posicionamiento_deseado`, `atributos_deseados`) | `brief` |
 | `market.v1.md` | `Market` | `brief_summary`, `marcas_candidatas` |
 | `prompts.v1.md` | `PromptSet` (en este paquete) | `brief_summary`, `market`, `banco_plantillas` |
 | `plan.v1.md` | `Plan` | `brief_summary`, `metrics`, `findings` |
