@@ -3,7 +3,7 @@ import { useState } from "react";
 type Tema = "light" | "dark";
 
 const CLAVE = "posiq-theme";
-const COLOR_BARRA: Record<Tema, string> = { light: "#f7f4f2", dark: "#130e16" };
+const COLOR_BARRA: Record<Tema, string> = { light: "#f7f7f5", dark: "#141414" };
 
 function temaActual(): Tema {
   return document.documentElement.dataset.theme === "dark" ? "dark" : "light";

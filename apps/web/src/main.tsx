@@ -1,5 +1,5 @@
-import "@fontsource-variable/bricolage-grotesque";
-import "@fontsource-variable/geist";
+import "@fontsource-variable/antonio";
+import "@fontsource-variable/outfit";
 import "./index.css";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
