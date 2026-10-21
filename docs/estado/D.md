@@ -44,6 +44,15 @@
   por estudio en sessionStorage (`lib/avisoKit.ts`) y `CompetitorsPage` lo enseña con
   `components/AvisoKit.tsx`. Hecho por zona C con autorización; los mocks aún no lo devuelven.
 
+## En `feature/D-identidad-claudia` (PR abierta, sin fusionar)
+- Identidad visual de Claudia (commit 64e33cf de `feature/D-web-claudia`) aplicada sobre el login
+  real con token (#38): logo de diana en SVG en cabecera, pantallas de cuentas (`AuthLayout`) y
+  favicon; paleta cian/magenta/amarillo/coral con carbón #141414; Antonio y Outfit; marcas de
+  registro; botón principal cian (login y registro con botón en tinta); franja de aros y pasos con
+  viñetas en «Nuevo estudio». No reintroduce el login de cliente antiguo de esa rama.
+- Comprobado con Playwright (web 5211, API 8911 en fixture), claro y oscuro: logo en login y
+  cabecera, favicon con la diana, sin errores de consola.
+
 ## Falta
 - Integrar `/brands`, `/brands/{id}/serie` y `/studies/{id}/remeasure/estimate` cuando los publique
   la etapa «Seguimiento API» (zona C; hoy responden 404 y la web degrada). `POST /remeasure` ya existe
