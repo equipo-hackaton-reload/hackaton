@@ -5,6 +5,7 @@ Formato [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); versionado 
 ## [Unreleased]
 
 ### Added
+- Contratos aditivos del diferencial (zona A), fuera de `schemas.py`: `stats_schemas` (`Intervalo`, `Significancia`), `scenario_schemas` (`EntradaEscenario`, `AccionAplazada`, `EscenarioPlan`), `source_map_schemas` (`FuenteSector`, `MapaFuentes`, `OportunidadFuente`) y `accuracy_schemas` (`Afirmacion`, `Verificacion`, `HallazgoExactitud`, `AccionMitigacion`).
 - Simulación del plan, calidad por acción y re-medición mock en la interfaz web (zona D); preparada para los campos opcionales de la API de C.
 - README de arranque reproducible (zona C): requisitos, demo sin claves con la API y la web o con `scripts/demo_kit.py`, variables con claves, estimación de coste, tabla de la API, desarrollo y limitaciones.
 - `JUDGE_PROVIDER=reglas` (zona C; campo aditivo en `settings.py` y `.env.example`): el juez de menciones y PlanGuard no llaman a ningún LLM aunque haya claves, para un estudio rápido con DeepSeek solo en intake, plan y redacción. `/estimate` lo refleja. La propuesta declara en sus limitaciones cuándo las menciones se evaluaron solo por reglas.
