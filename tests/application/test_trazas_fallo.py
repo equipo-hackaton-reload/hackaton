@@ -58,7 +58,7 @@ def runner(repo: SqlStudyRepo, llm: FakeLLM, **kw: Any) -> StudyRunner:
     return StudyRunner({"kit": deps}, InMemorySaver(serde=serializer()), repo)
 
 
-@pytest.mark.parametrize("nodo", ["intake.v1", "market.v1"])
+@pytest.mark.parametrize("nodo", ["intake.v2", "market.v1"])
 async def test_a_failed_llm_call_is_traced_and_costed(repo: SqlStudyRepo, nodo: str) -> None:
     llm = StudyLLM(kit_llm().handlers)
     llm.handlers[nodo] = failing(nodo, 0.012)
@@ -76,7 +76,7 @@ async def test_a_failed_llm_call_is_traced_and_costed(repo: SqlStudyRepo, nodo: 
 
 async def test_the_failed_call_counts_in_the_budget(repo: SqlStudyRepo) -> None:
     llm = StudyLLM(kit_llm().handlers)
-    llm.handlers["intake.v1"] = failing("intake.v1", 1.0)
+    llm.handlers["intake.v2"] = failing("intake.v2", 1.0)
     r = runner(repo, llm, budget_max=0.5)
     study = r.create("kit")
     await r.start(study, BRIEF)

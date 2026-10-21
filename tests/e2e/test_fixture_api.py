@@ -53,6 +53,9 @@ def test_fixture_wiring_completes_and_exports_word(tmp_path: Path, multipart: bo
         assert proposal["diagnostico"]["metrics"] == view["metrics"]
         assert proposal["plan"] == view["plan"]
         assert "DEMO SIN IA" in proposal["resumen_ejecutivo"]
+        # intake.v2: la identidad deseada que trae el brief de Alborada, con su texto literal.
+        assert view["brief"]["posicionamiento_deseado"].startswith("Clínica oftalmológica privada")
+        assert len(view["brief"]["atributos_deseados"]) == 3
         # Trazabilidad brief → propuesta: todo lo que pidió el cliente está tratado.
         encargo = proposal["encargo"]
         assert encargo["ciudades"] == ["Madrid", "Barcelona"]

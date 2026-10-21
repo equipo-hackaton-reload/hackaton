@@ -297,7 +297,7 @@ def cobertura_primera_accion(state: dict[str, Any]) -> dict[str, list[str]]:
 def kit_llm() -> FakeLLM:
     return FakeLLM(
         {
-            "intake.v1": lambda _: brief_alborada(),
+            "intake.v2": lambda _: brief_alborada(),
             "market.v1": market_from_candidates,
             "plan.v1": plan_from_findings,
             "write.v2": proposal_draft,
