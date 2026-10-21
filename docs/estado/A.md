@@ -45,6 +45,12 @@
   - Conectarlo al grafo y a la API (C). Mostrarlo en la web (D) y en el Word (E).
   - Muchas «no verificables» lo son porque el `BriefSummary` no tiene diferenciales, sedes ni
     equipo médico. Ampliarlo es un `contract-change` que no se ha hecho.
+- Escenarios del plan (`feature/A-escenarios`, ADR 0009): `scenarios.build_scenario`,
+  `build_preset`/`build_presets` y `minimal_cover` (en los preajustes la medición no cubre hallazgos).
+  Alborada: mínimo viable 5 puntos → 27,67; equilibrado 7 puntos → 28,20; completo 16 puntos →
+  30,77. `intervalo` en None hasta el IC del score (`feature/A-rigor-estadistico`). Falta que C
+  rellene `escenarios` (`EscenarioGuardado`, #24) con `build_presets`, más un endpoint para el
+  escenario personalizado, y que D lo pinte.
 
 ## Falta
 - Que la web (D) y el Word (E) muestren la simulación. La calidad del plan solo existe con claves de juez.
