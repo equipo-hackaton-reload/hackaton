@@ -120,3 +120,36 @@ async def test_remedicion_siembra_el_banco_y_la_medicion_anterior(repo: SqlStudy
     rigor = despues["rigor"]
     assert rigor is not None and "score_global" in rigor.deltas
     assert rigor.deltas["score_global"].delta == 0
+
+
+async def test_si_fallan_los_deltas_se_conserva_el_rigor_de_la_medicion_actual(
+    repo: SqlStudyRepo, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Un contraste con la medición anterior que falla no anula los IC de la medición nueva."""
+
+    def falla(*_: Any, **__: Any) -> Any:
+        raise ValueError("marcas foco distintas")
+
+    monkeypatch.setattr(DIFERENCIAL, "significancia_remedicion", falla)
+    state = await analyzed_state(repo)
+    metrics = state["metrics"].model_copy(update={"comparado_con": "anterior"})
+    state = merge(
+        state,
+        {
+            "metrics": metrics,
+            "medicion_anterior": {
+                "study_id": "anterior",
+                "metrics": state["metrics"],
+                "evaluations": state["evaluations"],
+                "runs": state["runs"],
+                "prompts": state["prompts"],
+            },
+        },
+    )
+    update = await nodes.diferencial(state, make_deps(FakeLLM({}), [], repo))
+    rigor = update["rigor"]
+    assert rigor is not None
+    assert rigor.score_global.valor == metrics.score_global.score
+    assert rigor.score_por_motor and rigor.hallazgos
+    assert rigor.deltas == {}
+    assert update["errores"] == ["diferencial: rigor.deltas sin calcular: marcas foco distintas"]

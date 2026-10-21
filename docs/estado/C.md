@@ -74,6 +74,9 @@
     (la capa LLM `claims.v1` no se usa en el grafo).
   - Cada bloque se calcula por separado: si uno lanza `ValueError`/`KeyError`, queda en null con el
     motivo en `errores` («diferencial: … sin calcular: …») y el estudio sigue.
+    Dentro de `rigor`, los deltas de la re-medición van aparte: si el contraste con la medición
+    anterior falla, `rigor.deltas` queda vacío con «diferencial: rigor.deltas sin calcular: …» en
+    `errores` y se conservan los IC y significancias de la medición actual.
 - Coste en tiempo: con Alborada, ≈2,7 s en esta máquina (1,4 s el informe con 2000 réplicas,
   0,5 s los cuatro motores, 0,8 s la exactitud; el ADR 0008 habla de ≈4 s en otra). Corre en
   `asyncio.to_thread`: no bloquea el bucle de la API (test con latidos del bucle). Una re-medición

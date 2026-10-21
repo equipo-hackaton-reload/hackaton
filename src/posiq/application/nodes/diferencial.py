@@ -59,22 +59,33 @@ def rigor(
     *,
     replicas: int = REPLICAS_BOOTSTRAP,
     semilla: int = SEMILLA_BOOTSTRAP,
+    errores: list[str] | None = None,
 ) -> Rigor:
-    """Intervalos y significancias del estudio (y de sus deltas si es una re-medición)."""
+    """Intervalos y significancias del estudio (y de sus deltas si es una re-medición).
+
+    Los deltas se calculan aparte: si el contraste con la medición anterior falla (marcas foco
+    distintas, muestra que no reproduce el score guardado...), `deltas` queda vacío con el motivo
+    en `errores` y el rigor de la medición actual se conserva entero.
+    """
     metrics = state["metrics"]
     muestra = Muestra(state["evaluations"], state["runs"], state["prompts"])
     informe = informe_rigor(metrics, state["findings"], muestra, replicas=replicas, semilla=semilla)
     deltas: dict[str, Significancia] = {}
     anterior: MedicionAnterior | None = state.get("medicion_anterior")
     if anterior is not None and metrics.comparado_con == anterior["study_id"]:
-        deltas = significancia_remedicion(
-            metrics,
-            anterior["metrics"],
-            muestra,
-            Muestra(anterior["evaluations"], anterior["runs"], anterior["prompts"]),
-            replicas=replicas,
-            semilla=semilla,
-        ).por_clave()
+        try:
+            deltas = significancia_remedicion(
+                metrics,
+                anterior["metrics"],
+                muestra,
+                Muestra(anterior["evaluations"], anterior["runs"], anterior["prompts"]),
+                replicas=replicas,
+                semilla=semilla,
+            ).por_clave()
+        except (ValueError, KeyError) as exc:
+            log.warning("diferencial: deltas sin calcular en %s", state["study_id"])
+            if errores is not None:
+                errores.append(f"diferencial: rigor.deltas sin calcular: {exc}")
     return Rigor(
         score_global=informe.score,
         score_por_motor=intervalos_score_por_motor(
@@ -124,7 +135,7 @@ def calcular(state: StudyState, catalogo: Sequence[Source]) -> dict[str, Any]:
             update.update(dict.fromkeys(nombres))
             errores.append(f"diferencial: {', '.join(nombres)} sin calcular: {exc}")
 
-    bloque(("rigor",), lambda: {"rigor": rigor(state)})
+    bloque(("rigor",), lambda: {"rigor": rigor(state, errores=errores)})
     bloque(
         ("competidores",),
         lambda: {
