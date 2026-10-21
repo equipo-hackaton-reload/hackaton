@@ -18,6 +18,7 @@ from posiq.adapters.export import (
 from posiq.adapters.export.docx import fmt_cifra, fmt_score
 from posiq.adapters.export.pdf import find_soffice
 from posiq.adapters.export.template import SECCIONES, TEMPLATE_PATH, build_template
+from posiq.domain.brief_coverage import evaluar_cobertura, puntos_del_brief
 from posiq.domain.findings import detect_findings
 from posiq.domain.metrics import compute_metrics
 from posiq.domain.schemas import (
@@ -172,8 +173,17 @@ def proposal(kit: Kit, alborada_brief: BriefSummary) -> Proposal:
 
 
 @pytest.fixture(scope="module")
-def docx_bytes(proposal: Proposal) -> bytes:
-    return DocxExporter().render(proposal, formato="docx")
+def proposal_con_encargo(proposal: Proposal, alborada_brief: BriefSummary) -> Proposal:
+    """La misma propuesta con el encargo del brief: todo enlazado salvo los pilotos."""
+    acciones = [a.id for a in proposal.plan.acciones]
+    enlaces = {p.id: acciones for p in puntos_del_brief(alborada_brief) if p.id != "publico-4"}
+    encargo = evaluar_cobertura(alborada_brief, proposal.plan, proposal.hallazgos, enlaces)
+    return proposal.model_copy(update={"encargo": encargo})
+
+
+@pytest.fixture(scope="module")
+def docx_bytes(proposal_con_encargo: Proposal) -> bytes:
+    return DocxExporter().render(proposal_con_encargo, formato="docx")
 
 
 def _texto(contenido: bytes) -> str:
@@ -194,7 +204,7 @@ def test_cumple_el_puerto() -> None:
     assert all(callable(e.render) for e in exporters)
 
 
-def test_docx_con_las_diez_secciones_y_cifras(proposal: Proposal, docx_bytes: bytes) -> None:
+def test_docx_con_las_secciones_y_cifras(proposal: Proposal, docx_bytes: bytes) -> None:
     texto = _texto(docx_bytes)
     posiciones = [texto.index(s) for s in SECCIONES]
     assert posiciones == sorted(posiciones)
@@ -213,6 +223,44 @@ def test_docx_con_las_diez_secciones_y_cifras(proposal: Proposal, docx_bytes: by
     if not EJEMPLO.is_file() or _partes(EJEMPLO.read_bytes()) != _partes(docx_bytes):
         EJEMPLO.parent.mkdir(parents=True, exist_ok=True)
         EJEMPLO.write_bytes(docx_bytes)
+
+
+def test_docx_con_lo_que_nos_habeis_pedido(
+    proposal_con_encargo: Proposal, docx_bytes: bytes
+) -> None:
+    texto = _texto(docx_bytes)
+    encargo = proposal_con_encargo.encargo
+    assert encargo is not None
+    inicio = texto.index(SECCIONES[1])
+    assert inicio < texto.index(SECCIONES[2]) < texto.index(SECCIONES[3])
+    seccion = texto[inicio : texto.index(SECCIONES[2])]
+    # Los puntos literales, en viñetas dentro de la sección.
+    for punto in encargo.cobertura:
+        assert punto.texto in seccion
+    assert "18.000–27.000 € al año" in seccion
+    # La tabla de cobertura (las tablas se leen aparte de los párrafos).
+    filas = [
+        [c.text for c in fila.cells]
+        for t in Document(BytesIO(docx_bytes)).tables
+        for fila in t.rows
+        if t.rows[0].cells[0].text == "Punto"
+    ]
+    assert filas[0] == ["Punto", "Lo que pedisteis", "Dónde se trata", "Estado"]
+    por_texto = {f[1]: f for f in filas[1:]}
+    assert len(por_texto) == len(encargo.cobertura)
+    assert por_texto["Madrid"] == ["Ciudad", "Madrid", "Acciones A1, A2", "Cubierto"]
+    restriccion = por_texto["Sin comparativas denigratorias"]
+    assert restriccion[2] == "La declaran todas las acciones del plan."
+    presupuesto = por_texto["18.000–27.000 € al año"]
+    assert presupuesto[2] == "Plan de 22.000 €, dentro del máximo de 27.000 €."
+    pilotos = por_texto["Profesionales con requisitos específicos (pilotos)"]
+    assert pilotos[2].startswith("pendiente: Ninguna acción ni hallazgo")
+    assert [f[3] for f in filas[1:]].count("Pendiente") == 1
+
+
+def test_docx_sin_encargo(proposal: Proposal) -> None:
+    texto = _texto(DocxExporter().render(proposal, formato="docx"))
+    assert SECCIONES[1] in texto and "no registra el encargo" in texto
 
 
 @pytest.mark.parametrize(

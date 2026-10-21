@@ -15,7 +15,7 @@ from posiq.application.deps import new_study
 from posiq.application.kit import load_kit
 from posiq.application.nodes.market import reconcile
 from posiq.application.nodes.review import parse_market, parse_plan
-from posiq.application.nodes.write import LIMITACION_KIT, LIMITACION_REGLAS
+from posiq.application.nodes.write import LIMITACION_KIT, LIMITACION_REGLAS, PREFIJO_PENDIENTES
 from posiq.application.state import StudyState, initial_state
 from posiq.domain.schemas import Brand, Market, PromptInstance, Run, Trace
 from tests.application.fakes import (
@@ -30,6 +30,7 @@ from tests.application.fakes import (
     kit_settings,
     make_deps,
     plan_from_findings,
+    proposal_draft,
 )
 from tests.domain.factories import prompt
 
@@ -456,6 +457,52 @@ async def test_write_declares_rule_based_evaluations(repo: SqlStudyRepo) -> None
         merge(state, {"juez": "fixture-detection"}), make_deps(kit_llm(), [], repo)
     )
     assert LIMITACION_REGLAS not in demo["proposal"].contexto.limitaciones
+
+
+async def test_write_fills_the_brief_coverage(repo: SqlStudyRepo) -> None:
+    state = await analyzed_state(repo)
+    state = merge(state, await nodes.plan(state, make_deps(kit_llm(), [], repo)))
+    llm = kit_llm()
+    update = await nodes.write(state, make_deps(llm, [], repo))
+
+    enc = update["proposal"].encargo
+    brief = state["brief"]
+    assert enc.objetivos == brief.objetivos and enc.ciudades == brief.ciudades
+    assert enc.restricciones == brief.restricciones
+    assert [p.estado for p in enc.cobertura] == ["cubierto"] * len(enc.cobertura)
+    # El redactor recibe los puntos literales; con todo cubierto no hay reintento.
+    assert llm.names().count("write.v2") == 1
+    puntos = llm.calls[-1][1]["puntos_brief"]
+    assert {"id": "objetivo-1", "texto": brief.objetivos[0]}.items() <= puntos[0].items()
+    assert not any(
+        lim.startswith(PREFIJO_PENDIENTES) for lim in update["proposal"].contexto.limitaciones
+    )
+    assert len(update["traces"]) == 1
+
+
+async def test_write_retries_once_and_declares_what_is_missing(repo: SqlStudyRepo) -> None:
+    state = await analyzed_state(repo)
+    state = merge(state, await nodes.plan(state, make_deps(kit_llm(), [], repo)))
+
+    def sin_madrid(st: dict[str, Any]) -> BaseModel:
+        draft = proposal_draft(st)
+        cobertura = {k: v for k, v in draft.cobertura_brief.items() if k != "ciudad-1"}
+        return draft.model_copy(update={"cobertura_brief": cobertura})
+
+    llm = kit_llm()
+    llm.handlers["write.v2"] = sin_madrid
+    update = await nodes.write(state, make_deps(llm, [], repo))
+
+    assert llm.names().count("write.v2") == 2
+    reintento = llm.calls[-1][1]
+    assert reintento["carencias_cobertura"][0].startswith("ciudad-1 · ciudad «Madrid»")
+    assert "borrador_anterior" in reintento
+    assert len(update["traces"]) == 2
+    p = update["proposal"]
+    [madrid] = p.encargo.pendientes
+    assert madrid.id == "ciudad-1"
+    [aviso] = [lim for lim in p.contexto.limitaciones if lim.startswith(PREFIJO_PENDIENTES)]
+    assert "Madrid" in aviso
 
 
 def test_fake_ports_satisfy_the_protocols() -> None:

@@ -1,7 +1,8 @@
 """Plantilla docxtpl de la propuesta, construida con python-docx (reproducible, sin edición a mano).
 
 La plantilla solo coloca valores ya formateados por `docx.build_context`: no hace aritmética.
-Las diez secciones siguen el formato del entregable (doc 06). Se regenera con
+Las diez secciones del formato del entregable (doc 06) más «Lo que nos habéis pedido» (2.ª): el
+encargo literal del brief y dónde se trata cada punto (ADR 0013). Se regenera con
 `uv run python scripts/build_docx_template.py`.
 """
 
@@ -16,15 +17,16 @@ TEMPLATE_PATH = Path(__file__).parent / "templates" / "propuesta.docx"
 
 SECCIONES: tuple[str, ...] = (
     "1. Resumen ejecutivo",
-    "2. Contexto y alcance",
-    "3. Diagnóstico de visibilidad",
-    "4. Análisis de la competencia",
-    "5. Hallazgos clave",
-    "6. Estrategia recomendada",
-    "7. Plan de acción por fases",
-    "8. Medición y seguimiento",
-    "9. Riesgos y supuestos",
-    "10. Hoja de ruta y presupuesto",
+    "2. Lo que nos habéis pedido",
+    "3. Contexto y alcance",
+    "4. Diagnóstico de visibilidad",
+    "5. Análisis de la competencia",
+    "6. Hallazgos clave",
+    "7. Estrategia recomendada",
+    "8. Plan de acción por fases",
+    "9. Medición y seguimiento",
+    "10. Riesgos y supuestos",
+    "11. Hoja de ruta y presupuesto",
 )
 
 
@@ -89,8 +91,25 @@ def _portada(doc: DocumentObject) -> None:
     _tag(doc, "endif")
 
 
+def _encargo(doc: DocumentObject) -> None:
+    """Lo que pidió el cliente, tal cual, y la tabla de cobertura punto → dónde se trata."""
+    doc.add_heading(SECCIONES[1], level=1)
+    _p(doc, "{{ encargo.intro }}")
+    _tag(doc, "for l in encargo.listas")
+    doc.add_heading("{{ l.titulo }}", level=2)
+    _vinetas(doc, "l.puntos")
+    _tag(doc, "endfor")
+    doc.add_heading("Dónde se trata cada punto", level=2)
+    _tabla(
+        doc,
+        ["Punto", "Lo que pedisteis", "Dónde se trata", "Estado"],
+        "encargo.cobertura",
+        ["tipo", "texto", "donde", "estado"],
+    )
+
+
 def _diagnostico(doc: DocumentObject) -> None:
-    doc.add_heading(SECCIONES[2], level=1)
+    doc.add_heading(SECCIONES[3], level=1)
     _texto(doc, "diag.texto")
     _ficha(
         doc,
@@ -134,7 +153,7 @@ def _diagnostico(doc: DocumentObject) -> None:
 
 
 def _competencia(doc: DocumentObject) -> None:
-    doc.add_heading(SECCIONES[3], level=1)
+    doc.add_heading(SECCIONES[4], level=1)
     _texto(doc, "comp.texto")
     doc.add_heading("Ranking por Score de Citación", level=2)
     _tabla(
@@ -153,7 +172,7 @@ def _competencia(doc: DocumentObject) -> None:
 
 
 def _hallazgos(doc: DocumentObject) -> None:
-    doc.add_heading(SECCIONES[4], level=1)
+    doc.add_heading(SECCIONES[5], level=1)
     _tag(doc, "for h in hallazgos")
     doc.add_heading("{{ h.id }} · {{ h.titulo }}", level=2)
     _p(doc, "{{ h.descripcion }}")
@@ -172,7 +191,7 @@ def _hallazgos(doc: DocumentObject) -> None:
 
 
 def _plan(doc: DocumentObject) -> None:
-    doc.add_heading(SECCIONES[6], level=1)
+    doc.add_heading(SECCIONES[7], level=1)
     _ficha(
         doc,
         [
@@ -217,7 +236,9 @@ def build_template(path: Path = TEMPLATE_PATH) -> Path:
     doc.add_heading(SECCIONES[0], level=1)
     _texto(doc, "resumen")
 
-    doc.add_heading(SECCIONES[1], level=1)
+    _encargo(doc)
+
+    doc.add_heading(SECCIONES[2], level=1)
     _ficha(
         doc,
         [
@@ -237,7 +258,7 @@ def build_template(path: Path = TEMPLATE_PATH) -> Path:
     _competencia(doc)
     _hallazgos(doc)
 
-    doc.add_heading(SECCIONES[5], level=1)
+    doc.add_heading(SECCIONES[6], level=1)
     _texto(doc, "estrategia.texto")
     doc.add_heading("Objetivos", level=2)
     _tabla(
@@ -251,7 +272,7 @@ def build_template(path: Path = TEMPLATE_PATH) -> Path:
 
     _plan(doc)
 
-    doc.add_heading(SECCIONES[7], level=1)
+    doc.add_heading(SECCIONES[8], level=1)
     doc.add_heading("KPIs", level=2)
     _vinetas(doc, "medicion.kpis")
     _ficha(
@@ -259,10 +280,10 @@ def build_template(path: Path = TEMPLATE_PATH) -> Path:
         [("Metodología", "{{ medicion.metodologia }}"), ("Cadencia", "{{ medicion.cadencia }}")],
     )
 
-    doc.add_heading(SECCIONES[8], level=1)
+    doc.add_heading(SECCIONES[9], level=1)
     _tabla(doc, ["Riesgo", "Mitigación"], "riesgos", ["riesgo", "mitigacion"])
 
-    doc.add_heading(SECCIONES[9], level=1)
+    doc.add_heading(SECCIONES[10], level=1)
     doc.add_heading("Hitos", level=2)
     _tabla(doc, ["Semana", "Hito"], "hoja.hitos", ["semana", "descripcion"])
     doc.add_heading("Responsabilidades", level=2)

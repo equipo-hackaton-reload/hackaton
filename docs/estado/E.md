@@ -4,6 +4,10 @@
 - `DocxExporter` con plantilla reproducible y `PdfExporter` con LibreOffice (503 sin `soffice`).
 - Prompts v1: `intake`, `market`, `prompts`, `plan`, `write`.
 - ADR 0001–0007, ejemplo Word en `docs/ejemplos/`, evaluación en `docs/evaluacion/`, `docs/plan-b.md`.
+- Trazabilidad brief → propuesta (zona A, ADR 0013): prompt `write.v2.md` (enlaza cada punto del
+  brief con acciones o hallazgos en `cobertura_brief`) y sección del Word «2. Lo que nos habéis
+  pedido» antes del contexto: listas literales del brief y tabla punto → dónde se trata, con
+  «Pendiente». `SECCIONES` pasa a 11 (las diez del doc 06 + esta); plantilla regenerada.
 
 ## Coordinación con zona D
 - La tarea web de simulación y re-medición actualizó `CHANGELOG.md` y este estado con autorización

@@ -24,6 +24,24 @@ from posiq.domain.schemas import Brand, BriefSummary, Evaluation, Finding, Marke
 from posiq.prompts import PromptSet
 from posiq.settings import Settings
 
+# Qué acción o hallazgo del plan de ejemplo trata cada punto del brief de Alborada (lo que haría un
+# redactor). `domain.brief_coverage` descarta los ids que no existan en el estudio.
+COBERTURA_ALBORADA: dict[str, list[str]] = {
+    "objetivo-1": ["A1-2", "A2-2", "F-ciudad-barcelona", "F-brecha-lider"],
+    "objetivo-2": ["A1-1", "A3-2"],
+    "servicio-1": ["A1-1", "A2-2", "A3-2"],
+    "servicio-2": ["A1-1", "A2-3"],
+    "ciudad-1": ["A0-1", "A2-1"],
+    "ciudad-2": ["A1-2", "A2-2", "F-ciudad-barcelona"],
+    "publico-1": ["A1-1", "A3-2"],
+    "publico-2": ["A1-1"],
+    "publico-3": ["A2-3"],
+    "publico-4": ["A1-1"],
+    "competidor-1": ["F-brecha-lider"],
+    "competidor-2": ["F-brecha-lider"],
+    "competidor-3": ["F-brecha-lider", "F-fuente-lider"],
+}
+
 
 def fixture_trace(study_id: str, nodo: str) -> Trace:
     return Trace(
@@ -122,6 +140,7 @@ class FixtureLLM:
                     "Datos sintéticos; ninguna acción garantiza resultados.",
                 ],
                 hoja_ruta=proposal.hoja_ruta.seguimiento,
+                cobertura_brief=COBERTURA_ALBORADA,
             )
         else:
             raise ValueError(f"FixtureLLM no soporta el esquema {schema.__name__}")

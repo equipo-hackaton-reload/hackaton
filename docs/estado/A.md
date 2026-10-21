@@ -27,7 +27,10 @@
   - PR 2: `domain/brief_coverage.py` con `puntos_del_brief`, `evaluar_cobertura` y `carencias`.
     Con el kit, sin enlaces del redactor solo quedan cubiertas las 2 restricciones y el presupuesto
     (22.000 € ≤ 27.000 €): 13 de 16 puntos pendientes. Con los enlaces del golden, 16 de 16.
-  - Falta PR 3: cableado en `write` (con reintento), prompt `write.v2` y sección del Word.
+  - PR 3: cableado en `write` (con un reintento y limitación si falta algo), prompt `write.v2`,
+    sección «Lo que nos habéis pedido» en el Word y cobertura en el fixture (16 de 16 en la demo).
+  - Falta: que la web lo pinte (D, forma del JSON en `docs/estado/D.md`). `posicionamiento_deseado`
+    y `atributos_deseados` existen, pero `intake.v1` aún no los extrae ni son puntos de cobertura.
 
 ## Exactitud de marca (`feature/A-exactitud-marca`, ADR 0011)
 

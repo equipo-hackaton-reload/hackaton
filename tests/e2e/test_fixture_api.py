@@ -51,8 +51,14 @@ def test_fixture_wiring_completes_and_exports_word(tmp_path: Path, multipart: bo
         assert proposal["diagnostico"]["metrics"] == view["metrics"]
         assert proposal["plan"] == view["plan"]
         assert "DEMO SIN IA" in proposal["resumen_ejecutivo"]
+        # Trazabilidad brief → propuesta: todo lo que pidió el cliente está tratado.
+        encargo = proposal["encargo"]
+        assert encargo["ciudades"] == ["Madrid", "Barcelona"]
+        assert len(encargo["cobertura"]) == 16
+        assert {p["estado"] for p in encargo["cobertura"]} == {"cubierto"}
         response = client.get(f"/studies/{sid}/export?formato=docx")
         assert response.status_code == 200, response.text
         with ZipFile(BytesIO(response.content)) as doc:
             text = doc.read("word/document.xml").decode()
             assert "Alborada" in text and "sintéticos" in text
+            assert "Lo que nos habéis pedido" in text
