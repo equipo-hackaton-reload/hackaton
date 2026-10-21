@@ -73,7 +73,7 @@ export function LoginPage() {
 
   return (
     <AuthLayout>
-      <h1 className="font-display text-[28px] font-bold tracking-[-0.025em]">Inicia sesión</h1>
+      <h1 className="font-display text-[44px] font-light uppercase leading-none tracking-[0.01em]">Inicia sesión</h1>
       <p className="mt-1.5 text-muted">Entra para crear y seguir los estudios de tu marca.</p>
 
       {recienVerificado && !fallo && (
@@ -124,7 +124,7 @@ export function LoginPage() {
           Recordarme en este navegador
         </label>
 
-        <button type="submit" className="btn-primary h-12 w-full text-[15px]" disabled={enviando} aria-busy={enviando}>
+        <button type="submit" className="btn-ink h-12 w-full text-[15px]" disabled={enviando} aria-busy={enviando}>
           {enviando ? (
             <>
               <Spinner /> Entrando…

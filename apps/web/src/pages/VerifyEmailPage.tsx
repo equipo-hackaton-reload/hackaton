@@ -88,12 +88,12 @@ export function VerifyEmailPage() {
 
       {hecho ? (
         <div role="status">
-          <h1 className="mt-5 font-display text-[26px] font-bold tracking-[-0.025em]">Correo verificado</h1>
+          <h1 className="mt-5 text-[40px] leading-none">Correo verificado</h1>
           <p className="mt-2 text-muted">Gracias. Ahora inicia sesión…</p>
         </div>
       ) : (
         <>
-          <h1 className="mt-5 font-display text-[26px] font-bold tracking-[-0.025em]">Verifica tu correo</h1>
+          <h1 className="mt-5 text-[40px] leading-none">Verifica tu correo</h1>
           <p className="mt-2 text-muted">
             Escribe el código de {CODIGO_LONGITUD} cifras que hemos enviado a <strong className="text-ink">{email}</strong>.
             Caduca a los {VIGENCIA_MIN} minutos.
@@ -124,7 +124,7 @@ export function VerifyEmailPage() {
               placeholder={"0".repeat(CODIGO_LONGITUD)}
               aria-invalid={Boolean(error)}
               aria-describedby={`${id}-ayuda${error ? ` ${id}-error` : ""}`}
-              className={`field num h-14 text-center font-display text-[26px] font-semibold tracking-[0.5em] placeholder:tracking-[0.5em] ${error ? "border-negative" : ""}`}
+              className={`field num h-14 text-center text-[28px] font-light tracking-[0.5em] placeholder:tracking-[0.5em] ${error ? "border-negative" : ""}`}
             />
             <p id={`${id}-ayuda`} className="mt-1.5 text-meta text-muted">Puedes pegarlo tal cual.</p>
 

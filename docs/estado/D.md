@@ -44,6 +44,21 @@
   por estudio en sessionStorage (`lib/avisoKit.ts`) y `CompetitorsPage` lo enseña con
   `components/AvisoKit.tsx`. Hecho por zona C con autorización; los mocks aún no lo devuelven.
 
+## En `feature/D-identidad-claudia` (PR abierta, sin fusionar)
+- Identidad visual de Claudia (commit 64e33cf de `feature/D-web-claudia`) aplicada sobre el login
+  real con token (#38): logo de diana en SVG en cabecera, pantallas de cuentas (`AuthLayout`) y
+  favicon; paleta cian/magenta/amarillo/coral con carbón #141414; Antonio y Outfit; marcas de
+  registro; botón principal cian (login y registro con botón en tinta); franja de aros y pasos con
+  viñetas en «Nuevo estudio». No reintroduce el login de cliente antiguo de esa rama.
+- Comprobado con Playwright (web 5211, API 8911 en fixture), claro y oscuro: logo en login y
+  cabecera, favicon con la diana, sin errores de consola.
+- Ajuste para portátiles: el titular del panel de cuentas escala con la altura
+  (`clamp(56px,9vh,96px)`, 96px solo desde 860px de alto), la diana grande solo aparece con
+  1280px de ancho y 820px de alto y queda bajo el texto, y el pie «Hackatón EPS UFV» solo desde
+  800px de alto. Las marcas de registro van por debajo del contenido (`-z-10` + `isolate`) y en la
+  app solo desde 1300px de ancho y solo las dos inferiores (las de arriba las tapaba la cabecera).
+  Revisado a 1024x640, 1280x720, 1280x800, 1366x768 y 1440x900.
+
 ## Falta
 - Integrar `/brands`, `/brands/{id}/serie` y `/studies/{id}/remeasure/estimate` cuando los publique
   la etapa «Seguimiento API» (zona C; hoy responden 404 y la web degrada). `POST /remeasure` ya existe

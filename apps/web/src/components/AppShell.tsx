@@ -2,6 +2,7 @@ import { useState, type ReactNode } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import { clearSession, useSession } from "../lib/session";
+import { RegistrationMarks } from "./RegistrationMarks";
 import { ThemeToggle } from "./ThemeToggle";
 import { Wordmark } from "./Wordmark";
 
@@ -32,7 +33,7 @@ function UserMenu() {
       aria-label={`Cerrar sesión de ${email}`}
       className="group flex h-10 items-center gap-2 rounded-full pl-1 pr-1 text-meta text-muted transition-colors hover:bg-raised hover:text-ink sm:pr-3"
     >
-      <span aria-hidden="true" className="grid size-8 place-items-center rounded-full bg-accent font-display text-[13px] font-bold text-on-accent">
+      <span aria-hidden="true" className="grid size-8 place-items-center rounded-full bg-primary text-[13px] font-bold text-on-primary">
         {inicial}
       </span>
       <span className="hidden sm:inline">{saliendo ? "Saliendo…" : "Salir"}</span>
@@ -43,7 +44,8 @@ function UserMenu() {
 /** Barra superior fija con el nombre del producto y, dentro de un estudio, su estado. */
 export function AppShell({ bar, children }: { bar?: ReactNode; children: ReactNode }) {
   return (
-    <div className="min-h-dvh">
+    <div className="isolate min-h-dvh">
+      <RegistrationMarks soloInferiores />
       <a
         href="#contenido"
         className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-3 focus:z-50 focus:rounded-control focus:bg-surface focus:px-3 focus:py-2"

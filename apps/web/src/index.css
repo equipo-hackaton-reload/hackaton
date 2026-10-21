@@ -3,82 +3,96 @@
 @tailwind utilities;
 
 /*
- * Tokens de posiq. Un fondo cálido con resplandores de la marca, una tinta y un acento magenta que
- * marca la marca foco y la acción principal. Claro u oscuro según `data-theme`, que fija el script
- * de index.html (elección guardada o, si no, la del sistema).
+ * Tokens de posiq., sacados del logotipo: carbón #141414, magenta, cian, amarillo y coral.
+ *
+ * Para que la vista descanse: ni negro ni blanco puros en texto y fondo (menos deslumbramiento y
+ * halo), los neones a plena saturación solo en la diana y en detalles pequeños, y en la interfaz
+ * versiones atenuadas con contraste AA. Positivo es cian y negativo coral, no verde y rojo: se
+ * distinguen también con daltonismo, y siempre van con icono o texto.
+ * Claro u oscuro según `data-theme`, que fija el script de index.html.
  */
 :root {
   color-scheme: light;
-  --ground: #f7f4f2;
+  --ground: #f7f7f5;
   --surface: #ffffff;
-  --raised: #f4f0ee;
-  --active: #ece6e4;
-  --border: #e8e1de;
-  --rule: #f0ebe8;
-  --control: #cfc7c4;
-  --text: #1a1418;
-  --muted: #5d555a;
-  --faint: #6e6569;
-  --primary: #1d171b;
-  --on-primary: #ffffff;
-  --accent: #c41d63;
+  --raised: #f0f0ed;
+  --active: #e7e7e3;
+  --border: #e1e1dc;
+  --rule: #ebebe7;
+  --control: #c4c4be;
+  --text: #171717;
+  --muted: #51514d;
+  --faint: #67675f;
+  --primary: #171717;
+  --on-primary: #fafaf8;
+  --accent: #b3169e;
   --on-accent: #ffffff;
-  --accent-soft: #fbe8f0;
-  --accent-ink: #8f1347;
-  --positive: #247b50;
-  --negative: #c4242a;
-  --pill-positive-bg: #dcfae5;
-  --pill-positive-ink: #04250e;
-  --pill-negative-bg: #ffedea;
-  --pill-negative-ink: #831c1e;
-  --pill-warning-bg: #fffbeb;
-  --pill-warning-ink: #92400e;
-  --pill-warning-line: #fde68a;
-  --track: #ece6e4;
-  --bar: #aaa1a5;
-  --header: rgb(247 244 242 / 0.78);
-  --glow-a: rgb(196 29 99 / 0.11);
-  --glow-b: rgb(255 150 90 / 0.10);
-  --dots: rgb(26 20 24 / 0.07);
-  --panel-shadow: 0 1px 2px rgb(40 20 30 / 0.04), 0 10px 28px -14px rgb(40 20 30 / 0.14);
-  --cta-shadow: 0 1px 2px rgb(143 19 71 / 0.25), 0 6px 16px -6px rgb(196 29 99 / 0.45);
+  --accent-soft: #fae8f7;
+  --accent-ink: #8c0f7b;
+  --brand-magenta: #d61bcb;
+  --brand-cyan: #00aecb;
+  --brand-yellow: #e9b800;
+  --brand-coral: #f0614f;
+  --positive: #0b7285;
+  --negative: #c43a2d;
+  --pill-positive-bg: #e2f6f9;
+  --pill-positive-ink: #075766;
+  --pill-negative-bg: #fdecea;
+  --pill-negative-ink: #9a2b20;
+  --pill-warning-bg: #fdf6dc;
+  --pill-warning-ink: #6f5300;
+  --pill-warning-line: #efd982;
+  --cta: #00b3cf;
+  --cta-hover: #0099b3;
+  --on-cta: #141414;
+  --track: #e9e9e5;
+  --bar: #3a3a37;
+  --header: rgb(247 247 245 / 0.9);
+  --mark: #171717;
+  --panel-shadow: none;
+  --cta-shadow: none;
 }
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --ground: #130e16;
-  --surface: #1b1520;
-  --raised: #241c2a;
-  --active: #2f2636;
-  --border: #2f2636;
-  --rule: #271f2d;
-  --control: #4f4456;
-  --text: #f4eff3;
-  --muted: #bbb1b9;
-  --faint: #9f949d;
-  --primary: #f4eff3;
-  --on-primary: #130e16;
-  --accent: #ff5e9c;
-  --on-accent: #22060f;
-  --accent-soft: #3d1830;
-  --accent-ink: #ff94bd;
-  --positive: #3fc07a;
-  --negative: #f0657a;
-  --pill-positive-bg: #172a1f;
-  --pill-positive-ink: #5fd393;
-  --pill-negative-bg: #2e1a24;
-  --pill-negative-ink: #f0899a;
-  --pill-warning-bg: #2b2113;
-  --pill-warning-ink: #f5c46b;
-  --pill-warning-line: #5a4517;
-  --track: #2f2636;
-  --bar: #75697a;
-  --header: rgb(19 14 22 / 0.72);
-  --glow-a: rgb(255 94 156 / 0.16);
-  --glow-b: rgb(255 140 80 / 0.10);
-  --dots: rgb(244 239 243 / 0.06);
-  --panel-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04), 0 12px 32px -16px rgb(0 0 0 / 0.6);
-  --cta-shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 20px -8px rgb(255 94 156 / 0.5);
+  --ground: #141414;
+  --surface: #1b1b1b;
+  --raised: #232323;
+  --active: #2c2c2c;
+  --border: #2f2f2f;
+  --rule: #252525;
+  --control: #4a4a4a;
+  --text: #ebebe8;
+  --muted: #a9a9a4;
+  --faint: #8f8f89;
+  --primary: #ebebe8;
+  --on-primary: #141414;
+  --accent: #f07ae8;
+  --on-accent: #141414;
+  --accent-soft: #3a1838;
+  --accent-ink: #f6a2f0;
+  --brand-magenta: #ff3ff2;
+  --brand-cyan: #2fe0ef;
+  --brand-yellow: #fbe957;
+  --brand-coral: #ff7f70;
+  --positive: #63d6e3;
+  --negative: #ff8f82;
+  --pill-positive-bg: #12292c;
+  --pill-positive-ink: #84e3ee;
+  --pill-negative-bg: #331b19;
+  --pill-negative-ink: #ffaaa0;
+  --pill-warning-bg: #2d2811;
+  --pill-warning-ink: #f8e07c;
+  --pill-warning-line: #5a4e18;
+  --cta: #3dcfdb;
+  --cta-hover: #6adde6;
+  --on-cta: #141414;
+  --track: #2c2c2c;
+  --bar: #bcbcb6;
+  --header: rgb(20 20 20 / 0.9);
+  --mark: #ebebe8;
+  --panel-shadow: none;
+  --cta-shadow: none;
 }
 
 @layer base {
@@ -88,32 +102,17 @@
   }
   body {
     @apply bg-ground font-sans text-body text-ink antialiased;
-    font-feature-settings: "kern", "ss01";
-    background-image:
-      radial-gradient(1100px 620px at 8% -12%, var(--glow-a), transparent 62%),
-      radial-gradient(900px 560px at 100% -6%, var(--glow-b), transparent 60%);
-    background-attachment: fixed;
-    background-repeat: no-repeat;
-  }
-  /* Trama de puntos que se desvanece hacia abajo: da textura sin competir con los datos. */
-  body::before {
-    content: "";
-    position: fixed;
-    inset: 0;
-    z-index: -1;
-    pointer-events: none;
-    background-image: radial-gradient(var(--dots) 1px, transparent 1px);
-    background-size: 22px 22px;
-    mask-image: linear-gradient(to bottom, black, transparent 520px);
+    font-feature-settings: "kern";
   }
   h1,
   h2,
   h3 {
-    @apply font-display;
     text-wrap: balance;
   }
+  /* Titulares en la estrecha del logotipo, en mayúsculas y con peso medio: se leen sin gritar. */
   h1 {
-    letter-spacing: -0.025em;
+    @apply font-display font-normal uppercase;
+    letter-spacing: 0.01em;
   }
   ::selection {
     background: var(--accent-soft);
@@ -146,11 +145,29 @@
   .btn {
     @apply inline-flex h-10 items-center justify-center gap-2 whitespace-nowrap rounded-control px-3.5 text-body font-medium transition-[background-color,color,box-shadow,transform,filter] duration-150 ease-out active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 disabled:active:scale-100;
   }
+  /*
+   * Acción principal en el cian de la diana con texto carbón (contraste AA en los dos temas).
+   * El magenta queda reservado para la marca foco, así que un botón nunca se confunde con un dato.
+   */
   .btn-primary {
-    @apply btn bg-accent text-on-accent shadow-cta hover:brightness-110;
+    @apply btn bg-[var(--cta)] font-semibold text-[var(--on-cta)] hover:bg-[var(--cta-hover)];
+  }
+  /* Variante tinta, para el login. */
+  .btn-ink {
+    @apply btn bg-primary text-on-primary hover:bg-accent hover:text-on-accent;
+  }
+  /* Franja con los cuatro aros del logotipo, de fuera adentro. Marca el panel principal. */
+  .brand-stripe {
+    background: linear-gradient(
+      to right,
+      var(--brand-magenta) 0 25%,
+      var(--brand-cyan) 25% 50%,
+      var(--brand-yellow) 50% 75%,
+      var(--brand-coral) 75% 100%
+    );
   }
   .btn-secondary {
-    @apply btn border border-control bg-surface text-ink hover:bg-raised;
+    @apply btn border border-ink bg-surface text-ink hover:bg-ink hover:text-ground;
   }
   .btn-ghost {
     @apply btn text-ink hover:bg-raised;
@@ -183,16 +200,23 @@
     @apply mt-1.5 flex items-center gap-1.5 text-meta text-pill-neg-ink;
   }
 
-  .login-hero {
-    /* Una sola familia de color (frambuesa a vino): sin violetas ni azules en el degradado. */
-    background: linear-gradient(155deg, #d8335f 0%, #b01650 48%, #6e0f2f 100%);
+  /* Rótulo espaciado en mayúsculas («LO QUE OS PROPONEMOS» en la presentación). */
+  .tracked {
+    @apply text-meta font-bold uppercase tracking-[0.18em];
   }
-  .login-blob {
-    position: absolute;
-    border-radius: 9999px;
-    filter: blur(70px);
-    opacity: 0.55;
-    pointer-events: none;
+  /* Viñeta de color de la presentación. El color acompaña al texto, nunca lo sustituye. */
+  .dot {
+    @apply inline-block size-2.5 flex-none rounded-full;
+  }
+
+  /* Panel del login: el carbón del logotipo en los dos temas, con los aros en su versión de noche. */
+  .login-hero {
+    background: #141414;
+    color: #ebebe8;
+    --brand-magenta: #ff3ff2;
+    --brand-cyan: #2fe0ef;
+    --brand-yellow: #fbe957;
+    --brand-coral: #ff7f70;
   }
 }
 

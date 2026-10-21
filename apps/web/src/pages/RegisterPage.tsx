@@ -59,7 +59,7 @@ export function RegisterPage() {
 
   return (
     <AuthLayout>
-      <h1 className="font-display text-[28px] font-bold tracking-[-0.025em]">Crea tu cuenta</h1>
+      <h1 className="font-display text-[44px] font-light uppercase leading-none tracking-[0.01em]">Crea tu cuenta</h1>
       <p className="mt-1.5 text-muted">Tus estudios y su seguimiento quedan guardados en tu cuenta; nadie más los ve.</p>
 
       <form noValidate onSubmit={registrar} className="mt-8 space-y-5">
@@ -103,7 +103,7 @@ export function RegisterPage() {
           ayuda={`Al menos ${MIN_PASSWORD} caracteres.`}
         />
 
-        <button type="submit" className="btn-primary h-12 w-full text-[15px]" disabled={enviando} aria-busy={enviando}>
+        <button type="submit" className="btn-ink h-12 w-full text-[15px]" disabled={enviando} aria-busy={enviando}>
           {enviando ? (
             <>
               <Spinner /> Creando la cuenta…

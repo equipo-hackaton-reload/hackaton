@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="light dark" />
-    <meta name="theme-color" content="#f7f4f2" />
+    <meta name="theme-color" content="#f7f7f5" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <title>posiq.</title>
     <script>
@@ -14,7 +14,7 @@
         try { t = localStorage.getItem("posiq-theme"); } catch (e) {}
         if (t !== "light" && t !== "dark") t = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
         document.documentElement.dataset.theme = t;
-        document.querySelector('meta[name="theme-color"]').content = t === "dark" ? "#130e16" : "#f7f4f2";
+        document.querySelector('meta[name="theme-color"]').content = t === "dark" ? "#141414" : "#f7f7f5";
       })();
     </script>
   </head>
