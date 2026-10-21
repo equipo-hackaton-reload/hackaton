@@ -32,9 +32,12 @@
   `atributos_deseados`); falta pintar el encargo.
 
 ## Falta
-- Integrar contra la API real cuando C fusione `/auth/*`, `/brands`, `/serie` y
-  `/remeasure/estimate`; comprobar el formato de `expira_en` (la web acepta ISO o segundos) y si
-  `POST /auth/verify/reenviar` devuelve `codigo_dev` en el cuerpo (la web lo lee si viene).
+- `/auth/*` ya está en develop (#36); los mocks usan sus mismos `detail` (`credenciales_invalidas`,
+  `correo_no_verificado`, `codigo_no_valido`, `demasiados_intentos`, `correo_ya_registrado`) y
+  el cuerpo plano de `verify/reenviar` (`{enviado, codigo_dev?}`). Falta probarlo de punta a punta
+  con `VITE_USE_MOCKS=false`.
+- Integrar `/brands`, `/brands/{id}/serie` y `/studies/{id}/remeasure/estimate` cuando los publique
+  la etapa «Seguimiento API»; `types/tracking.ts` ya replica `domain/tracking_schemas.py` (#35).
 - `Objective` no trae `unidad`: la web la infiere (KPI de tasa con valores 0-1 → porcentaje). Si A
   añade `unidad` al objetivo, la web ya la usa.
 - Mostrar `proposal.encargo` (ver abajo).
