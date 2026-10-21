@@ -1,5 +1,6 @@
 """Llamadas pagadas que acaban en error: también dejan `Trace` y cuentan en el coste (ADR 0018)."""
 
+import threading
 from collections.abc import Sequence
 from typing import Any
 
@@ -15,10 +16,11 @@ from posiq.application.deps import trazas_de_fallo
 from posiq.application.graph import serializer
 from posiq.application.nodes.judge import trazas_del_juez
 from posiq.application.runner import StudyRunner
-from posiq.domain.schemas import Brand, Evaluation, Market, Run, Trace
+from posiq.domain.schemas import Brand, Evaluation, Market, PromptInstance, Run, Trace
 from tests.application.fakes import (
     KIT_DIR,
     DetectionJudge,
+    FakeEngine,
     FakeLLM,
     kit_llm,
     make_deps,
@@ -151,3 +153,51 @@ def test_judge_traces_walk_fallback_and_consensus_without_duplicates() -> None:
     jev = J([a], fallback=llm)
     consenso = J([a, b], jueces=[jev, jev])
     assert trazas_del_juez(consenso) == [a, b]
+
+
+class PaidThenBroken(FakeEngine):
+    """Motor de pago que cobra la primera repetición y falla en la segunda (error de la API)."""
+
+    def ask(self, prompt: PromptInstance, *, repeticion: int, study_id: str) -> Run:
+        if repeticion > 1:
+            raise RuntimeError("la API del motor se ha caído")
+        return super().ask(prompt, repeticion=repeticion, study_id=study_id)
+
+
+async def test_run_failure_carries_the_engine_calls_already_paid(repo: SqlStudyRepo) -> None:
+    state = await kit_state_until_judge(repo, n_prompts=1)
+    motor = PaidThenBroken(coste=0.01)
+    with pytest.raises(BaseException) as info:
+        await nodes.run(state, make_deps(kit_llm(), [motor], repo))
+    pagadas = trazas_de_fallo(info.value)
+    assert [t.coste_eur for t in pagadas] == [0.01]
+    assert pagadas[0].nodo == "run:fake:ChatGPT" and pagadas[0].study_id == state["study_id"]
+
+
+async def test_runner_records_the_run_failure_traces_off_the_event_loop(
+    repo: SqlStudyRepo, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    hilos: list[int] = []
+    guardar = repo.save_traces
+
+    def save_traces(study_id: str, traces: list[Trace]) -> None:
+        hilos.append(threading.get_ident())
+        guardar(study_id, traces)
+
+    monkeypatch.setattr(repo, "save_traces", save_traces)
+    deps = make_deps(StudyLLM(kit_llm().handlers), [PaidThenBroken(coste=0.01)], repo)
+    r = StudyRunner({"kit": deps}, InMemorySaver(serde=serializer()), repo)
+    study = r.create("kit")
+    await r.start(study, BRIEF)
+    assert r.estado(study) != "error", r.fallos.get(study.id)
+    hilos.clear()
+    await r.resume(study.id, {"aprobado": True})
+
+    assert r.estado(study) == "error" and "TaskGroup" in r.fallos[study.id]
+    values, _ = await r.state(study.id)
+    del_motor = [t for t in values["traces"] if t.nodo.startswith("run:")]
+    assert del_motor and all(t.coste_eur == 0.01 for t in del_motor)
+    assert values["coste_acumulado_eur"] == pytest.approx(0.01 * len(del_motor))
+    assert {t.nodo for t in repo.get_traces(study.id)} >= {"run:fake:ChatGPT"}
+    # La escritura del repo va a un hilo (`deps.db`), no bloquea el bucle de eventos.
+    assert hilos and threading.get_ident() not in hilos

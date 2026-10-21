@@ -65,6 +65,19 @@ aviso «falta X en .env» confundía.
 - **Mensaje de clave:** «falta X (ni en el entorno ni en .env)», en `MissingCredentialError` y en
   el aviso de motores desactivados.
 
+## Revisión posterior
+
+- El nodo `run` también adjunta a su excepción las trazas de los motores ya cobradas
+  (`budget.traces` desde el inicio del nodo), como `judge`; antes, un error de un motor dentro del
+  `TaskGroup` perdía lo pagado por los demás pares.
+- `StudyRunner._registrar_trazas_de_fallo` guarda en el repositorio con `deps.db` (en un hilo),
+  como el resto de escrituras: una escritura síncrona en el bucle de eventos podía bloquear al
+  checkpointer, que comparte la base SQLite.
+- **Aviso del modo kit.** El kit mide siempre las respuestas sintéticas de Alborada aunque se pegue
+  otro brief (no cambia). `POST /studies` en modo kit devuelve, de forma aditiva,
+  `aviso: "Modo kit: datos sintéticos de Alborada; el brief no cambia las mediciones"` (`null` en
+  real) y la web lo enseña en la pantalla de competidores.
+
 ## Consecuencias
 
 - Ensayar la demo con claves en el entorno ya no gasta nada ni cambia la cifra.

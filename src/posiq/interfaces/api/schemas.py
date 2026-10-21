@@ -37,8 +37,15 @@ class StudyCreate(BaseModel):
     modo: ModoEstudio = "kit"
 
 
+# El modo kit mide siempre las respuestas sintéticas de Alborada, se pegue el brief que se pegue
+# (ADR 0018): la respuesta de `POST /studies` lo avisa para que nadie lo tome por una medición.
+AVISO_KIT = "Modo kit: datos sintéticos de Alborada; el brief no cambia las mediciones"
+
+
 class StudyCreated(BaseModel):
     study_id: str
+    # Solo en modo kit (`AVISO_KIT`); `null` en modo real. Campo aditivo.
+    aviso: str | None = None
 
 
 class RemeasureCreated(BaseModel):

@@ -40,6 +40,10 @@
   estar alineado con `schemas.py` (`Encargo`, `PuntoBrief`, `posicionamiento_deseado`,
   `atributos_deseados`); falta pintar el encargo.
 
+- Aviso del modo kit: `POST /studies` devuelve `aviso` (solo en kit); `NewStudyPage` lo guarda
+  por estudio en sessionStorage (`lib/avisoKit.ts`) y `CompetitorsPage` lo enseña con
+  `components/AvisoKit.tsx`. Hecho por zona C con autorización; los mocks aún no lo devuelven.
+
 ## Falta
 - Integrar `/brands`, `/brands/{id}/serie` y `/studies/{id}/remeasure/estimate` cuando los publique
   la etapa «Seguimiento API» (zona C; hoy responden 404 y la web degrada). `POST /remeasure` ya existe

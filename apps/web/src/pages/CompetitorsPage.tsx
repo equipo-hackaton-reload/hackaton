@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ApiError } from "../api/client";
 import { useResume } from "../api/hooks";
+import { AvisoKit } from "../components/AvisoKit";
 import { BrandEditor } from "../components/BrandEditor";
 import { fromDrafts, toDrafts, validar, type BrandDraft } from "../lib/brands";
 import { BriefCard } from "../components/BriefCard";
@@ -97,6 +98,7 @@ export function CompetitorsPage() {
           )
         }
       />
+      <AvisoKit studyId={id} />
       <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
         <Editor
           key={pendiente ? "editable" : "confirmado"}

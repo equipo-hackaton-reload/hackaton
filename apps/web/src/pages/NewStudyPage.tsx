@@ -4,6 +4,7 @@ import { ApiError } from "../api/client";
 import { useCreateStudy, useEstimate } from "../api/hooks";
 import briefEjemplo from "../assets/brief-ejemplo.md?raw";
 import { AppShell } from "../components/AppShell";
+import { guardarAvisoKit } from "../lib/avisoKit";
 import { PageTitle } from "../components/PageTitle";
 import { CostEstimateView } from "../components/CostEstimateView";
 import { fmtInt } from "../lib/format";
@@ -67,7 +68,12 @@ export function NewStudyPage() {
     if (!brief.trim() || bloqueadoPorCoste) return;
     create.mutate(
       { brief_texto: brief, modo },
-      { onSuccess: ({ study_id }) => navigate(`/studies/${study_id}/competidores`) },
+      {
+        onSuccess: ({ study_id, aviso }) => {
+          guardarAvisoKit(study_id, aviso); // «Modo kit: datos sintéticos de Alborada…»
+          navigate(`/studies/${study_id}/competidores`);
+        },
+      },
     );
   }
 
