@@ -1,3 +1,4 @@
+import asyncio
 from typing import Any
 
 import pytest
@@ -5,8 +6,9 @@ from typesafe_sdk import AsyncTypeSafeClient
 
 from posiq.adapters.budget import Budget, BudgetExceeded
 from posiq.adapters.cache import DiskCache
-from posiq.adapters.judge.base import SystemOneJudge, score_confidence
+from posiq.adapters.judge.base import SystemOneJudge, discrepa, score_confidence
 from posiq.adapters.judge.jev import JevJudge
+from posiq.domain.detection import detect_in_run
 from posiq.domain.judge_questions import JUDGE_QUESTIONS, build_state
 from posiq.domain.schemas import Brand, Run
 from posiq.ports import Judge
@@ -53,9 +55,9 @@ class StubFallback(SystemOneJudge):
 
     async def _call(
         self, client: Any, state: dict[str, Any], questions: Any
-    ) -> tuple[dict[str, Any], int, int]:
+    ) -> tuple[dict[str, Any], int, int, str | None]:
         response = await client.system_one(state=state, questions=questions)
-        return as_dicts(response.answers), 0, 0
+        return as_dicts(response.answers), 0, 0, None
 
 
 def test_cumple_el_contrato_judge(settings: Settings) -> None:
@@ -77,7 +79,7 @@ def test_confianza_alta_se_acepta(settings: Settings) -> None:
     (call,) = fake.calls
     assert call["questions"] is JUDGE_QUESTIONS
     assert call["state"] == build_state(RUN, ALBORADA)
-    assert call["model"] == "jev-latest"
+    assert call["model"] == "jev-1.13"
 
 
 def test_confianza_intermedia_se_marca_para_revision(settings: Settings) -> None:
@@ -98,6 +100,50 @@ def test_confianza_baja_sin_fallback_se_marca(settings: Settings) -> None:
     assert e.origen == "jev" and e.necesita_revision
 
 
+def test_discrepancia_va_a_revision_aunque_el_fallback_este_seguro(settings: Settings) -> None:
+    # Las reglas ven a Alborada en RUN; Jev dice que no aparece → discrepancia.
+    fallback = StubFallback(FakeSystemOneClient())  # el fallback acierta y con confianza 0,9
+    judge = jev(settings, FakeSystemOneClient(sdk_answers(mentioned=0.05)), fallback=fallback)
+    outcome = asyncio.run(judge.ajudge(RUN, ALBORADA))
+    assert outcome.discrepa and outcome.confianza == pytest.approx(0.5)
+    e = judge.evaluate(RUN, ALBORADA)
+    assert e.origen == "fallback" and e.confianza == pytest.approx(0.9)
+    assert e.necesita_revision
+    assert len(fallback.fake.calls) == 1
+
+
+def test_discrepancia_por_tipo_ausente_tambien_va_a_revision(settings: Settings) -> None:
+    fallback = StubFallback(FakeSystemOneClient())
+    answers = sdk_answers(mention="ausente")
+    e = jev(settings, FakeSystemOneClient(answers), fallback=fallback).evaluate(RUN, ALBORADA)
+    assert e.origen == "fallback" and e.necesita_revision
+
+
+def test_sin_discrepancia_el_fallback_seguro_se_acepta(settings: Settings) -> None:
+    fallback = StubFallback(FakeSystemOneClient())
+    judge = jev(settings, FakeSystemOneClient(sdk_answers(strength_conf=0.4)), fallback=fallback)
+    assert not asyncio.run(judge.ajudge(RUN, ALBORADA)).discrepa
+    e = judge.evaluate(RUN, ALBORADA)
+    assert e.origen == "fallback" and not e.necesita_revision
+
+
+def test_discrepa_coincide_con_el_limite_de_confianza() -> None:
+    presente = detect_in_run(RUN, MARKET)["alborada"]
+    assert discrepa(as_dicts(sdk_answers(mentioned=0.1)), presente)
+    assert discrepa(as_dicts(sdk_answers(mention="ausente")), presente)
+    assert not discrepa(as_dicts(sdk_answers()), presente)
+    assert discrepa(as_dicts(sdk_answers(mentioned=0.9)), None)
+    assert not discrepa(as_dicts(sdk_answers(mentioned=0.1)), None)
+
+
+def test_traza_con_el_modelo_que_respondio(settings: Settings) -> None:
+    fake = FakeSystemOneClient(model="jev-1.13.2")
+    judge = jev(settings, fake)
+    judge.evaluate(RUN, ALBORADA)
+    assert judge.traces[0].modelo == "jev-1.13.2"
+    assert fake.calls[0]["model"] == "jev-1.13"
+
+
 def test_discrepancia_con_las_reglas_limita_la_confianza() -> None:
     ausente = as_dicts(sdk_answers(mentioned=0.1))
     assert score_confidence(ausente, None) == pytest.approx(0.8)
@@ -112,7 +158,7 @@ def test_traza_y_presupuesto(settings: Settings) -> None:
     (trace,) = judge.traces
     assert (trace.nodo, trace.modelo, trace.tokens_in, trace.tokens_out) == (
         "judge:jev",
-        "jev-latest",
+        "jev-1.13",
         1000,
         20,
     )

@@ -8,8 +8,13 @@ confianza vive en código con los umbrales de settings:
 - < `JUDGE_CONFIDENCE_FALLBACK` → se delega en el juez de fallback, si lo hay; si no, se marca.
 
 La confianza que decide es la de las preguntas que afectan al score: `mentioned`, `mention_type`
-y `strength` (en un Noul, la distancia a 0,5 hace de confianza). Si el juez y la detección por
-reglas discrepan sobre la aparición, se limita a 0,5, igual que en `answers_to_evaluation`.
+y `strength` (en un Noul, la distancia a 0,5 hace de confianza).
+
+Reglas y juez son dos capas (ADR 0012): la detección por reglas fija aparición y posición (el suelo
+determinista que audita) y el juez aporta la semántica. Si discrepan sobre la aparición
+(`discrepa`), la confianza se limita a 0,5, así que se delega en el fallback si lo hay, y la
+evaluación final sale SIEMPRE con `necesita_revision=True`, aunque el fallback responda con
+confianza alta: una discrepancia entre capas la resuelve una persona, no un segundo modelo.
 """
 
 import asyncio
@@ -44,26 +49,43 @@ class JudgeOutcome:
     evaluation: Evaluation
     confianza: float
     answers: Answers
+    discrepa: bool = False
 
 
 def noul_confidence(p: float) -> float:
     return abs(p - 0.5) * 2
 
 
+def discrepa(answers: Mapping[str, Mapping[str, Any]], detection: Detection | None) -> bool:
+    """¿Juez y reglas discrepan sobre la aparición? Sin detección por reglas, si el juez la ve
+    mencionada; con detección, si el juez la ve ausente (por `mentioned` o por `mention_type`)."""
+    p = float(answers["mentioned"]["noul"])
+    if detection is None:
+        return p >= 0.5
+    return p < 0.5 or answers["mention_type"]["choice"] == "ausente"
+
+
 def score_confidence(
     answers: Mapping[str, Mapping[str, Any]], detection: Detection | None
 ) -> float:
-    """Mínimo de las confianzas de `mentioned`, `mention_type` y `strength` (ver módulo)."""
+    """Mínimo de las confianzas de `mentioned`, `mention_type` y `strength`, limitado a
+    `DISCREPANCY_CAP` si juez y reglas discrepan (ver módulo)."""
     p = float(answers["mentioned"]["noul"])
     if detection is None:
-        return min(noul_confidence(p), DISCREPANCY_CAP) if p >= 0.5 else noul_confidence(p)
-    confianza = min(
-        noul_confidence(p),
-        float(answers["mention_type"]["confidence"]),
-        float(answers["strength"]["confidence"]),
-    )
-    discrepa = p < 0.5 or answers["mention_type"]["choice"] == "ausente"
-    return min(confianza, DISCREPANCY_CAP) if discrepa else confianza
+        confianza = noul_confidence(p)
+    else:
+        confianza = min(
+            noul_confidence(p),
+            float(answers["mention_type"]["confidence"]),
+            float(answers["strength"]["confidence"]),
+        )
+    return min(confianza, DISCREPANCY_CAP) if discrepa(answers, detection) else confianza
+
+
+def served_model(response: Any) -> str | None:
+    """Modelo que respondió según la API (un alias puede resolverse a otra versión), o `None`."""
+    model = getattr(response, "model", None)
+    return model if isinstance(model, str) and model else None
 
 
 def answers_to_dict(answers: Mapping[str, Any]) -> Answers:
@@ -119,8 +141,9 @@ class SystemOneJudge(ABC):
     @abstractmethod
     async def _call(
         self, client: Any, state: dict[str, Any], questions: Mapping[str, Any]
-    ) -> tuple[Answers, int, int]:
-        """Envía `state` con `questions`; devuelve respuestas y tokens de entrada/salida."""
+    ) -> tuple[Answers, int, int, str | None]:
+        """Envía `state` con `questions`; devuelve respuestas, tokens de entrada y salida y el
+        modelo que respondió según la API (`None` si no lo dice)."""
 
     # --- Interfaz pública -------------------------------------------------------------------------
 
@@ -145,11 +168,14 @@ class SystemOneJudge(ABC):
     async def aevaluate(self, run: Run, brand: Brand, *, client: Any | None = None) -> Evaluation:
         outcome = await self.ajudge(run, brand, client=client)
         if outcome.confianza < self.fallback_threshold and self.fallback is not None:
-            return await self.fallback.aevaluate(run, brand)
+            evaluation = await self.fallback.aevaluate(run, brand)
+            if outcome.discrepa:  # reglas y juez discrepan: lo revisa una persona
+                return evaluation.model_copy(update={"necesita_revision": True})
+            return evaluation
         return outcome.evaluation.model_copy(
             update={
                 "confianza": outcome.confianza,
-                "necesita_revision": outcome.confianza < self.accept,
+                "necesita_revision": outcome.discrepa or outcome.confianza < self.accept,
             }
         )
 
@@ -162,7 +188,12 @@ class SystemOneJudge(ABC):
         state = build_state(run, brand)
         answers = await self.ask(run.study_id, state, client=client)
         evaluation = answers_to_evaluation(answers, run, brand, detection, origen=self.origen)
-        return JudgeOutcome(evaluation, score_confidence(answers, detection), answers)
+        return JudgeOutcome(
+            evaluation,
+            score_confidence(answers, detection),
+            answers,
+            discrepa=discrepa(answers, detection),
+        )
 
     # --- Internos ---------------------------------------------------------------------------------
 
@@ -194,19 +225,27 @@ class SystemOneJudge(ABC):
             self._record(study_id, nodo, version, 0, 0, start)
             return dict(cached)
         async with self._session(client) as session:
-            answers, tokens_in, tokens_out = await self._call(session, state, questions)
+            answers, tokens_in, tokens_out, served = await self._call(session, state, questions)
         if self.cache is not None:
             self.cache.set(key, answers)
-        self._record(study_id, nodo, version, tokens_in, tokens_out, start)
+        self._record(study_id, nodo, version, tokens_in, tokens_out, start, served)
         return answers
 
     def _record(
-        self, study_id: str, nodo: str, version: str, tokens_in: int, tokens_out: int, start: float
+        self,
+        study_id: str,
+        nodo: str,
+        version: str,
+        tokens_in: int,
+        tokens_out: int,
+        start: float,
+        served: str | None = None,
     ) -> None:
+        """`modelo` de la traza: el que respondió si la API lo dice; si no, el pedido."""
         trace = Trace(
             study_id=study_id,
             nodo=nodo,
-            modelo=self.model,
+            modelo=served or self.model,
             prompt_version=version,
             tokens_in=tokens_in,
             tokens_out=tokens_out,
@@ -220,4 +259,12 @@ class SystemOneJudge(ABC):
             self.budget.record(trace)
 
 
-__all__ = ["JUDGE_QUESTIONS", "Answers", "JudgeOutcome", "SystemOneJudge", "score_confidence"]
+__all__ = [
+    "JUDGE_QUESTIONS",
+    "Answers",
+    "JudgeOutcome",
+    "SystemOneJudge",
+    "discrepa",
+    "score_confidence",
+    "served_model",
+]

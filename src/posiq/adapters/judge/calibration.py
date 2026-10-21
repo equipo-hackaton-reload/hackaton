@@ -1,7 +1,9 @@
 """Calibración del juez frente a las 133 etiquetas humanas de `muestra_evaluada.csv`.
 
 Se mide el juez EN BRUTO (`ajudge`, sin política ni fallback) para saber cuánto acierta por sí
-solo y cuántas filas irían a revisión o a fallback con los umbrales actuales. Las 15 ejecuciones
+solo y cuántas filas irían a revisión o a fallback con los umbrales actuales. `discrepancias`
+cuenta las filas en las que juez y reglas discrepan sobre la aparición: van a fallback por su
+confianza limitada y, además, terminan SIEMPRE en revisión humana (ADR 0012). Las 15 ejecuciones
 se separan por `Ejecucion_ID` (doc 07): las 10 primeras son de calibración y las 5 últimas, de
 reserva. Las etiquetas humanas nunca se envían al juez.
 """
@@ -52,6 +54,7 @@ class CalibrationReport:
     aceptadas: int
     a_revision: int
     a_fallback: int
+    discrepancias: int
     matriz_tipo_mencion: dict[tuple[str, str], int]
     fallos: list[tuple[str, str, str, str]] = field(default_factory=list)
     coste_eur: float = 0.0
@@ -150,6 +153,7 @@ def build_report(
             judge.fallback_threshold <= p.outcome.confianza < judge.accept for p in pairs
         ),
         a_fallback=sum(p.outcome.confianza < judge.fallback_threshold for p in pairs),
+        discrepancias=sum(p.outcome.discrepa for p in pairs),
         matriz_tipo_mencion=dict(matriz),
         fallos=fallos,
         coste_eur=sum(t.coste_eur for t in judge.traces),
@@ -205,7 +209,8 @@ def render_markdown(report: CalibrationReport) -> str:
         "",
         f"Con ACCEPT = {report.accept} y FALLBACK = {report.fallback_threshold}: "
         f"{report.aceptadas} aceptadas · {report.a_revision} a revisión · "
-        f"{report.a_fallback} a fallback.",
+        f"{report.a_fallback} a fallback. De ellas, {report.discrepancias} discrepan con las "
+        "reglas sobre la aparición y terminan en revisión humana aunque el fallback acierte.",
         "",
         "## Matriz de tipo de mención (humano → juez)",
         "",

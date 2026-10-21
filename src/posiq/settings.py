@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     deepseek_model: str = ""
 
     typesafe_api_key: SecretStr = SecretStr("")
-    jev_model: str = "jev-latest"
+    jev_model: str = "jev-1.13"  # versión fijada; `jev-latest` es un alias que cambia
 
     openai_api_key: SecretStr = SecretStr("")
     gemini_api_key: SecretStr = SecretStr("")
