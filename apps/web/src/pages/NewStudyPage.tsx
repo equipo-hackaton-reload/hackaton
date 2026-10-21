@@ -14,7 +14,7 @@ const MODOS: { value: ModoEstudio; label: string; detail: string }[] = [
     value: "kit",
     label: "Kit",
     detail:
-      "Usa las respuestas del kit del reto (624 ejecuciones): no se pregunta a los motores, pero el juez y la redacción sí pueden tener coste.",
+      "Usa las respuestas del kit del reto (624 ejecuciones): no se pregunta a los motores. Debajo, el coste que estima la API.",
   },
   {
     value: "real",

@@ -89,7 +89,7 @@ describe("volver a medir", () => {
       render(<App initialPath={`/marcas/${MARCA}`} client={testClient()} requireLogin />);
       await user.click(await screen.findByRole("button", { name: "Volver a medir" }));
       const dialogo = screen.getByRole("dialog", { name: "Volver a medir" });
-      expect(nb((await within(dialogo).findByTestId("estimacion")).textContent)).toContain("0,44 €");
+      expect(nb((await within(dialogo).findByTestId("estimacion")).textContent)).toContain("0,00 €");
 
       // Cancelar no lanza nada.
       await user.click(within(dialogo).getByRole("button", { name: "Cancelar" }));
@@ -148,5 +148,41 @@ describe("volver a medir", () => {
     } finally {
       config.pasoMs = 0;
     }
+  });
+});
+
+describe("API sin las rutas de seguimiento (404 «Not Found»)", () => {
+  const rutaInexistente = () => HttpResponse.json({ detail: "Not Found" }, { status: 404 });
+
+  it("/marcas explica que el seguimiento aún no está disponible, sin botón de reintentar", async () => {
+    iniciarSesion();
+    server.use(http.get(`${API_URL}/brands`, rutaInexistente));
+    render(<App initialPath="/marcas" client={testClient()} requireLogin />);
+    const alerta = await screen.findByRole("alert");
+    expect(alerta).toHaveTextContent("Seguimiento no disponible todavía");
+    expect(alerta).toHaveTextContent("todavía no ofrece el seguimiento por marca");
+    expect(within(alerta).queryByRole("button", { name: "Reintentar" })).not.toBeInTheDocument();
+  });
+
+  it("la serie de una marca degrada con un mensaje claro", async () => {
+    iniciarSesion();
+    server.use(http.get(`${API_URL}/brands/:brandId/serie`, rutaInexistente));
+    render(<App initialPath={`/marcas/${MARCA}`} client={testClient()} requireLogin />);
+    const alerta = await screen.findByRole("alert");
+    expect(alerta).toHaveTextContent("todavía no ofrece la serie de mediciones");
+    expect(alerta).not.toHaveTextContent("No tienes ninguna marca");
+  });
+
+  it("sin estimación propia de re-medición usa GET /estimate del mismo modo y lo avisa", async () => {
+    const { user: cuenta } = iniciarSesion();
+    const id = await completado(cuenta.id);
+    server.use(http.get(`${API_URL}/studies/:id/remeasure/estimate`, rutaInexistente));
+    const user = userEvent.setup();
+    render(<App initialPath={`/studies/${id}/diagnostico`} client={testClient()} requireLogin />);
+    await user.click(await screen.findByRole("button", { name: "Volver a medir" }));
+    const dialogo = screen.getByRole("dialog", { name: "Volver a medir" });
+    expect(await within(dialogo).findByTestId("estimacion-aproximada")).toBeInTheDocument();
+    expect(nb(within(dialogo).getByTestId("estimacion").textContent)).toContain("0,00 €");
+    expect(within(dialogo).getByRole("button", { name: /Confirmar y medir/ })).toBeEnabled();
   });
 });

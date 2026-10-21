@@ -447,18 +447,24 @@ export function tracesFor(modo: ModoEstudio, fase: 1 | 2 | 3): TraceSeed[] {
 export const ESTIMACION_REAL = {
   llamadas: 624,
   coste_estimado_eur: 3.55,
-  coste_motores_eur: 3.11,
+  coste_motores_eur: 3.05,
   coste_juez_eur: 0.44,
+  coste_llm_eur: 0.06,
+  coste_plan_guard_eur: 0,
+  llamadas_llm: 6,
   juez: "jev",
   presupuesto_max_eur: 5,
 };
 
-/** En kit no se pregunta a los motores; el juez y la redacción sí cuestan. */
+/** El modo kit es gratis por defecto (ADR 0018): ni motores ni LLM ni juez de pago. */
 export const ESTIMACION_KIT = {
-  llamadas: 624,
-  coste_estimado_eur: 0.44,
+  llamadas: 0,
+  coste_estimado_eur: 0,
   coste_motores_eur: 0,
-  coste_juez_eur: 0.44,
-  juez: "jev",
+  coste_juez_eur: 0,
+  coste_llm_eur: 0,
+  coste_plan_guard_eur: 0,
+  llamadas_llm: 0,
+  juez: "kit",
   presupuesto_max_eur: 5,
 };

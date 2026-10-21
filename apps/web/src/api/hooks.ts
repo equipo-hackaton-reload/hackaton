@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { CreateStudyRequest, ResumeRequest, StudyStatus } from "../types/api";
+import type { CostEstimate, CreateStudyRequest, ResumeRequest, StudyStatus } from "../types/api";
 import type { ModoEstudio } from "../types/schemas";
 import type { RemeasureRequest } from "../types/tracking";
-import { api } from "./client";
+import { api, rutaNoDisponible } from "./client";
 
 export const POLL_MS = 3000;
 
@@ -53,10 +53,28 @@ export function useResume(id: string) {
 }
 
 /** Coste de volver a medir `id` con el mismo modo que el original. Siempre fresco. */
+/** Estimación de la re-medición; `aproximada` si viene de `GET /estimate` por falta de la ruta propia. */
+export type EstimacionRemedicion = CostEstimate & { aproximada?: boolean };
+
+/**
+ * `GET /studies/{id}/remeasure/estimate`. Si la API todavía no ofrece esa ruta (404 «Not Found»), se
+ * usa `GET /estimate` con el modo del estudio y se marca como aproximada: el coste sigue saliendo de la
+ * API, nunca de la web.
+ */
+async function estimacionRemedicion(id: string): Promise<EstimacionRemedicion> {
+  try {
+    return await api.remeasureEstimate(id);
+  } catch (e) {
+    if (!rutaNoDisponible(e)) throw e;
+    const { study } = await api.getStudy(id);
+    return { ...(await api.estimate(study.modo)), aproximada: true };
+  }
+}
+
 export function useRemeasureEstimate(id: string, enabled: boolean) {
   return useQuery({
     queryKey: keys.remeasureEstimate(id),
-    queryFn: () => api.remeasureEstimate(id),
+    queryFn: () => estimacionRemedicion(id),
     enabled,
     staleTime: 0,
     gcTime: 0,

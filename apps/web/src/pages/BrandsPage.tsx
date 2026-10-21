@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { rutaNoDisponible } from "../api/client";
 import { useBrands } from "../api/hooks";
 import { AppShell } from "../components/AppShell";
 import { PageTitle } from "../components/PageTitle";
@@ -25,10 +26,16 @@ export function BrandsPage() {
           <Skeleton className="h-16 w-full" />
         </div>
       ) : q.isError ? (
-        <ErrorState error={q.error} titulo="No se pudieron cargar tus marcas">
-          <button type="button" className="btn-secondary" onClick={() => q.refetch()}>
-            Reintentar
-          </button>
+        <ErrorState
+          error={q.error}
+          titulo={rutaNoDisponible(q.error) ? "Seguimiento no disponible todavía" : "No se pudieron cargar tus marcas"}
+          noDisponible={"Esta API todavía no ofrece el seguimiento por marca (GET /brands). Tus estudios siguen accesibles desde su enlace; el seguimiento aparecerá aquí cuando la API lo publique."}
+        >
+          {!rutaNoDisponible(q.error) && (
+            <button type="button" className="btn-secondary" onClick={() => q.refetch()}>
+              Reintentar
+            </button>
+          )}
         </ErrorState>
       ) : q.data.length === 0 ? (
         <div className="panel px-5 py-6">

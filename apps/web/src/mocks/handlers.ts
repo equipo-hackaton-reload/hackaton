@@ -237,6 +237,12 @@ const studyHandlers = [
   }),
 ];
 
+/**
+ * Contrato de seguimiento que la web espera (README → API). `GET /brands`, `GET /brands/{id}/serie` y
+ * `GET /studies/{id}/remeasure/estimate` todavía no existen en la API real: allí responden 404
+ * «Not Found» y la web degrada (ver `rutaNoDisponible`). `POST /studies/{id}/remeasure` sí existe y
+ * hoy ignora `{confirmado, coste_estimado_eur}`; el mock ya valida ese cuerpo.
+ */
 const trackingHandlers = [
   http.get(u("/brands"), ({ request }) => {
     const user = usuario(request);

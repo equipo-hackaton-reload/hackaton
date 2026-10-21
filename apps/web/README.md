@@ -110,11 +110,16 @@ estudio ajeno responde 404.
 | POST | `/auth/login` | `{email, password}` | 200 `{token, expira_en, user}`; 401; 403 `correo_no_verificado` |
 | POST | `/auth/logout` | — | 204 |
 | GET | `/auth/me` | — | `{user}` |
-| GET | `/brands` | — | `[{brand_id, nombre, n_mediciones, ultima_medicion}]` |
-| GET | `/brands/{id}/serie` | — | `SerieMarca` (`src/types/tracking.ts`) |
-| GET | `/studies/{id}/remeasure/estimate` | — | `CostEstimate` |
+| GET | `/brands` ⚠ | — | `[{brand_id, nombre, n_mediciones, ultima_medicion}]` |
+| GET | `/brands/{id}/serie` ⚠ | — | `SerieMarca` (`src/types/tracking.ts`) |
+| GET | `/studies/{id}/remeasure/estimate` ⚠ | — | `CostEstimate` |
 | POST | `/studies/{id}/remeasure` | `{confirmado: true, coste_estimado_eur}` | 201 `{study_id, remedicion_de}`; 400; 409 (coste cambiado o re-medición en curso) |
-| GET | `/estimate?modo=kit\|real` | — | `CostEstimate` (también en kit: el juez puede costar) |
+| GET | `/estimate?modo=kit\|real` | — | `CostEstimate` (también en kit: 0 € salvo con `KIT_IA_REAL=true`, ADR 0018) |
+
+⚠ Aún no existen en la API (develop): responden 404 «Not Found» y la web degrada con un aviso
+(«Seguimiento no disponible todavía»); sin la estimación propia de re-medición, el diálogo usa
+`GET /estimate` del modo del estudio y lo marca como aproximada. `POST /remeasure` sí existe, pero hoy
+no valida `{confirmado, coste_estimado_eur}`. Los mocks MSW ya implementan el contrato completo.
 
 Con los mocks, la cuenta de demostración es `demo@posiq.app` / `demo1234`; trae dos mediciones de
 ejemplo anteriores para que el seguimiento muestre un cambio de método y un cambio significativo.

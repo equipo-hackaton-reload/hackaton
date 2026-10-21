@@ -5,6 +5,7 @@ import { PageTitle } from "../components/PageTitle";
 import { Panel } from "../components/Panel";
 import { RemeasureButton } from "../components/RemeasureButton";
 import { SerieChart } from "../components/SerieChart";
+import { rutaNoDisponible } from "../api/client";
 import { ErrorState, Skeleton } from "../components/States";
 import { fmtDay, fmtNum, fmtSigned, fmtUnidad, ordinal } from "../lib/format";
 import { SIN_CAMBIOS, type CambioSerie, type SerieMarca } from "../types/tracking";
@@ -174,12 +175,23 @@ export function TrackingPage() {
   if (q.isError) {
     return (
       <AppShell>
-        <ErrorState error={q.error} titulo="No se pudo cargar el seguimiento" noEncontrado="No tienes ninguna marca con ese identificador.">
+        <ErrorState
+          error={q.error}
+          titulo={rutaNoDisponible(q.error) ? "Seguimiento no disponible todavía" : "No se pudo cargar el seguimiento"}
+          noEncontrado="No tienes ninguna marca con ese identificador."
+          noDisponible="Esta API todavía no ofrece la serie de mediciones por marca (GET /brands/{id}/serie). El estudio sigue disponible; la serie aparecerá aquí cuando la API la publique."
+        >
           <div className="flex flex-wrap gap-2">
-            <button type="button" className="btn-secondary" onClick={() => q.refetch()}>
-              Reintentar
-            </button>
-            <Link to="/marcas" className="btn-ghost">Volver a mis marcas</Link>
+            {rutaNoDisponible(q.error) ? (
+              <Link to="/" className="btn-secondary">Nuevo estudio</Link>
+            ) : (
+              <>
+                <button type="button" className="btn-secondary" onClick={() => q.refetch()}>
+                  Reintentar
+                </button>
+                <Link to="/marcas" className="btn-ghost">Volver a mis marcas</Link>
+              </>
+            )}
           </div>
         </ErrorState>
       </AppShell>

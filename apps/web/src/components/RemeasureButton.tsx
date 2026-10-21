@@ -90,7 +90,15 @@ function RemeasureDialog({ studyId, onClose }: { studyId: string; onClose: () =>
           {estimate.isPending ? (
             <p className="text-muted">Calculando el coste…</p>
           ) : est ? (
-            <CostEstimateView estimate={est} />
+            <>
+              <CostEstimateView estimate={est} />
+              {est.aproximada && (
+                <p className="mt-2 text-meta text-muted" data-testid="estimacion-aproximada">
+                  Esta API todavía no calcula el coste propio de la re-medición: se muestra su estimación para un
+                  estudio nuevo del mismo modo.
+                </p>
+              )}
+            </>
           ) : (
             <p className="text-negative">
               No se pudo obtener la estimación del coste

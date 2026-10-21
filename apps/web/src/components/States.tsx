@@ -1,5 +1,5 @@
 import { useContext, type ReactNode } from "react";
-import { ApiError } from "../api/client";
+import { ApiError, rutaNoDisponible } from "../api/client";
 import { FalloContext } from "./falloContext";
 
 /** Espera mientras el grafo trabaja: dice qué está haciendo y que la pantalla se actualiza sola. */
@@ -33,14 +33,18 @@ export function ErrorState({
   children,
   titulo = "No se pudo cargar el estudio",
   noEncontrado = "No existe ningún estudio con ese identificador en tu cuenta.",
+  noDisponible = "La API conectada todavía no ofrece esta función.",
 }: {
   error: unknown;
   children?: ReactNode;
   titulo?: string;
   noEncontrado?: string;
+  /** Mensaje cuando la ruta no existe en la API (404 «Not Found» de FastAPI). */
+  noDisponible?: string;
 }) {
-  const msg =
-    error instanceof ApiError
+  const msg = rutaNoDisponible(error)
+    ? noDisponible
+    : error instanceof ApiError
       ? error.status === 404
         ? noEncontrado
         : `La API respondió ${error.status}: ${error.message}`

@@ -16,11 +16,11 @@ describe("flujo completo con MSW", () => {
     const user = userEvent.setup();
     render(<App initialPath="/" client={testClient()} requireLogin />);
 
-    // 1. Nuevo estudio: el modo kit viene por defecto y también enseña su estimación real.
+    // 1. Nuevo estudio: el modo kit viene por defecto y también enseña su estimación (gratis).
     expect(screen.getByRole("heading", { level: 1, name: "Nuevo estudio" })).toBeInTheDocument();
     expect(screen.getByRole("radio", { name: "Kit" })).toBeChecked();
     expect(screen.getByRole("button", { name: "Analizar" })).toBeDisabled();
-    expect(nb((await screen.findByTestId("estimacion")).textContent)).toContain("0,44 €");
+    expect(nb((await screen.findByTestId("estimacion")).textContent)).toContain("0,00 €");
     await user.click(screen.getByRole("radio", { name: "Real" }));
     expect(nb((await screen.findByTestId("estimacion")).textContent)).toContain("3,55 €");
     await user.click(screen.getByRole("radio", { name: "Kit" }));

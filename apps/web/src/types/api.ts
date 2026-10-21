@@ -136,13 +136,18 @@ export interface Evidence {
 
 /**
  * `GET /estimate?modo=kit|real` y `GET /studies/{id}/remeasure/estimate` → estimación previa del
- * coste. En modo kit los motores no cuestan, pero el juez puede tener coste.
+ * coste (motores + LLM de los nodos + juez + PlanGuard). El modo kit es gratis salvo con
+ * `KIT_IA_REAL=true` en la API; la web enseña lo que diga la estimación.
  */
 export interface CostEstimate {
   llamadas: number;
   coste_estimado_eur: number;
   coste_motores_eur?: number;
   coste_juez_eur?: number;
+  /** LLM de los nodos (intake, market, prompts, plan, write). */
+  coste_llm_eur?: number;
+  coste_plan_guard_eur?: number;
+  llamadas_llm?: number;
   juez?: string;
   presupuesto_max_eur: number;
 }

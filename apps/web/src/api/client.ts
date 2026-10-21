@@ -35,6 +35,14 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * 404 de una ruta que la API conectada todavía no ofrece (FastAPI responde `{"detail": "Not Found"}`),
+ * distinto del 404 de un recurso que no existe o no es tuyo (la API explica cuál).
+ */
+export function rutaNoDisponible(e: unknown): boolean {
+  return e instanceof ApiError && e.status === 404 && e.message === "Not Found";
+}
+
 async function detalle(res: Response): Promise<string> {
   try {
     const body = await res.json();
