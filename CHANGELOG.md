@@ -4,6 +4,8 @@ Formato [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); versionado 
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-21
+
 ### Added
 - Simulación del plan, calidad por acción y re-medición mock en la interfaz web (zona D); preparada para los campos opcionales de la API de C.
 - README de arranque reproducible (zona C): requisitos, demo sin claves con la API y la web o con `scripts/demo_kit.py`, variables con claves, estimación de coste, tabla de la API, desarrollo y limitaciones.
@@ -26,10 +28,13 @@ Formato [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); versionado 
 - Prompts versionados v1 (`intake`, `market`, `prompts`, `plan`, `write`), `PromptSet` y `load_prompt`.
 - Interfaz web (zona D): cinco pantallas del estudio con sondeo, revisiones editables, evidencias por hallazgo y trazas; mocks MSW con cifras del dominio sobre el kit; job `web` en CI.
 - Orquestación (zona C): puerto `StudyRepo` y `SqlStudyRepo` (SQLModel), grafo LangGraph con revisiones humanas por `interrupt()` y checkpointer SQLite, API FastAPI (`/studies`, `/resume`, `/export`, `/health`) y e2e del modo kit sin APIs (ADR 0005).
+
 ### Changed
+- Release 0.3.0 (zona A): `VERSION` 0.3.0 y tabla de los entregables del reto en `docs/estado/README.md`.
 - Release por fast-forward `develop → main` (repo solo squash): CONTRIBUTING y `.claude/settings.json` con `git push origin develop:main` siempre con confirmación manual (zona A).
 - `Finding.unidad` y `Proposal.marcas` (contract-change aditivo, zona E); `pyyaml` como dependencia directa.
 - `GET /studies/{id}` devuelve `revision_pendiente: null` en lugar de `"none"` cuando no hay revisión pendiente (zona C; el estado interno del grafo no cambia).
+
 ### Fixed
 - `CHANGELOG.md` sin los marcadores de conflicto que entraron con la #20; el CI (`check`) falla si hay marcadores `<<<<<<<`/`=======`/`>>>>>>>` en el repo (zona A).
 - Un fallo de la API de PlanGuard ya no tumba el nodo `plan`: se anota y `calidad_plan` queda en null; solo `BudgetExceeded` para el estudio (zona C).

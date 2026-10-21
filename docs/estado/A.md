@@ -50,6 +50,7 @@ Fallos y rarezas por zona:
   las etiquetas del kit donde existen), fijado en `tests/e2e/test_demo_canonica_api.py`.
 - Formato español en los textos de `findings.py`: coma decimal y nombres de fase con tilde (lo detectó el ensayo).
 - Medir la cifra con Jev real cuando haya `TYPESAFE_API_KEY` y compararla con la canónica.
+- Release 0.3.0: PR draft `feature/A-release-0.3.0` con `VERSION` 0.3.0, CHANGELOG cortado y tabla de entregables en `docs/estado/README.md`; se refresca a las 20:00 y luego fast-forward a `main` + tag `v0.3.0` (a mano).
 - Cierre de hito: CHANGELOG y `VERSION` por PR; luego `git push origin develop:main` (fast-forward, a mano) y tag.
 
 ## No tocar
