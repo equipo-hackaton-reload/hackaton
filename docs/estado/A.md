@@ -173,9 +173,27 @@ Todo aditivo en `tracking.py`/`tracking_schemas.py` (ADR 0016 actualizado):
   privadas, loopback, link-local, CGNAT, ULA, multicast ni IPv4 mapeadas; conexión a la IP
   validada contra DNS rebinding), `MAX_REDIRECCIONES`=5 a mano, `MAX_BYTES_DESCARGA`=2 MB tras
   descomprimir en streaming y `TIMEOUT_TOTAL_RECURSO_S`=10 s total. B debe probarlos.
-- **Siguiente (A):** `domain/web_audit.py` (parseo de robots.txt RFC 9309, sitemap, JSON-LD,
-  texto visible, Content-Signal; `auditar(...)` y `hallazgos_web(...)`), con golden sobre
-  respuestas fijas. Luego B (`adapters/web` httpx + fixture), C (nodo `web_audit` entre `judge` y
+- **Hecho (`feature/A-web-audit-dominio`):** `domain/web_audit.py`, puro.
+  - `analizar_web(respuestas, *, study_id, brand_id, dominio, origen, fetcher, obtenido_en,
+    sitemaps=(), paginas=()) -> AuditoriaWeb` (alias `auditar`). `respuestas` va por id de
+    `RECURSOS` (`robots`, `sitemap`, `portada`, `portada_markdown`, `llms_txt` y los
+    `.well-known`); un id ausente cuenta como no descargado (`error`), uno desconocido lanza
+    `ValueError`.
+  - Para el nodo (C): primero `RECURSOS`; luego `urls_sitemap(robots, dominio)` → descargar →
+    `sitemaps`; luego `paginas_sitemap(sitemaps + [sitemap fijo], dominio)` → descargar →
+    `paginas`. Ambas filtran con `url_permitida`.
+  - `hallazgos_web(auditoria, evaluaciones, runs, *, prompts, brand_id=None) -> list[Finding]`
+    (alias `hallazgos_tecnicos`). Necesita `prompts` para saber qué es espontáneo (el ADR no los
+    listaba). Después, `vincular_hallazgos(auditoria, hallazgos)` rellena `finding_ids`.
+  - Decisiones de implementación: Agentes/API falla sin `motores_afectados` (informativo; así
+    `AuditoriaWeb.motores_afectados` no sale siempre con los 4 motores); 406 cuenta como `falla`
+    (sin variante markdown); `content_signal` también se evalúa desde la cabecera aunque no haya
+    robots.txt; un bot sin motor (CCBot) bloqueado hace fallar `bots_ia_sin_bloqueo` pero no da
+    `F-web-bots-bloqueados`.
+  - Hallazgos según el ADR: un único `F-web-bots-bloqueados` (cifra = nº de motores) y uno por
+    bloque < 50. No hay hallazgos por comprobación (`F-web-sin-schema`...): la descripción del de
+    bloque lista los ids que fallan.
+- **Siguiente:** B (`adapters/web` httpx + fixture), C (nodo `web_audit` entre `judge` y
   `analyze`, `Settings.web_audit=off` por defecto, trazas `http:<fetcher>`), D (tarjeta) y E (plan
   y Word). Todo en el ADR 0019.
 
