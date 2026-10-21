@@ -44,6 +44,15 @@ def test_kit_with_only_deepseek_prices_the_fallback_judge() -> None:
     assert deepseek.coste_juez_eur > jev.coste_juez_eur > 0
 
 
+def test_judge_forced_to_rules_costs_nothing_even_with_keys() -> None:
+    settings = kit_settings(
+        judge_provider="reglas", deepseek_api_key=SecretStr("k"), typesafe_api_key=SecretStr("k")
+    )
+    estimate = estimate_study("kit", settings)
+    assert estimate.juez == "reglas"
+    assert estimate.coste_juez_eur == estimate.coste_estimado_eur == 0
+
+
 def test_counts_must_be_positive() -> None:
     with pytest.raises(ValueError):
         estimate_study("real", kit_settings(), n_prompts=0)

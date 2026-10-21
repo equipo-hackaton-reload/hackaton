@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     langfuse_host: str = ""
 
     budget_eur_max: float = 5.0
+    # `auto`: Jev, o el fallback LLM, según las claves. `reglas`: el juez de menciones solo usa
+    # reglas (aparición y posición) aunque haya claves; ahorra las llamadas del juez.
+    judge_provider: Literal["auto", "reglas"] = "auto"
     judge_confidence_accept: float = 0.80
     judge_confidence_fallback: float = 0.55
     judge_concurrency: int = 8

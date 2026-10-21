@@ -5,6 +5,7 @@ Formato [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); versionado 
 ## [Unreleased]
 
 ### Added
+- `JUDGE_PROVIDER=reglas` (zona C; campo aditivo en `settings.py` y `.env.example`): el juez de menciones y PlanGuard no llaman a ningún LLM aunque haya claves, para un estudio rápido con DeepSeek solo en intake, plan y redacción. `/estimate` lo refleja. La propuesta declara en sus limitaciones cuándo las menciones se evaluaron solo por reglas.
 - Re-medición (zona C): `POST /studies/{id}/remeasure` crea un estudio nuevo con el brief y el mercado confirmado de un estudio completado (409 si no lo está), arranca en `prompts` y compara con la medición anterior; `GET /studies/{id}` expone `metrics_delta`.
 - Demo canónica en pantalla (zona A, toca B/C): en fixture/kit el `FixtureJudge` devuelve las etiquetas humanas del kit donde existen (reglas en el resto), así la API muestra 25,93 → 30,8 como la deck; e2e en `tests/e2e/test_demo_canonica_api.py`.
 - Simulación del impacto y calidad del plan en el grafo (zona C): el nodo `plan` añade `simulacion` (`simulate_plan`) y `calidad_plan` (PlanGuard, solo con claves de juez; sin ellas queda en null y no bloquea), se recalculan si la persona edita el plan y se exponen en `GET /studies/{id}`. El checkpointer admite los modelos de `simulation_schemas` y `quality_schemas`.
@@ -27,6 +28,7 @@ Formato [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); versionado 
 - `Finding.unidad` y `Proposal.marcas` (contract-change aditivo, zona E); `pyyaml` como dependencia directa.
 - `GET /studies/{id}` devuelve `revision_pendiente: null` en lugar de `"none"` cuando no hay revisión pendiente (zona C; el estado interno del grafo no cambia).
 ### Fixed
+- Un fallo de la API de PlanGuard ya no tumba el nodo `plan`: se anota y `calidad_plan` queda en null; solo `BudgetExceeded` para el estudio (zona C).
 - Codificación del mensaje 409 de `/export` («la propuesta aún no está completada»).
 
 ## [0.1.0] - 2026-10-20
