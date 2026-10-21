@@ -18,6 +18,7 @@ from posiq.adapters.llm._fixture_data import (
 )
 from posiq.application.schemas_draft import ProposalDraft
 from posiq.domain import kit_loader as kl
+from posiq.domain.accuracy import AfirmacionesLLM, afirmaciones_llm_por_reglas
 from posiq.domain.detection import detect_in_run, evaluation_from_detection
 from posiq.domain.schemas import Brand, BriefSummary, Evaluation, Finding, Market, Plan, Run, Trace
 from posiq.prompts import PromptSet
@@ -51,7 +52,10 @@ class FixtureLLM:
 
         kit = load_kit(str(Path(self.settings.kit_dir).resolve()))
         output: BaseModel
-        if schema is BriefSummary:
+        if schema is AfirmacionesLLM:
+            # Sin IA: las mismas reglas del dominio; salida reproducible.
+            output = afirmaciones_llm_por_reglas(state)
+        elif schema is BriefSummary:
             if "alborada" not in str(state.get("brief", "")).lower():
                 raise ValueError("FixtureLLM solo admite el brief sintético de Alborada")
             output = alborada_brief_summary()

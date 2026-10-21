@@ -21,6 +21,31 @@
     competidores: su problema es que aparece menos.
   - **Para que C lo enchufe:** falta `StudyRepo.list_by_sector`.
 
+## Exactitud de marca (`feature/A-exactitud-marca`, ADR 0011)
+
+- `domain/accuracy.py` (puro):
+  - `extraer_afirmaciones(runs, brand, brief, *, marcas, ciudades)`
+  - `verificar(afirmaciones, brief, brand, *, marcas, ciudades)`
+  - `hallazgo_exactitud(study_id, brand_id, afirmaciones, verificaciones)`
+  - `acciones_mitigacion(afirmaciones, verificaciones, brand, *, fuentes)`
+  - Todo junto: `evaluar_exactitud(study_id, brand, brief, runs, *, marcas, ciudades,
+    afirmaciones_llm) -> (HallazgoExactitud, list[AccionMitigacion])`.
+  - Recuentos: `recuento(hallazgo)` y `expresiones_a_revisar(hallazgo)`.
+  - Listas documentadas: `EXPRESIONES_RIESGO`, `SERVICIOS_CONOCIDOS` y `CIUDADES_CONOCIDAS`.
+- Capa LLM opcional: `application/accuracy.extraer_afirmaciones_llm(llm, runs, brand, *, study_id,
+  marcas) -> (afirmaciones, trazas)` con `prompts/claims.v1.md`. En fixture es determinista.
+- **Kit de Alborada (reglas, datos reales):**
+  - 276 afirmaciones en 193 evaluaciones.
+  - **0 inexactitudes**: no se fabrican.
+  - Por estado: 62 correctas, 193 no verificables y **21 «a revisar por la clínica»** (todas por
+    «la opción más recomendada / recomendable»).
+  - Por tipo: servicio 195 (62 correctas, 131 no verificables, 2 a revisar), profesional 62 (no
+    verificables), otro 19 (a revisar). Sede, precio y resultado clínico: 0.
+- Falta:
+  - Conectarlo al grafo y a la API (C). Mostrarlo en la web (D) y en el Word (E).
+  - Muchas «no verificables» lo son porque el `BriefSummary` no tiene diferenciales, sedes ni
+    equipo médico. Ampliarlo es un `contract-change` que no se ha hecho.
+
 ## Falta
 - Que la web (D) y el Word (E) muestren la simulación. La calidad del plan solo existe con claves de juez.
 

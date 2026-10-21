@@ -1,4 +1,9 @@
-from posiq.domain.detection import detect_brands, detect_in_run, evaluation_from_detection
+from posiq.domain.detection import (
+    brand_mentions,
+    detect_brands,
+    detect_in_run,
+    evaluation_from_detection,
+)
 from tests.domain.factories import brand, run, source
 
 ALBORADA = brand(aliases=["Alborada Visión", "Alborada"])
@@ -72,3 +77,10 @@ def test_evaluation_from_detection() -> None:
     assert evaluation_from_detection(con_fuentes, ALBORADA, det).tipo_fuente is None
     ausente = evaluation_from_detection(r, ALBORADA, None)
     assert (ausente.aparece, ausente.posicion, ausente.fuerza) == (False, None, 0)
+
+
+def test_brand_mentions_devuelve_todas_las_menciones_en_el_texto_original() -> None:
+    alb = brand("alb", aliases=["Alborada"])
+    texto = "Clínica Alborada Visión y luego Alborada."
+    assert brand_mentions(texto, [alb]) == [(0, 23, "alb"), (32, 40, "alb")]
+    assert texto[32:40] == "Alborada"
