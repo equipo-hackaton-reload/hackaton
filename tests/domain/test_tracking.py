@@ -427,6 +427,24 @@ def test_cambio_de_competidores_no_compara_puesto_ni_diferencia() -> None:
     assert comp.motivos_competidores == [motivo]
 
 
+def test_metodologia_y_mercado_cambiados_no_dice_que_el_score_se_compara() -> None:
+    # Par no comparable (otra metodología) y además entra una marca: no se emite el motivo de
+    # competidores, que diría «el score y la aparición se comparan».
+    serie = _serie(
+        _medicion("S-1", T1, 10),
+        _medicion("S-2", T2, 10, version_metodologia="metodo-2", mercado_metricas=MERCADO_AMPLIO),
+    )
+    a, b = serie.puntos
+    assert not b.comparable_con_anterior and not b.competidores_comparables
+    assert any("versión de la metodología" in m for m in b.motivos_no_comparable)
+    assert not any(x.startswith(MOTIVO_COMPETIDORES) for x in b.avisos)
+    assert not any("se comparan" in x for x in b.avisos)
+    assert serie.cambios == []
+    assert len(serie.resumen) == 1 and MOTIVO_COMPETIDORES not in serie.resumen[0]
+    comp = comparabilidad(a, b)
+    assert not comp.comparable and comp.motivos_competidores == []
+
+
 def test_mismo_mercado_compara_competidores() -> None:
     serie = _serie(_medicion("S-1", T1, 10), _medicion("S-2", T2, 10))
     b = serie.puntos[1]

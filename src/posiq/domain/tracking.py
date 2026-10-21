@@ -105,7 +105,8 @@ class MedicionSerie:
 
 class Comparabilidad(NamedTuple):
     """`comparable`: el score y la aparición se comparan. `motivos_competidores` no vacío: cambió
-    el mercado y el puesto y la diferencia frente a los competidores NO se comparan."""
+    el mercado y el puesto y la diferencia frente a los competidores NO se comparan (solo se
+    rellena si el par es comparable; si no, ya lo explican `motivos`)."""
 
     comparable: bool
     motivos: list[str]
@@ -216,7 +217,10 @@ def comparabilidad(anterior: PuntoSerie, actual: PuntoSerie) -> Comparabilidad:
                 f"No consta el modelo de {motor} en una de las dos mediciones: no se puede "
                 "comprobar si ha cambiado."
             )
-    return Comparabilidad(not motivos, motivos, avisos, _motivos_competidores(anterior, actual))
+    # Si el par no es comparable, nada se compara: el motivo de competidores (que dice que el score
+    # y la aparición sí) sobraría y contradiría `comparable=False`.
+    competidores = [] if motivos else _motivos_competidores(anterior, actual)
+    return Comparabilidad(not motivos, motivos, avisos, competidores)
 
 
 def _motivos_competidores(anterior: PuntoSerie, actual: PuntoSerie) -> list[str]:
