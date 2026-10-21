@@ -14,7 +14,12 @@ from typesafe_sdk import RetryPolicy
 from posiq.adapters.budget import Budget
 from posiq.adapters.cache import DiskCache
 from posiq.adapters.errors import require_secret
-from posiq.adapters.judge.base import Answers, SystemOneJudge, answers_to_dict
+from posiq.adapters.judge.base import (
+    Answers,
+    SystemOneJudge,
+    answers_to_dict,
+    served_model,
+)
 from posiq.adapters.llm.openai_compat import DEFAULT_MODEL
 from posiq.domain.schemas import Brand
 from posiq.settings import Settings
@@ -85,11 +90,16 @@ class LLMJudge(SystemOneJudge):
 
     async def _call(
         self, client: Any, state: dict[str, Any], questions: Mapping[str, Any]
-    ) -> tuple[Answers, int, int]:
+    ) -> tuple[Answers, int, int, str | None]:
         response = await client.system_one(state, questions)
         usage = response.usage
         tokens_in = getattr(usage, "input_tokens_total", None) or getattr(usage, "input_tokens", 0)
         tokens_out = getattr(usage, "output_tokens_total", None) or getattr(
             usage, "output_tokens", 0
         )
-        return answers_to_dict(response.answers), int(tokens_in or 0), int(tokens_out or 0)
+        return (
+            answers_to_dict(response.answers),
+            int(tokens_in or 0),
+            int(tokens_out or 0),
+            served_model(response),
+        )

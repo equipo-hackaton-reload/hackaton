@@ -54,6 +54,7 @@ def test_calibracion_con_juez_falso(settings: Settings, kit: dict[str, Any]) -> 
     # así que la discrepancia limita la confianza a 0,5 (a fallback).
     assert report.a_revision == len(labels_seen)
     assert report.a_fallback == 133 - len(labels_seen) and report.aceptadas == 0
+    assert report.discrepancias == report.a_fallback  # todas acaban en revisión humana
     assert report.tokens_in == 133 * 1000 and report.coste_eur > 0
     assert set(report.por_split) == {"calibracion", "reserva"}
 

@@ -47,8 +47,11 @@ def sdk_answers(
 class FakeSystemOneClient:
     """Imita AsyncTypeSafeClient y AsyncSystemOneAdapterClient."""
 
-    def __init__(self, answers: dict[str, Any] | None = None, *, usage: Any = None) -> None:
+    def __init__(
+        self, answers: dict[str, Any] | None = None, *, usage: Any = None, model: str | None = None
+    ) -> None:
         self.answers = answers or sdk_answers()
+        self.model = model
         self.usage = usage or SimpleNamespace(input_tokens=1000, output_tokens=20)
         self.calls: list[dict[str, Any]] = []
         self.in_flight = 0
@@ -67,4 +70,4 @@ class FakeSystemOneClient:
         await asyncio.sleep(0.01)
         self.in_flight -= 1
         self.calls.append({"state": state, "questions": questions, **kwargs})
-        return SimpleNamespace(answers=self.answers, usage=self.usage)
+        return SimpleNamespace(answers=self.answers, usage=self.usage, model=self.model)
