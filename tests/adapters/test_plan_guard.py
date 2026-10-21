@@ -72,7 +72,7 @@ def test_evalua_cada_accion_con_las_preguntas_del_plan(settings: Settings) -> No
     q = g.assess(PLAN, [FINDING], brief())
     assert [a.action_id for a in q.acciones] == ["A1", "A2"]
     assert q.pct_especificas == 1.0 and q.calidad_media == 3 and q.por_debajo_umbral == []
-    assert (q.study_id, q.juez, q.modelo) == ("S-1", "jev", "jev-latest")
+    assert (q.study_id, q.juez, q.modelo) == ("S-1", "jev", "jev-1.13")
     assert {id(c["questions"]) for c in fake.calls} == {id(PLAN_QUESTIONS)}
     states = [c["state"] for c in fake.calls]
     assert build_action_state(PLAN.acciones[0], [FINDING], brief()) in states

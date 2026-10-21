@@ -8,7 +8,12 @@ from typesafe_sdk import AsyncTypeSafeClient, RetryPolicy
 from posiq.adapters.budget import Budget
 from posiq.adapters.cache import DiskCache
 from posiq.adapters.errors import require_secret
-from posiq.adapters.judge.base import Answers, SystemOneJudge, answers_to_dict
+from posiq.adapters.judge.base import (
+    Answers,
+    SystemOneJudge,
+    answers_to_dict,
+    served_model,
+)
 from posiq.domain.schemas import Brand
 from posiq.settings import Settings
 
@@ -56,7 +61,14 @@ class JevJudge(SystemOneJudge):
 
     async def _call(
         self, client: Any, state: dict[str, Any], questions: Mapping[str, Any]
-    ) -> tuple[Answers, int, int]:
+    ) -> tuple[Answers, int, int, str | None]:
+        # System One no admite temperatura ni semilla (`SystemOneRequest` solo lleva model, state,
+        # questions y assets): la reproducibilidad sale del modelo fijado y de la caché en disco.
         response = await client.system_one(state=state, questions=questions, model=self.model)
         usage = response.usage
-        return answers_to_dict(response.answers), usage.input_tokens, usage.output_tokens
+        return (
+            answers_to_dict(response.answers),
+            usage.input_tokens,
+            usage.output_tokens,
+            served_model(response),
+        )

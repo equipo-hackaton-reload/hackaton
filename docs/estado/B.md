@@ -4,6 +4,9 @@
 - Motor del kit y motores reales ChatGPT, Gemini, Perplexity y Claude con búsqueda web, caché,
   reintentos y presupuesto (`scripts/smoke_engines.py`). **Sin probar en real.**
 - Juez Jev con fallback LLM, calibración (`scripts/calibrate_judge.py`) y `PlanGuard`.
+- Política del juez (ADR 0014): discrepancia reglas-juez → fallback y SIEMPRE revisión humana;
+  `JEV_MODEL=jev-1.13` fijado (sin temperatura ni semilla en la API); la `Trace` guarda el modelo
+  que respondió. Falta comprobar con clave que la API acepta `jev-1.13` (`client.models.list()`).
 - LLM `openai_compat` (DeepSeek) y `FixtureLLM` para la demo sin claves.
 
 ## Falta

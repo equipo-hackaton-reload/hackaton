@@ -14,7 +14,7 @@ Defínelas en `.env`, en la raíz del repo. El fichero está en `.gitignore`: nu
 | Variable | Para qué | Obligatoria |
 |---|---|---|
 | `TYPESAFE_API_KEY` | Juez Jev | Sí, para calibrar Jev |
-| `JEV_MODEL` | Modelo de Jev (por defecto `jev-latest`) | No |
+| `JEV_MODEL` | Modelo de Jev (por defecto `jev-1.13`, fijado; `jev-latest` es un alias móvil) | No |
 | `DEEPSEEK_API_KEY` | Juez de fallback (LLM) | Sí, para calibrar el fallback |
 | `DEEPSEEK_MODEL`, `DEEPSEEK_BASE_URL` | Modelo y endpoint del fallback (por defecto `deepseek-chat` en `https://api.deepseek.com`) | No |
 | `JUDGE_CONFIDENCE_ACCEPT`, `JUDGE_CONFIDENCE_FALLBACK` | Umbrales de la política (0,80 y 0,55) | No |
