@@ -37,7 +37,7 @@
   - PR 3: cableado en `write` (con un reintento y limitación si falta algo), prompt `write.v2`,
     sección «Lo que nos habéis pedido» en el Word y cobertura en el fixture (16 de 16 en la demo).
   - Falta: que la web lo pinte (D, forma del JSON en `docs/estado/D.md`). `posicionamiento_deseado`
-    y `atributos_deseados` existen, pero `intake.v1` aún no los extrae ni son puntos de cobertura.
+    y `atributos_deseados` ya los extrae `intake.v2` (zona E), pero aún no son puntos de cobertura.
 
 ## Seguimiento con método: serie temporal (`feature/A-serie-temporal`, ADR 0016)
 

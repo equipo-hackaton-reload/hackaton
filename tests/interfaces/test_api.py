@@ -184,7 +184,7 @@ async def test_remeasure_reuses_the_confirmed_market_and_compares(
     # El kit da las mismas respuestas: la re-medición mide repetibilidad, no una mejora.
     assert delta["score_delta"] == 0
     nodos = {t["nodo"] for t in (await client.get(f"/studies/{nuevo}/traces")).json()}
-    assert "intake.v1" not in nodos and "market.v1" not in nodos
+    assert "intake.v2" not in nodos and "market.v1" not in nodos
 
     response = await client.post(
         f"/studies/{nuevo}/resume", json={"revision": "plan", "payload": {"aprobado": True}}
@@ -239,7 +239,7 @@ async def test_traces_lists_the_traces_of_the_study(client: httpx.AsyncClient) -
     sid = await create(client)
     traces = (await client.get(f"/studies/{sid}/traces")).json()
     assert {t["study_id"] for t in traces} == {sid}
-    assert {"intake.v1", "market.v1"} <= {t["nodo"] for t in traces}
+    assert {"intake.v2", "market.v1"} <= {t["nodo"] for t in traces}
 
     view = await approve_competitors(client, sid)
     after = (await client.get(f"/studies/{sid}/traces")).json()
@@ -342,7 +342,7 @@ async def test_graph_failure_is_reported_as_error(repo: SqlStudyRepo) -> None:
         raise RuntimeError("LLM caído")
 
     app = create_app(
-        runner=build_runner(repo, FakeLLM({"intake.v1": boom})), settings=api_settings()
+        runner=build_runner(repo, FakeLLM({"intake.v2": boom})), settings=api_settings()
     )
     async with httpx.AsyncClient(
         transport=httpx.ASGITransport(app=app), base_url="http://test"
