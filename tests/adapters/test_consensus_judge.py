@@ -58,7 +58,7 @@ def test_mayoria_de_tres_llamadas_y_trazas(settings: Settings) -> None:
     assert e.fuerza == 3
     assert e.confianza == pytest.approx(2 / 3) and e.necesita_revision
     assert [t.nodo for t in juez.traces] == ["judge:jev"] * 3
-    assert all(t.tokens_in == 1000 and t.modelo == "jev-latest" for t in juez.traces)
+    assert all(t.tokens_in == 1000 and t.modelo == settings.jev_model for t in juez.traces)
     assert budget.traces == juez.traces
     (detalle,) = juez.consensos
     assert detalle.n == 3 and detalle.acuerdo_por_campo["fuerza"] == pytest.approx(2 / 3)
