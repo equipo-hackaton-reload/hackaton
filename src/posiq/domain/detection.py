@@ -50,6 +50,12 @@ def _matches(folded: str, brands: list[Brand]) -> list[_Match]:
     return kept
 
 
+def brand_mentions(text: str, brands: list[Brand]) -> list[tuple[int, int, str]]:
+    """Todas las menciones (no solapadas) como `(inicio, fin, brand_id)` sobre `text` original."""
+    folded, index = fold_with_map(text)
+    return [(index[m.start], index[m.end - 1] + 1, m.brand_id) for m in _matches(folded, brands)]
+
+
 def detect_brands(text: str, brands: list[Brand]) -> list[Detection]:
     """Marcas presentes en `text`, ordenadas por posición. Las ausentes no aparecen en la lista."""
     folded, index = fold_with_map(text)
