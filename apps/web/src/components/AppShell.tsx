@@ -44,8 +44,8 @@ function UserMenu() {
 /** Barra superior fija con el nombre del producto y, dentro de un estudio, su estado. */
 export function AppShell({ bar, children }: { bar?: ReactNode; children: ReactNode }) {
   return (
-    <div className="min-h-dvh">
-      <RegistrationMarks />
+    <div className="isolate min-h-dvh">
+      <RegistrationMarks soloInferiores />
       <a
         href="#contenido"
         className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-3 focus:z-50 focus:rounded-control focus:bg-surface focus:px-3 focus:py-2"

@@ -147,23 +147,24 @@ export function AuthLayout({ children }: { children: ReactNode }) {
   return (
     <div className="grid min-h-dvh lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]">
       {/* Panel de marca: en móvil se reduce a una franja para que el formulario quede a mano. */}
-      <aside className="login-hero relative flex flex-col justify-between overflow-hidden px-6 pb-8 pt-6 sm:px-10 lg:px-14 lg:py-12">
-        {/* La diana del logotipo a gran tamaño, recortada en la esquina y atenuada: decorativa. */}
-        <LogoMark className="pointer-events-none absolute -bottom-24 -right-24 hidden size-[420px] opacity-80 lg:block" />
+      <aside className="login-hero relative isolate flex flex-col justify-between overflow-hidden px-6 pb-8 pt-6 sm:px-10 lg:px-14 lg:py-12 [@media(min-width:1024px)_and_(max-height:780px)]:py-8">
+        {/* La diana del logotipo a gran tamaño, recortada en la esquina y atenuada: decorativa. Solo en
+            pantallas anchas Y altas, donde no pisa los pasos; siempre por debajo del texto (-z-10). */}
+        <LogoMark className="pointer-events-none absolute -bottom-24 -right-24 -z-10 hidden size-[420px] opacity-80 [@media(min-width:1280px)_and_(min-height:820px)]:block" />
 
         <span className="relative">
           <Wordmark className="text-[30px]" />
         </span>
 
         <div className="relative mt-8 max-w-[36rem] lg:mt-0">
-          <p className="font-display text-[56px] font-normal uppercase leading-[1.02] tracking-[0.01em] sm:text-[76px] lg:text-[96px]">¿Te recomienda la IA?</p>
-          <p className="tracked mt-6 text-white/85">Lo que hace posiq.</p>
+          <p className="font-display text-[56px] font-normal uppercase leading-[1.02] tracking-[0.01em] sm:text-[76px] lg:text-[clamp(56px,9vh,96px)] [@media(min-width:1024px)_and_(min-height:860px)]:text-[96px]">¿Te recomienda la IA?</p>
+          <p className="tracked mt-6 text-white/85 [@media(min-width:1024px)_and_(max-height:780px)]:mt-4">Lo que hace posiq.</p>
           <p className="mt-2 max-w-[28rem] text-[15px] leading-relaxed text-white/80 sm:text-base">
             Mide cuánto aparece tu marca cuando alguien pregunta a ChatGPT, Gemini, Perplexity o Claude, la compara con
             tu competencia y sigue su evolución con método.
           </p>
 
-          <ol className="mt-8 hidden max-w-[22rem] gap-5 sm:grid">
+          <ol className="mt-8 hidden max-w-[22rem] gap-5 sm:grid [@media(min-width:1024px)_and_(max-height:780px)]:mt-5 [@media(min-width:1024px)_and_(max-height:780px)]:gap-3">
             {PASOS.map(([titulo, texto], i) => (
               <li key={titulo} className="flex gap-3.5">
                 <span aria-hidden="true" className={`dot mt-1.5 ${DOTS[i]}`} />
@@ -178,11 +179,11 @@ export function AuthLayout({ children }: { children: ReactNode }) {
           </ol>
         </div>
 
-        <p className="tracked relative mt-8 hidden text-white/60 lg:block">Hackatón EPS UFV · Zona D</p>
+        <p className="tracked relative mt-8 hidden text-white/60 [@media(min-width:1024px)_and_(min-height:800px)]:block">Hackatón EPS UFV · Zona D</p>
       </aside>
 
-      <main id="contenido" className="relative flex items-center justify-center px-4 py-10 sm:px-8">
-        <RegistrationMarks className="!absolute" />
+      <main id="contenido" className="relative isolate flex items-center justify-center px-4 py-10 sm:px-8">
+        <RegistrationMarks className="absolute hidden lg:block" />
         <div className="absolute right-4 top-4 sm:right-6">
           <ThemeToggle />
         </div>
