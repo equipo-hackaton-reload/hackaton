@@ -196,6 +196,11 @@ def create_app(runner: StudyRunner | None = None, settings: Settings | None = No
             plan=values.get("plan"),
             simulacion=values.get("simulacion"),
             calidad_plan=values.get("calidad_plan"),
+            rigor=values.get("rigor"),
+            escenarios=values.get("escenarios"),
+            oportunidades_fuente=values.get("oportunidades_fuente"),
+            exactitud=values.get("exactitud"),
+            mitigaciones=values.get("mitigaciones"),
             proposal=values.get("proposal"),
         )
 

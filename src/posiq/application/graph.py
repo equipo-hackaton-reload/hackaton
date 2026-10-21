@@ -24,10 +24,18 @@ from langgraph.graph.state import CompiledStateGraph
 from langgraph.types import RetryPolicy
 from pydantic import BaseModel
 
-from posiq.application import nodes
+from posiq.application import diferencial, nodes
 from posiq.application.deps import Deps
 from posiq.application.state import StudyState
-from posiq.domain import quality_schemas, schemas, simulation_schemas
+from posiq.domain import (
+    accuracy_schemas,
+    quality_schemas,
+    scenario_schemas,
+    schemas,
+    simulation_schemas,
+    source_map_schemas,
+    stats_schemas,
+)
 
 Node = Callable[[StudyState, Deps], Awaitable[dict[str, Any]]]
 
@@ -71,9 +79,18 @@ def build_graph(deps: Deps, checkpointer: BaseCheckpointSaver[Any] | None) -> St
     return builder.compile(checkpointer=checkpointer)
 
 
-# Módulos del dominio cuyos modelos viajan en el estado (simulación y calidad viven fuera de
-# `schemas.py` para no tocar el contrato).
-STATE_MODULES = (schemas, simulation_schemas, quality_schemas)
+# Módulos cuyos modelos viajan en el estado. Los del dominio fuera de `schemas.py` (simulación,
+# calidad y diferencial) existen para no tocar el contrato; `diferencial` agrupa sus resultados.
+STATE_MODULES = (
+    schemas,
+    simulation_schemas,
+    quality_schemas,
+    stats_schemas,
+    scenario_schemas,
+    source_map_schemas,
+    accuracy_schemas,
+    diferencial,
+)
 
 
 def serializer() -> JsonPlusSerializer:
