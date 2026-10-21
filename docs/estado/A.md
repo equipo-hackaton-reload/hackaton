@@ -72,6 +72,17 @@
     study_ids.
 - **Para D:** pintar el primer punto como «línea base», no como aviso. Los textos de `resumen` y de
   `cambios[].texto` ya vienen redactados.
+- **Arreglos de la revisión (`feature/A-serie-fixes`):**
+  - `PuntoSerie.marcas_mercado` (brand_ids ordenados) y `competidores_comparables` (aditivos). Si
+    cambia el mercado, el score y la aparición se comparan, pero el puesto y la diferencia frente a
+    los competidores no; el motivo «Cambian los competidores del mercado: …» va en `avisos` y en el
+    `resumen`. `Comparabilidad` gana `motivos_competidores`, que solo se rellena si el par es
+    comparable (si cambian metodología y mercado a la vez, solo constan los `motivos`).
+  - El `resumen` ya no dice «Sin cambios fuera del margen de error» si no se calculó nada: con un
+    punto, «Línea base: aún no hay con qué comparar.»; con pares no comparables, «… no comparable
+    con la medición anterior: <motivos>». Constantes en `tracking.py`.
+  - ADR 0016: la huella del banco incluye el texto; la re-medición real debe reutilizar el banco
+    (pendiente en C: runner/nodo de prompts).
 
 ## Exactitud de marca (`feature/A-exactitud-marca`, ADR 0011)
 

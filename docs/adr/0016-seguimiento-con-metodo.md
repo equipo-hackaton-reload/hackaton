@@ -42,11 +42,25 @@ Un punto es comparable con el anterior si coinciden estas cuatro cosas:
 | Versión de la metodología, del score, banco o motores | No comparable, con un motivo por cada diferencia. No se calcula ningún cambio. |
 | Modelo de un motor (`Run.modelo`) | Comparable, con aviso: parte del cambio puede deberse al modelo. |
 | El modelo consta en una medición y no en la otra | Comparable, con aviso. |
+| Conjunto de marcas del mercado (`PuntoSerie.marcas_mercado`) | Score y aparición, comparables. Puesto y diferencia frente a los competidores, **no**: `competidores_comparables = False`, no se calculan como cambio y el motivo («Cambian los competidores del mercado: entran …; salen … (n → m marcas). …») va en `avisos` y en el resumen. |
 | Primer punto | `comparable_con_anterior = False`, con el motivo «Línea base: es la primera medición de la serie.». |
+
+El conjunto de marcas cuenta porque el puesto y la media de los competidores dependen de quién
+esté en el mercado. Sin esta regla, un estudio con el mismo score (25,93 → 25,93) pasaba del 8.º
+de 10 al 2.º de 4 y salía como cambio «fuera del margen de error». Si en un punto no consta el
+mercado (`marcas_mercado` vacío, datos anteriores a este campo), no se declara cambio.
 
 La huella del banco (`huella_banco`) es el SHA-256 de lo que se pregunta en cada prompt:
 plantilla, familia, fase, instanciación, perfil, ciudad, texto, marcas nombradas y prioridad.
 No depende del orden ni de los ids de instancia.
+
+**La huella incluye el texto del prompt.** Si la re-medición vuelve a generar el banco (por
+ejemplo, si el LLM reescribe las preguntas), la huella cambia y la serie dice, con razón, que no
+es comparable: no se puede atribuir un cambio de score a la marca si cambió lo que se pregunta.
+Por eso la re-medición real debe **reutilizar el banco** de la medición anterior (mismos
+`PromptInstance`, no uno regenerado). Hoy `POST /studies/{id}/remeasure` arranca en `prompts` y
+regenera el banco; lo corrige otro paquete en el runner y el nodo de prompts (zona C). Hasta
+entonces, una serie de re-mediciones reales sale «no comparable» por el banco, que es lo honesto.
 
 ### Cambios entre puntos consecutivos comparables
 
@@ -63,9 +77,23 @@ las marcas sobre las mismas ejecuciones (emparejado). Usa `scoring.score_from_pr
 fórmula no se duplica. Se usan la misma semilla y las mismas réplicas que en `stats`.
 
 Un cambio es significativo si y solo si su IC al 95 % excluye 0. Solo los significativos van a
-`cambios_significativos` y al `resumen`. Si no hay ninguno, el resumen es exactamente «Sin cambios
-fuera del margen de error». Si una métrica no admite contraste, `significancia = None` y
-`significativo = False`, y el texto lo dice.
+`cambios_significativos` y al `resumen`. Si una métrica no admite contraste, `significancia = None`
+y `significativo = False`, y el texto lo dice.
+
+### Resumen
+
+«Sin cambios» solo se dice si se ha comparado algo. El `resumen` distingue:
+
+| Caso | Resumen |
+|---|---|
+| Un solo punto | «Línea base: aún no hay con qué comparar.» |
+| Ningún punto | «Sin mediciones: aún no hay con qué comparar.» |
+| Par no comparable | «Del … al …: no comparable con la medición anterior: <motivos>» |
+| Par con cambio de competidores | «Del … al …: Cambian los competidores del mercado: …» |
+| Par comparable sin datos para ningún cambio | «Del … al …: No hay datos para calcular cambios con la medición anterior.» |
+| Cambios significativos | Sus textos, en orden. |
+| Se calcularon cambios, ninguno significativo y nada más que decir | Exactamente «Sin cambios fuera del margen de error». |
+| Igual, pero con alguna línea anterior (no comparable o competidores) | Esas líneas y «Sin cambios fuera del margen de error en lo que sí es comparable.» |
 
 ### Indicadores adelantados
 

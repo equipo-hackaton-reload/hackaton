@@ -8,6 +8,8 @@ de una marca en una `SerieMarca` y solo informa de los cambios que salen del mar
   versión de la metodología, la del score, la huella del banco de prompts (`huella_banco`) y el
   conjunto de motores. Si cambia el modelo de un motor (`Run.modelo`), siguen siendo comparables,
   con un aviso. Si no lo son, se dicen los motivos y no se calcula ningún cambio entre ellas.
+  Si cambia el conjunto de marcas del mercado, el score y la aparición siguen siendo comparables,
+  pero el puesto y la diferencia frente a los competidores no se calculan como cambio.
 - **Cambios** entre puntos consecutivos comparables:
   - Score de la marca: bootstrap independiente de cada estudio (`stats.significancia_remedicion`).
   - Aparición espontánea global y por motor: Newcombe (`stats.significancia_remedicion`).
@@ -69,7 +71,13 @@ from posiq.domain.tracking_schemas import (
 )
 
 SIN_CAMBIOS: Final = "Sin cambios fuera del margen de error"
+SIN_CAMBIOS_COMPARABLES: Final = f"{SIN_CAMBIOS} en lo que sí es comparable."
 MOTIVO_LINEA_BASE: Final = "Línea base: es la primera medición de la serie."
+RESUMEN_LINEA_BASE: Final = "Línea base: aún no hay con qué comparar."
+RESUMEN_SIN_MEDICIONES: Final = "Sin mediciones: aún no hay con qué comparar."
+NO_COMPARABLE: Final = "No comparable con la medición anterior"
+SIN_DATOS_CAMBIOS: Final = "No hay datos para calcular cambios con la medición anterior."
+MOTIVO_COMPETIDORES: Final = "Cambian los competidores del mercado"
 TOP_FUENTES_MERCADO: Final = 5
 """Fuentes ganadas más citadas del mercado del estudio para el indicador de presencia."""
 
@@ -96,9 +104,18 @@ class MedicionSerie:
 
 
 class Comparabilidad(NamedTuple):
+    """`comparable`: el score y la aparición se comparan. `motivos_competidores` no vacío: cambió
+    el mercado y el puesto y la diferencia frente a los competidores NO se comparan (solo se
+    rellena si el par es comparable; si no, ya lo explican `motivos`)."""
+
     comparable: bool
     motivos: list[str]
     avisos: list[str]
+    motivos_competidores: list[str]
+
+    @property
+    def competidores_comparables(self) -> bool:
+        return self.comparable and not self.motivos_competidores
 
 
 # --- Formato --------------------------------------------------------------------------------------
@@ -200,7 +217,27 @@ def comparabilidad(anterior: PuntoSerie, actual: PuntoSerie) -> Comparabilidad:
                 f"No consta el modelo de {motor} en una de las dos mediciones: no se puede "
                 "comprobar si ha cambiado."
             )
-    return Comparabilidad(not motivos, motivos, avisos)
+    # Si el par no es comparable, nada se compara: el motivo de competidores (que dice que el score
+    # y la aparición sí) sobraría y contradiría `comparable=False`.
+    competidores = [] if motivos else _motivos_competidores(anterior, actual)
+    return Comparabilidad(not motivos, motivos, avisos, competidores)
+
+
+def _motivos_competidores(anterior: PuntoSerie, actual: PuntoSerie) -> list[str]:
+    """Motivo si cambia el conjunto de marcas del mercado (vacío en un punto = no consta)."""
+    antes, ahora = set(anterior.marcas_mercado), set(actual.marcas_mercado)
+    if not antes or not ahora or antes == ahora:
+        return []
+    partes = []
+    if entran := sorted(ahora - antes):
+        partes.append(f"entran {', '.join(entran)}")
+    if salen := sorted(antes - ahora):
+        partes.append(f"salen {', '.join(salen)}")
+    return [
+        f"{MOTIVO_COMPETIDORES}: {'; '.join(partes)} ({len(antes)} → {len(ahora)} marcas). "
+        "El score y la aparición se comparan; el puesto y la diferencia frente a los "
+        "competidores, no."
+    ]
 
 
 # --- Mercado: scores de todas las marcas por ejecución --------------------------------------------
@@ -371,10 +408,15 @@ def _punto(
         comparable_con_anterior=False,
         motivos_no_comparable=[MOTIVO_LINEA_BASE],
         avisos=avisos,
+        marcas_mercado=sorted(m.ranking),
     )
 
 
 # --- Cambios --------------------------------------------------------------------------------------
+
+
+def _periodo(a: PuntoSerie, b: PuntoSerie) -> str:
+    return f"Del {_fecha(a.fecha)} al {_fecha(b.fecha)}"
 
 
 def _verbo(delta: float, decimales: int = 1) -> str:
@@ -522,8 +564,12 @@ def _cambios(
     replicas: int,
     semilla: int,
     nivel: float,
+    *,
+    competidores: bool = True,
 ) -> list[CambioSerie]:
-    periodo = f"Del {_fecha(a.fecha)} al {_fecha(b.fecha)}"
+    """Cambios entre dos puntos comparables. Sin `competidores` (cambió el mercado), no se
+    calculan el puesto ni la diferencia frente a los competidores."""
+    periodo = _periodo(a, b)
     rem = significancia_remedicion(
         med_b.metrics,
         med_a.metrics,
@@ -534,6 +580,12 @@ def _cambios(
         nivel=nivel,
     )
     tasas = rem.por_clave()
+    propios = [
+        _cambio_score(periodo, a, b, rem.score),
+        *_cambios_aparicion(periodo, a, b, med_a.metrics, med_b.metrics, tasas),
+    ]
+    if not competidores:
+        return [c for c in propios if c is not None]
     d_pos, d_dif = _bootstrap_mercado(merc_a, merc_b, replicas, semilla)
     n = len(merc_a.run_ids) + len(merc_b.run_ids)
     s_pos = (
@@ -553,8 +605,7 @@ def _cambios(
         else None
     )
     candidatos = [
-        _cambio_score(periodo, a, b, rem.score),
-        *_cambios_aparicion(periodo, a, b, med_a.metrics, med_b.metrics, tasas),
+        *propios,
         _cambio_posicion(periodo, a, b, s_pos),
         _cambio_diferencia(periodo, a, b, s_dif),
     ]
@@ -673,6 +724,7 @@ def construir_serie(
     mercados = [_mercado(m) for m in meds]
     puntos: list[PuntoSerie] = []
     cambios: list[CambioSerie] = []
+    lineas: list[str] = []
     for i, (med, mercado) in enumerate(zip(meds, mercados, strict=True)):
         punto = _punto(med, mercado, replicas, semilla, nivel)
         if puntos:
@@ -682,11 +734,16 @@ def construir_serie(
                 update={
                     "comparable_con_anterior": comp.comparable,
                     "motivos_no_comparable": comp.motivos,
-                    "avisos": [*punto.avisos, *comp.avisos],
+                    "avisos": [*punto.avisos, *comp.avisos, *comp.motivos_competidores],
+                    "competidores_comparables": comp.competidores_comparables,
                 }
             )
-            if comp.comparable:
-                cambios += _cambios(
+            periodo = _periodo(anterior, punto)
+            if not comp.comparable:
+                lineas.append(f"{periodo}: {NO_COMPARABLE.lower()}: {' '.join(comp.motivos)}")
+            else:
+                lineas += [f"{periodo}: {m}" for m in comp.motivos_competidores]
+                del_par = _cambios(
                     anterior,
                     punto,
                     meds[i - 1],
@@ -696,7 +753,12 @@ def construir_serie(
                     replicas,
                     semilla,
                     nivel,
+                    competidores=comp.competidores_comparables,
                 )
+                if not del_par:
+                    lineas.append(f"{periodo}: {SIN_DATOS_CAMBIOS}")
+                lineas += [c.texto for c in del_par if c.significativo]
+                cambios += del_par
         puntos.append(punto)
     significativos = [c for c in cambios if c.significativo]
     return SerieMarca(
@@ -706,5 +768,16 @@ def construir_serie(
         cambios=cambios,
         cambios_significativos=significativos,
         indicadores=_indicadores(puntos, meds),
-        resumen=[c.texto for c in significativos] or [SIN_CAMBIOS],
+        resumen=_resumen(puntos, cambios, lineas),
     )
+
+
+def _resumen(puntos: list[PuntoSerie], cambios: list[CambioSerie], lineas: list[str]) -> list[str]:
+    """Distingue la línea base, lo no comparable y «sin cambios» (solo si se calculó alguno)."""
+    if not puntos:
+        return [RESUMEN_SIN_MEDICIONES]
+    if len(puntos) == 1:
+        return [RESUMEN_LINEA_BASE]
+    if not cambios or any(c.significativo for c in cambios):
+        return lineas
+    return [*lineas, SIN_CAMBIOS_COMPARABLES] if lineas else [SIN_CAMBIOS]
