@@ -48,6 +48,10 @@ class Settings(BaseSettings):
     cache_path: str = ".cache/posiq_cache.sqlite"
 
     kit_dir: str = "data/kit/02_Datos/caso_oftalmologia"
+    # Modo kit SIEMPRE sin coste (ADR 0018): FixtureLLM, FixtureJudge con las etiquetas del kit y
+    # sin PlanGuard, aunque haya claves. `True` es un opt-in explícito para usar el LLM y el juez
+    # de pago sobre las respuestas del kit (p. ej. para ensayar la redacción con DeepSeek).
+    kit_ia_real: bool = False
 
     # Motores reales (ADR 0006). Modelos y precios PROVISIONALES: contrastar con la página de
     # precios oficial antes de lanzar un estudio. Tokens en USD por millón; búsqueda en USD por

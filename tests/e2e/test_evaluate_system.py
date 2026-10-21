@@ -37,7 +37,7 @@ def test_evaluacion_con_fixtures(script: ModuleType, tmp_path: Path) -> None:
     assert "**PENDIENTE**" in text
     assert "Hallazgos con `evaluation_ids` válidos: 7/7 (100 %)" in text
     assert "Acciones con `finding_ids` válidos: 9/9 (100 %)" in text
-    assert "falta la variable DEEPSEEK_API_KEY" in text
+    assert "falta DEEPSEEK_API_KEY (ni en el entorno ni en .env)" in text
     assert "| Fase 3 · Optimización y medición |" in text and "no una predicción" in text
 
 

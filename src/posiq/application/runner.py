@@ -13,11 +13,11 @@ from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.types import Command
 from pydantic import ValidationError
 
-from posiq.application.deps import Deps, new_study
+from posiq.application.deps import Deps, new_study, trazas_de_fallo
 from posiq.application.graph import StudyGraph, build_graph
 from posiq.application.nodes.review import parse_market, parse_plan
 from posiq.application.state import StudyState, initial_state
-from posiq.domain.schemas import ModoEstudio, Study
+from posiq.domain.schemas import ModoEstudio, Study, Trace
 from posiq.ports import StudyRepo
 
 log = logging.getLogger(__name__)
@@ -115,8 +115,29 @@ class StudyRunner:
         except Exception as exc:  # el grafo corre en segundo plano: el fallo se consulta por la API
             log.exception("estudio %s falló", study.id)
             self.fallos[study.id] = f"{type(exc).__name__}: {exc}"
+            await self._registrar_trazas_de_fallo(study, trazas_de_fallo(exc))
         finally:
             self.en_marcha.discard(study.id)
+
+    async def _registrar_trazas_de_fallo(self, study: Study, nuevas: list[Trace]) -> None:
+        """Suma al estudio las llamadas pagadas del nodo que falló (ADR 0018).
+
+        El nodo que lanza no actualiza el estado: sin esto, sus intentos fallidos se pagaban sin
+        `Trace` ni coste. Se escriben en el checkpoint (cuentan en el presupuesto si el estudio
+        sigue) y en el repositorio.
+        """
+        if not nuevas:
+            return
+        config = self.config(study.id)
+        graph = self.graphs[study.modo]
+        try:
+            snapshot = await graph.aget_state(config)
+            values = cast(StudyState, snapshot.values)
+            coste = values.get("coste_acumulado_eur", 0.0) + sum(t.coste_eur for t in nuevas)
+            await graph.aupdate_state(config, {"traces": nuevas, "coste_acumulado_eur": coste})
+            self.repo.save_traces(study.id, [*values.get("traces", []), *nuevas])
+        except Exception:  # registrar el coste no debe tapar el fallo original
+            log.exception("no se pudieron registrar las trazas del fallo de %s", study.id)
 
     async def state(self, study_id: str) -> tuple[StudyState, tuple[str, ...]]:
         """Valores del estado y nodos pendientes (`("review_plan",)` si espera esa revisión)."""

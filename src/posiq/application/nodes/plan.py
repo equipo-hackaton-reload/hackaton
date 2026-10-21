@@ -18,12 +18,14 @@ from posiq.adapters.budget import BudgetExceeded
 from posiq.adapters.errors import MissingCredentialError
 from posiq.application.deps import (
     Deps,
+    adjuntar_trazas,
     cost_update,
     db,
     dump,
     persist_traces,
     structured,
     study_budget,
+    trazas_si_falla,
 )
 from posiq.application.state import StudyState
 from posiq.domain.schemas import (
@@ -85,7 +87,8 @@ async def plan_checks(state: StudyState, deps: Deps, plan: Plan) -> dict[str, An
     errores: list[str] = []
     try:
         calidad = await guard.aassess(plan, state["findings"], state["brief"])
-    except BudgetExceeded:
+    except BudgetExceeded as exc:
+        adjuntar_trazas(exc, budget.traces[antes:])  # PlanGuard ya pagado
         raise  # el presupuesto sí para el estudio
     except MissingCredentialError as exc:
         calidad = None
@@ -112,22 +115,23 @@ async def plan(state: StudyState, deps: Deps) -> dict[str, Any]:
     propuesto = own_plan(propuesto, sid)
     traces = [trace]
     violaciones = plan_violations(propuesto, brief, findings)
-    if violaciones:
-        retry_state: StudyState = {**state, "traces": [*state.get("traces", []), trace]}
-        propuesto, trace = await structured(
-            deps,
-            retry_state,
-            Plan,
-            "plan.v1",
-            {**payload, "plan_anterior": dump(propuesto), "violaciones": violaciones},
-        )
-        propuesto = own_plan(propuesto, sid)
-        traces.append(trace)
-        violaciones = plan_violations(propuesto, brief, findings)
+    with trazas_si_falla(traces):  # lo ya pagado en este nodo cuenta aunque falle lo siguiente
+        if violaciones:
+            retry_state: StudyState = {**state, "traces": [*state.get("traces", []), trace]}
+            propuesto, trace = await structured(
+                deps,
+                retry_state,
+                Plan,
+                "plan.v1",
+                {**payload, "plan_anterior": dump(propuesto), "violaciones": violaciones},
+            )
+            propuesto = own_plan(propuesto, sid)
+            traces.append(trace)
+            violaciones = plan_violations(propuesto, brief, findings)
 
-    checks = await plan_checks(
-        {**state, "traces": [*state.get("traces", []), *traces]}, deps, propuesto
-    )
+        checks = await plan_checks(
+            {**state, "traces": [*state.get("traces", []), *traces]}, deps, propuesto
+        )
     traces.extend(checks["traces"])
 
     await db(deps.repo.save_plan, sid, propuesto)

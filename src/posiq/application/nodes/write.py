@@ -12,7 +12,15 @@ con las carencias; lo que siga pendiente se declara en `contexto.limitaciones`.
 from datetime import UTC, datetime
 from typing import Any
 
-from posiq.application.deps import Deps, cost_update, db, dump, persist_traces, structured
+from posiq.application.deps import (
+    Deps,
+    cost_update,
+    db,
+    dump,
+    persist_traces,
+    structured,
+    trazas_si_falla,
+)
 from posiq.application.nodes.judge import JUEZ_REGLAS
 from posiq.application.nodes.plan import metrics_summary
 from posiq.application.schemas_draft import ProposalDraft
@@ -151,13 +159,14 @@ async def write(state: StudyState, deps: Deps) -> dict[str, Any]:
     traces = [trace]
     if faltan := carencias_enlazables(encargo(borrador, state)):
         retry_state: StudyState = {**state, "traces": [*state.get("traces", []), trace]}
-        borrador, trace = await structured(
-            deps,
-            retry_state,
-            ProposalDraft,
-            PROMPT,
-            {**payload, "borrador_anterior": dump(borrador), "carencias_cobertura": faltan},
-        )
+        with trazas_si_falla(traces):  # el primer borrador ya se pagó
+            borrador, trace = await structured(
+                deps,
+                retry_state,
+                ProposalDraft,
+                PROMPT,
+                {**payload, "borrador_anterior": dump(borrador), "carencias_cobertura": faltan},
+            )
         traces.append(trace)
     proposal = assemble_proposal(borrador, state)
 

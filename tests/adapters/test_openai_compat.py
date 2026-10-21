@@ -83,6 +83,25 @@ def test_fallo_definitivo(settings: Settings, prompts: Path) -> None:
     with pytest.raises(LLMOutputError) as exc:
         client.structured(Ficha, "intake.v1", STATE, study_id="S-1")
     assert exc.value.attempts == 3 and len(client.client.calls) == 3
+    # Los tres intentos se han pagado: la excepción lleva su traza con el coste.
+    trace = exc.value.trace
+    assert trace is not None and trace.study_id == "S-1" and trace.nodo == "intake.v1"
+    assert (trace.tokens_in, trace.tokens_out) == (3000, 300)
+    assert trace.coste_eur == pytest.approx(3 * (1000 * 0.28 + 100 * 0.42) / 1e6 * 0.86)
+
+
+def test_fallo_de_api_tras_un_intento_cobrado(settings: Settings, prompts: Path) -> None:
+    client = llm(settings, prompts, ["no es json"])  # el segundo intento no tiene respuesta
+    with pytest.raises(LLMOutputError) as exc:
+        client.structured(Ficha, "intake.v1", STATE, study_id="S-1")
+    assert isinstance(exc.value.__cause__, IndexError)
+    assert exc.value.trace is not None and exc.value.trace.tokens_in == 1000
+
+
+def test_fallo_de_api_sin_nada_cobrado_no_se_envuelve(settings: Settings, prompts: Path) -> None:
+    client = llm(settings, prompts, [])
+    with pytest.raises(IndexError):
+        client.structured(Ficha, "intake.v1", STATE, study_id="S-1")
 
 
 def test_cache(settings: Settings, prompts: Path) -> None:

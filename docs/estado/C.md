@@ -39,6 +39,14 @@
   en `/auth/*` y `resume`, 413 por encima de `BRIEF_MAX_BYTES`, rate limit en memoria. Los tests de
   API se autentican con `tests/auth_helpers.py`; `demo_kit.py` entra como `demo@posiq.local`.
   **La web necesita login (zona D)**: sin él, contra la API real todo da 401.
+- Coste (ADR 0018): el modo kit es siempre gratis aunque haya claves (`FixtureLLM`,
+  `FixtureJudge` con las etiquetas del kit, sin PlanGuard); `KIT_IA_REAL=true` es el opt-in para
+  usar el LLM y el juez de pago sobre el kit. Lo ya pagado en un nodo que falla (intentos de
+  `LLMOutputError`, reintentos de plan/redacción, PlanGuard, juez y su fallback) viaja en la
+  excepción y `StudyRunner` lo suma al checkpoint y al repo: sale en `/traces` y en
+  `coste_acumulado_eur` también con estado `error`. `GET /estimate` cuenta LLM de los nodos
+  (`LLM_TOKENS`), juez con fallback (25 %) y PlanGuard; `estimate_study(..., remedicion=True)`
+  quita intake y market (para `GET /studies/{id}/remeasure/estimate`).
 
 ## Diferencial v0.4.0 (en curso)
 - Base común: el checkpointer admite `stats_schemas`, `scenario_schemas`, `source_map_schemas`,
@@ -83,6 +91,7 @@
 ## Siguiente tarea
 - Endpoints de seguimiento sobre las cuentas: `GET /brands`, `GET /brands/{id}/serie`,
   `GET /studies/{id}/remeasure/estimate` y `remeasure` con confirmación de coste.
+- Ajustar `LLM_TOKENS` de `estimate.py` con las `Trace` del primer estudio real.
 - Estudio de Alborada con DeepSeek en cuanto haya `DEEPSEEK_API_KEY`.
 - Persistir `StudyRunner.fallos` para que el estado `error` sobreviva a un reinicio.
 

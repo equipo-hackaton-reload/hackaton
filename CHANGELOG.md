@@ -44,6 +44,7 @@ Formato [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); versionado 
 - `Finding.unidad` y `Proposal.marcas` (contract-change aditivo, zona E); `pyyaml` como dependencia directa.
 - `GET /studies/{id}` devuelve `revision_pendiente: null` en lugar de `"none"` cuando no hay revisión pendiente (zona C; el estado interno del grafo no cambia).
 ### Fixed
+- Coste oculto (zona C, toca B; ADR 0018): el modo kit es siempre gratis (`FixtureLLM`, `FixtureJudge` con las etiquetas del kit y sin PlanGuard aunque haya claves; opt-in `KIT_IA_REAL=true`); los intentos fallidos del LLM, el fallback del juez y lo ya pagado en un nodo que falla dejan `Trace`, suman a `coste_acumulado_eur` y cuentan en el presupuesto; `GET /estimate` cuenta intake, market, prompts, plan, redacción, juez con fallback y PlanGuard (`coste_llm_eur`, `coste_plan_guard_eur`, `llamadas_llm`, `juez: "kit"`); aviso de clave «falta X (ni en el entorno ni en .env)».
 - `CHANGELOG.md` sin los marcadores de conflicto que entraron con la #20; el CI (`check`) falla si hay marcadores `<<<<<<<`/`=======`/`>>>>>>>` en el repo (zona A).
 - Un fallo de la API de PlanGuard ya no tumba el nodo `plan`: se anota y `calidad_plan` queda en null; solo `BudgetExceeded` para el estudio (zona C).
 - Codificación del mensaje 409 de `/export` («la propuesta aún no está completada»).
