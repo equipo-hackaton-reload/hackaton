@@ -37,7 +37,7 @@
   - PR 3: cableado en `write` (con un reintento y limitación si falta algo), prompt `write.v2`,
     sección «Lo que nos habéis pedido» en el Word y cobertura en el fixture (16 de 16 en la demo).
   - Falta: que la web lo pinte (D, forma del JSON en `docs/estado/D.md`). `posicionamiento_deseado`
-    y `atributos_deseados` existen, pero `intake.v1` aún no los extrae ni son puntos de cobertura.
+    y `atributos_deseados` ya los extrae `intake.v2` (zona E), pero aún no son puntos de cobertura.
 
 ## Seguimiento con método: serie temporal (`feature/A-serie-temporal`, ADR 0016)
 
@@ -72,6 +72,17 @@
     study_ids.
 - **Para D:** pintar el primer punto como «línea base», no como aviso. Los textos de `resumen` y de
   `cambios[].texto` ya vienen redactados.
+- **Arreglos de la revisión (`feature/A-serie-fixes`):**
+  - `PuntoSerie.marcas_mercado` (brand_ids ordenados) y `competidores_comparables` (aditivos). Si
+    cambia el mercado, el score y la aparición se comparan, pero el puesto y la diferencia frente a
+    los competidores no; el motivo «Cambian los competidores del mercado: …» va en `avisos` y en el
+    `resumen`. `Comparabilidad` gana `motivos_competidores`, que solo se rellena si el par es
+    comparable (si cambian metodología y mercado a la vez, solo constan los `motivos`).
+  - El `resumen` ya no dice «Sin cambios fuera del margen de error» si no se calculó nada: con un
+    punto, «Línea base: aún no hay con qué comparar.»; con pares no comparables, «… no comparable
+    con la medición anterior: <motivos>». Constantes en `tracking.py`.
+  - ADR 0016: la huella del banco incluye el texto; la re-medición real debe reutilizar el banco
+    (pendiente en C: runner/nodo de prompts).
 
 ## Exactitud de marca (`feature/A-exactitud-marca`, ADR 0011)
 
@@ -126,6 +137,24 @@
   En fixture no se nota, porque el `FixtureLLM` ignora el estado y devuelve
   `kit.brands_in_runs()`. Arreglo propuesto: renombrar las claves en `market.py` a
   `brief_summary`/`marcas_candidatas` (C), o cambiar el prompt y el README de prompts (E).
+
+## Auditoría técnica GEO de la web: contrato (`feature/A-auditoria-web-contrato`, ADR 0019)
+
+- `domain/web_audit_schemas.py`: `RespuestaWeb`, `AccesoBot`, `SenalContenido`, `Comprobacion`,
+  `PuntuacionBloque`, `AuditoriaWeb`, `RecursoConsultado`; `CATALOGO` (24 comprobaciones en 5
+  bloques), `PESO_BLOQUE` (contenido 35, descubrimiento 25, acceso de bots 25, rendimiento 10,
+  agentes/API 5), `BOT_MOTOR` (11 bots), `RECURSOS`, `puntuar_bloque` y `puntuar_total`.
+- `ports.WebFetcher` (`contract-change`): `get(url, *, dominio, accept=None) -> RespuestaWeb`, sin
+  lanzar. Requisitos de seguridad en el contrato: `url_permitida` (http/https, puerto por defecto,
+  host = dominio o subdominio; también `Sitemap:` y cada `Location`), `ip_permitida` (SSRF: sin
+  privadas, loopback, link-local, CGNAT, ULA, multicast ni IPv4 mapeadas; conexión a la IP
+  validada contra DNS rebinding), `MAX_REDIRECCIONES`=5 a mano, `MAX_BYTES_DESCARGA`=2 MB tras
+  descomprimir en streaming y `TIMEOUT_TOTAL_RECURSO_S`=10 s total. B debe probarlos.
+- **Siguiente (A):** `domain/web_audit.py` (parseo de robots.txt RFC 9309, sitemap, JSON-LD,
+  texto visible, Content-Signal; `auditar(...)` y `hallazgos_web(...)`), con golden sobre
+  respuestas fijas. Luego B (`adapters/web` httpx + fixture), C (nodo `web_audit` entre `judge` y
+  `analyze`, `Settings.web_audit=off` por defecto, trazas `http:<fetcher>`), D (tarjeta) y E (plan
+  y Word). Todo en el ADR 0019.
 
 ## Falta
 - Integrar `informe_rigor` en el grafo y en `GET /studies/{id}` (zona C), y pintar «25,9 [21,6–30,1]»

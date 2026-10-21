@@ -15,6 +15,7 @@ from posiq.adapters.llm._fixture_data import (
     alborada_brief_summary,
     alborada_proposal,
     example_plan,
+    identidad_deseada_alborada,
 )
 from posiq.application.schemas_draft import ProposalDraft
 from posiq.domain import kit_loader as kl
@@ -76,7 +77,10 @@ class FixtureLLM:
         elif schema is BriefSummary:
             if "alborada" not in str(state.get("brief", "")).lower():
                 raise ValueError("FixtureLLM solo admite el brief sintético de Alborada")
-            output = alborada_brief_summary()
+            # La ficha de ejemplo y, del brief recibido, solo la identidad deseada que trae.
+            output = alborada_brief_summary().model_copy(
+                update=identidad_deseada_alborada(str(state["brief"]))
+            )
         elif schema is Market:
             output = Market(marcas=kit.brands_in_runs())
         elif schema is PromptSet:

@@ -1,6 +1,7 @@
 """Contratos narrativos, fixtures explícitas y selección de motores del mercado confirmado."""
 
 from dataclasses import replace
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -18,6 +19,44 @@ from tests.application.test_nodes import analyzed_state, merge
 from tests.golden.conftest import alborada_brief_summary
 
 pytestmark = pytest.mark.anyio
+
+
+BRIEF_ALBORADA = Path(__file__).resolve().parents[2] / (
+    "data/kit/01_Briefings/Brief_de_ejemplo_Clinica_Alborada.md"
+)
+
+
+def test_fixture_intake_takes_the_desired_identity_from_the_brief() -> None:
+    llm = FixtureLLM(kit_settings())
+    texto = BRIEF_ALBORADA.read_text(encoding="utf-8")
+    brief, trace = llm.structured(BriefSummary, "intake.v2", {"brief": texto}, study_id="s")
+    assert brief.posicionamiento_deseado == (
+        "Clínica oftalmológica privada de tamaño medio con una oferta centrada en la cirugía que "
+        "permite dejar las gafas y en el tratamiento de cataratas"
+    )
+    assert brief.atributos_deseados == [
+        "Seguimiento postoperatorio personalizado incluido durante 12 meses",
+        "Valoración preoperatoria completa en una sola visita",
+        "Equipo médico estable y bien valorado por los pacientes",
+    ]
+    # Todo lo que extrae está, tal cual, en el brief.
+    plano = " ".join(texto.split()).casefold()
+    extraido = [brief.posicionamiento_deseado, *brief.atributos_deseados]
+    assert all(a.casefold() in plano for a in extraido)
+    assert trace.prompt_version == "intake.v2"
+    # El resto de la ficha (y con ello las cifras canónicas) no cambia.
+    assert (
+        brief.model_copy(update={"posicionamiento_deseado": "", "atributos_deseados": []})
+        == alborada_brief_summary()
+    )
+
+
+def test_fixture_intake_leaves_identity_empty_when_the_brief_does_not_say_it() -> None:
+    llm = FixtureLLM(kit_settings())
+    sin_identidad = "# Brief\n\nMarca: Clínica Alborada Visión. Oftalmología en Madrid y Barcelona."
+    brief, _ = llm.structured(BriefSummary, "intake.v2", {"brief": sin_identidad}, study_id="s")
+    assert brief.posicionamiento_deseado == "" and brief.atributos_deseados == []
+    assert brief.marca == "Clínica Alborada Visión"
 
 
 def test_fixture_brief_and_trace_match_golden_without_network() -> None:

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ApiError } from "../api/client";
 import { useResume } from "../api/hooks";
@@ -9,7 +9,8 @@ import { Panel } from "../components/Panel";
 import { PlanQualityCard } from "../components/PlanQualityCard";
 import { SimulationCard } from "../components/SimulationCard";
 import { Waiting } from "../components/States";
-import { fmtEur, fmtNum } from "../lib/format";
+import { fmtEur, fmtObjetivo } from "../lib/format";
+import { borrarBorrador, guardarBorrador, leerBorrador } from "../lib/planDraft";
 import type { Action, Plan } from "../types/schemas";
 import { useStudyContext } from "./studyContext";
 
@@ -31,8 +32,8 @@ function Objetivos({ plan }: { plan: Plan }) {
             {plan.objetivos.map((o) => (
               <tr key={o.kpi} className="border-t border-rule">
                 <th scope="row" className="px-5 py-2.5 text-left font-normal">{o.kpi}</th>
-                <td className="py-2.5 text-right text-muted">{fmtNum(o.valor_actual, 1)}</td>
-                <td className="py-2.5 text-right font-medium">{fmtNum(o.valor_objetivo, 1)}</td>
+                <td className="py-2.5 text-right text-muted">{fmtObjetivo(o, o.valor_actual)}</td>
+                <td className="py-2.5 text-right font-medium">{fmtObjetivo(o, o.valor_objetivo)}</td>
                 <td className="px-5 py-2.5 text-right text-muted">{o.plazo_semanas} sem.</td>
               </tr>
             ))}
@@ -48,7 +49,12 @@ function Editor({ original }: { original: Plan }) {
   const navigate = useNavigate();
   const resume = useResume(id);
   const pendiente = status.revision_pendiente === "plan";
-  const [plan, setPlan] = useState<Plan>(original);
+  const [plan, setPlan] = useState<Plan>(() => (pendiente ? leerBorrador(id, original) : null) ?? original);
+
+  // Cada edición se guarda como borrador: cambiar de pestaña no la pierde.
+  useEffect(() => {
+    if (pendiente) guardarBorrador(id, original, plan);
+  }, [id, original, plan, pendiente]);
   const findings = useMemo(() => new Map((status.findings ?? []).map((f) => [f.id, f])), [status.findings]);
   const originales = useMemo(() => new Map(original.fases.flatMap((f) => f.acciones).map((a) => [a.id, a])), [original]);
   const restricciones = status.brief?.restricciones ?? [];
@@ -70,7 +76,10 @@ function Editor({ original }: { original: Plan }) {
     // mutateAsync: el editor se remonta al cambiar el estado y descartaría un onSuccess local.
     resume
       .mutateAsync({ revision: "plan", payload: plan })
-      .then(() => navigate(`/studies/${id}/propuesta`))
+      .then(() => {
+        borrarBorrador(id);
+        navigate(`/studies/${id}/propuesta`);
+      })
       .catch(() => undefined);
   }
 

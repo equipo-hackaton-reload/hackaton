@@ -1,6 +1,7 @@
-import { NavLink, Outlet, useParams } from "react-router-dom";
+import { Link, NavLink, Outlet, useParams } from "react-router-dom";
 import { useStudy } from "../api/hooks";
 import { AppShell } from "../components/AppShell";
+import { FalloContext } from "../components/falloContext";
 import { ErrorState, Skeleton } from "../components/States";
 import { StatusBadge } from "../components/StatusBadge";
 import { fmtEur } from "../lib/format";
@@ -65,14 +66,47 @@ function StudyBar({ status }: { status: StudyStatus }) {
   );
 }
 
+/** El grafo se ha detenido: se dice por qué y se deja reintentar o salir, sin spinner infinito. */
+function EstudioDetenido({ status, onRetry, retrying }: { status: StudyStatus; onRetry: () => void; retrying: boolean }) {
+  return (
+    <section role="alert" aria-labelledby="detenido-titulo" className="mb-6 rounded-card border border-pill-neg-bg bg-pill-neg-bg px-5 py-4 text-pill-neg-ink">
+      <h2 id="detenido-titulo" className="font-semibold">El estudio se ha detenido por un error</h2>
+      {status.errores.length > 0 ? (
+        <ul className="mt-1.5 list-disc space-y-0.5 pl-5" data-testid="errores-estudio">
+          {status.errores.map((e) => (
+            <li key={e}>{e}</li>
+          ))}
+        </ul>
+      ) : (
+        <p className="mt-1.5">La API no ha dado más detalle.</p>
+      )}
+      <p className="mt-2 text-meta">Lo que ya se había calculado sigue disponible en las pestañas de arriba.</p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button type="button" className="btn-secondary" onClick={onRetry} disabled={retrying}>
+          {retrying ? "Comprobando…" : "Volver a comprobar"}
+        </button>
+        <Link to="/" className="btn-ghost">Empezar un estudio nuevo</Link>
+        <Link to={`/marcas/${encodeURIComponent(status.study.brand_id)}`} className="btn-ghost">Ir al seguimiento</Link>
+      </div>
+    </section>
+  );
+}
+
 export function StudyLayout() {
   const { id = "" } = useParams();
   const q = useStudy(id);
 
-  if (q.isError) {
+  if (q.isError && !q.data) {
     return (
       <AppShell>
-        <ErrorState error={q.error} />
+        <ErrorState error={q.error}>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" className="btn-secondary" onClick={() => q.refetch()} disabled={q.isFetching}>
+              {q.isFetching ? "Reintentando…" : "Reintentar"}
+            </button>
+            <Link to="/marcas" className="btn-ghost">Volver a mis marcas</Link>
+          </div>
+        </ErrorState>
       </AppShell>
     );
   }
@@ -88,7 +122,21 @@ export function StudyLayout() {
   }
   return (
     <AppShell bar={<StudyBar status={q.data} />}>
-      <Outlet context={{ id, status: q.data } satisfies StudyContext} />
+      {q.isError && (
+        // Fallo puntual de un sondeo: se avisa sin tapar la pantalla y se siguen mostrando los datos.
+        <p role="status" className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-control bg-pill-warn-bg px-4 py-2 text-meta text-pill-warn-ink" data-testid="sondeo-fallido">
+          No se pudo actualizar el estado del estudio; se muestran los últimos datos recibidos.
+          <button type="button" className="font-semibold underline hover:no-underline" onClick={() => q.refetch()}>
+            Reintentar ahora
+          </button>
+        </p>
+      )}
+      {q.data.estado === "error" && (
+        <EstudioDetenido status={q.data} onRetry={() => q.refetch()} retrying={q.isFetching} />
+      )}
+      <FalloContext.Provider value={q.data.estado === "error"}>
+        <Outlet context={{ id, status: q.data } satisfies StudyContext} />
+      </FalloContext.Provider>
     </AppShell>
   );
 }

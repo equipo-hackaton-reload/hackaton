@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { nombres } from "../lib/study";
 import { findingsFor, kitBrief, kitMarket, metricsFor, planFor, qualityFor, simulationFor } from "../mocks/data";
 import * as db from "../mocks/db";
-import { nb, renderUI } from "../test/utils";
+import { iniciarSesion, nb, renderUI } from "../test/utils";
 import type { Action } from "../types/schemas";
 import { ActionEditor } from "./ActionEditor";
 import { FindingsList } from "./FindingsList";
@@ -74,7 +74,8 @@ describe("VisibilityTables", () => {
 
 describe("FindingsList", () => {
   it("cada hallazgo muestra su cifra y abre sus evidencias con ids y texto", async () => {
-    const id = db.crear("kit");
+    const { user: cuenta } = iniciarSesion();
+    const id = db.crear("kit", cuenta.id);
     const user = userEvent.setup();
     renderUI(<FindingsList studyId={id} findings={findingsFor(id)} marcas={kitMarket.marcas} />);
 

@@ -2,6 +2,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { MemoryRouter } from "react-router-dom";
+import { saveSession } from "../lib/session";
+import { sesionDePrueba } from "../mocks/auth";
 
 const ESPACIOS_DUROS = new RegExp(`[${String.fromCharCode(0xa0, 0x202f)}]`, "g");
 
@@ -19,4 +21,11 @@ export function renderUI(ui: ReactElement) {
       <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>{ui}</MemoryRouter>
     </QueryClientProvider>,
   );
+}
+
+/** Abre sesión con una cuenta verificada del mock y devuelve su usuario y token. */
+export function iniciarSesion(email = "ana@clinica.es") {
+  const s = sesionDePrueba(email);
+  saveSession({ token: s.token, expiraEn: s.expira, user: s.user }, false);
+  return s;
 }

@@ -1,17 +1,24 @@
-import type { ReactNode } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
-import { clearSession, getSession } from "../lib/session";
+import { useState, type ReactNode } from "react";
+import { Link, NavLink, useNavigate } from "react-router-dom";
+import { api } from "../api/client";
+import { clearSession, useSession } from "../lib/session";
 import { ThemeToggle } from "./ThemeToggle";
 import { Wordmark } from "./Wordmark";
 
 /** Quién ha entrado y cómo salir, siempre a la vista en la cabecera. */
 function UserMenu() {
   const navigate = useNavigate();
-  const sesion = getSession();
+  const sesion = useSession();
+  const [saliendo, setSaliendo] = useState(false);
   if (!sesion) return null;
-  const inicial = (sesion.nombre || sesion.email)[0]?.toUpperCase() ?? "?";
+  const { email, nombre } = sesion.user;
+  const inicial = (nombre || email)[0]?.toUpperCase() ?? "?";
 
-  function salir() {
+  async function salir() {
+    if (!sesion) return;
+    setSaliendo(true);
+    // Se invalida el token en la API; si falla, la sesión local se borra igualmente.
+    await api.logout(sesion.token).catch(() => undefined);
     clearSession();
     navigate("/login", { replace: true });
   }
@@ -20,44 +27,20 @@ function UserMenu() {
     <button
       type="button"
       onClick={salir}
-      title={`${sesion.email} · Cerrar sesión`}
-      aria-label={`Cerrar sesión de ${sesion.email}`}
+      disabled={saliendo}
+      title={`${email} · Cerrar sesión`}
+      aria-label={`Cerrar sesión de ${email}`}
       className="group flex h-10 items-center gap-2 rounded-full pl-1 pr-1 text-meta text-muted transition-colors hover:bg-raised hover:text-ink sm:pr-3"
     >
       <span aria-hidden="true" className="grid size-8 place-items-center rounded-full bg-accent font-display text-[13px] font-bold text-on-accent">
         {inicial}
       </span>
-      <span className="hidden sm:inline">Salir</span>
+      <span className="hidden sm:inline">{saliendo ? "Saliendo…" : "Salir"}</span>
     </button>
   );
 }
 
 /** Barra superior fija con el nombre del producto y, dentro de un estudio, su estado. */
-/** Recordatorio discreto mientras el correo no esté verificado; no bloquea el trabajo. */
-function VerifyBanner() {
-  const { pathname, search } = useLocation();
-  const sesion = getSession();
-  if (!sesion || sesion.verificado || pathname === "/verificar") return null;
-  return (
-    <div className="border-b border-pill-warn-line bg-pill-warn-bg text-pill-warn-ink">
-      <p className="mx-auto flex max-w-canvas flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2 text-meta sm:px-6">
-        <svg aria-hidden="true" viewBox="0 0 20 20" className="size-4 flex-none" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M3 5.5h14v9H3zM3.5 6l6.5 5 6.5-5" />
-        </svg>
-        <span>
-          Aún no has verificado <strong>{sesion.email}</strong>.
-        </span>
-        <Link
-          to={`/verificar?next=${encodeURIComponent(pathname + search)}`}
-          className="font-semibold underline hover:no-underline"
-        >
-          Verificar ahora
-        </Link>
-      </p>
-    </div>
-  );
-}
-
 export function AppShell({ bar, children }: { bar?: ReactNode; children: ReactNode }) {
   return (
     <div className="min-h-dvh">
@@ -74,12 +57,21 @@ export function AppShell({ bar, children }: { bar?: ReactNode; children: ReactNo
           </Link>
           {bar}
           <div className={`flex items-center gap-1 ${bar ? "-ml-1 sm:-ml-3" : "ml-auto"}`}>
+            <NavLink
+              to="/marcas"
+              className={({ isActive }) =>
+                `flex h-8 items-center rounded-control px-2.5 text-meta transition-colors ${
+                  isActive ? "bg-active font-medium text-ink" : "text-muted hover:bg-raised hover:text-ink"
+                }`
+              }
+            >
+              Seguimiento
+            </NavLink>
             <ThemeToggle />
             <UserMenu />
           </div>
         </div>
       </header>
-      <VerifyBanner />
       <main id="contenido" className="mx-auto max-w-canvas px-4 pb-24 pt-8 sm:px-6">
         {children}
       </main>

@@ -73,8 +73,8 @@ async def test_intake_structures_the_brief_and_updates_the_study(repo: SqlStudyR
     update = await nodes.intake(state, make_deps(llm, [], repo))
 
     assert update["brief"] == brief_alborada()
-    assert llm.calls == [("intake.v1", {"brief": state["brief_texto"]})]
-    assert [t.nodo for t in update["traces"]] == ["intake.v1"]
+    assert llm.calls == [("intake.v2", {"brief": state["brief_texto"]})]
+    assert [t.nodo for t in update["traces"]] == ["intake.v2"]
     study = repo.get_study(state["study_id"])
     assert study.brief == brief_alborada() and study.brand_id == "clinica-alborada-vision"
 
@@ -511,5 +511,5 @@ def test_fake_ports_satisfy_the_protocols() -> None:
     llm: LLM = kit_llm()
     engine: Engine = FakeEngine()
     run: Run = engine.ask(prompt(), repeticion=1, study_id="s")
-    _, trace = llm.structured(type(brief_alborada()), "intake.v1", {}, study_id="s")
+    _, trace = llm.structured(type(brief_alborada()), "intake.v2", {}, study_id="s")
     assert isinstance(trace, Trace) and run.study_id == "s"

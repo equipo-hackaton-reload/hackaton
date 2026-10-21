@@ -1,4 +1,4 @@
-import type { Finding } from "../types/schemas";
+import type { Finding, Objective, UnidadCifra } from "../types/schemas";
 
 // es-ES no agrupa por defecto los miles de 4 cifras («1840» junto a «11.200»); se fuerza para que
 // las columnas de cifras se lean igual.
@@ -76,4 +76,63 @@ export function slug(s: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
+}
+
+const KPI_TASA = /visibilidad|tasa|aparici|cuota|proporci|porcentaje|%/i;
+
+/**
+ * Unidad de un objetivo del plan. `Objective` no trae `unidad` en el contrato: si la API la añade
+ * se usa; si no, un KPI de tasa con valores entre 0 y 1 es una fracción.
+ */
+export function unidadObjetivo(o: Objective): UnidadCifra | "porcentaje" | "numero" {
+  const declarada = (o as Objective & { unidad?: UnidadCifra }).unidad;
+  if (declarada) return declarada;
+  const fraccion = Math.abs(o.valor_actual) <= 1 && Math.abs(o.valor_objetivo) <= 1;
+  if (KPI_TASA.test(o.kpi)) return fraccion ? "fraccion" : "porcentaje";
+  return "numero";
+}
+
+/** Valor de un objetivo del plan con su unidad: 0,04 de una tasa es «4 %», no «0,0». */
+export function fmtObjetivo(o: Objective, valor: number): string {
+  switch (unidadObjetivo(o)) {
+    case "fraccion":
+      return fmtPct(valor);
+    case "porcentaje":
+      return `${fmtNum(valor, 0)} %`;
+    case "eur":
+      return fmtEur(valor, 0);
+    case "recuento":
+      return fmtInt(valor);
+    default:
+      return fmtNum(valor, 1);
+  }
+}
+
+/** Valor de un indicador con la misma convención de unidades que los hallazgos. */
+export function fmtUnidad(valor: number | null | undefined, unidad: string): string {
+  if (valor == null) return DASH;
+  switch (unidad) {
+    case "fraccion":
+      return fmtPct(valor);
+    case "recuento":
+      return fmtInt(valor);
+    case "eur":
+      return fmtEur(valor, 0);
+    case "puntos":
+      return fmtNum(valor);
+    default:
+      return fmtNum(valor);
+  }
+}
+
+/** Cifra con signo: «+4,53», «−1,20», «0,00». */
+export function fmtSigned(n: number | null | undefined, decimals = 2): string {
+  if (n == null) return DASH;
+  const t = fmtNum(Math.abs(n), decimals);
+  return n > 0 ? `+${t}` : n < 0 ? `−${t}` : t;
+}
+
+/** Fecha corta para ejes y tablas: «21 oct 2026». */
+export function fmtDay(iso: string): string {
+  return new Intl.DateTimeFormat("es-ES", { day: "numeric", month: "short", year: "numeric" }).format(new Date(iso));
 }

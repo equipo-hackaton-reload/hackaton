@@ -8,6 +8,10 @@
   brief con acciones o hallazgos en `cobertura_brief`) y sección del Word «2. Lo que nos habéis
   pedido» antes del contexto: listas literales del brief y tabla punto → dónde se trata, con
   «Pendiente». `SECCIONES` pasa a 11 (las diez del doc 06 + esta); plantilla regenerada.
+- Prompt `intake.v2.md` (el nodo `intake` lo usa; v1 se conserva): extrae además
+  `posicionamiento_deseado` y `atributos_deseados`, literales o resumen fiel del brief y vacíos si
+  el brief no los trae. `FixtureLLM` devuelve para Alborada su propuesta de valor y sus tres
+  «Diferenciales», solo si aparecen tal cual en el brief recibido (si no, vacíos).
 
 ## En la PR #23 (`feature/E-entregable`, rebasada sobre `1798244`)
 - `docs/arquitectura.md` (+ `.html` y `.pdf` con `scripts/build_architecture_pdf.py`): capa de verdad

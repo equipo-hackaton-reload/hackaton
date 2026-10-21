@@ -29,6 +29,33 @@ STUDY_ID = "S-kit-alborada"
 KIT_DIR = Path(__file__).resolve().parents[4] / "data" / "kit" / "02_Datos" / "caso_oftalmologia"
 
 
+# Identidad deseada que dice el brief de Alborada, con su texto literal: la propuesta de valor del
+# apartado 2 y sus «Diferenciales».
+POSICIONAMIENTO_ALBORADA = (
+    "Clínica oftalmológica privada de tamaño medio con una oferta centrada en la cirugía que "
+    "permite dejar las gafas y en el tratamiento de cataratas"
+)
+ATRIBUTOS_ALBORADA = (
+    "Seguimiento postoperatorio personalizado incluido durante 12 meses",
+    "Valoración preoperatoria completa en una sola visita",
+    "Equipo médico estable y bien valorado por los pacientes",
+)
+
+
+def identidad_deseada_alborada(brief_texto: str) -> dict[str, str | list[str]]:
+    """Posicionamiento y atributos deseados de Alborada que aparecen tal cual en `brief_texto`.
+
+    Lo que el texto no contiene se queda vacío: el fixture no inventa identidad de marca.
+    """
+    texto = " ".join(brief_texto.split()).casefold()
+    return {
+        "posicionamiento_deseado": (
+            POSICIONAMIENTO_ALBORADA if POSICIONAMIENTO_ALBORADA.casefold() in texto else ""
+        ),
+        "atributos_deseados": [a for a in ATRIBUTOS_ALBORADA if a.casefold() in texto],
+    }
+
+
 def alborada_brief_summary() -> BriefSummary:
     """Ficha del brief de ejemplo (data/kit/01_Briefings/Brief_de_ejemplo_Clinica_Alborada.md)."""
     return BriefSummary(
