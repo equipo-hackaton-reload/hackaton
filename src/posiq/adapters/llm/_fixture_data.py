@@ -94,6 +94,15 @@ def alborada_brief_summary() -> BriefSummary:
     )
 
 
+# Hallazgos técnicos de la auditoría web (ADR 0019) que cubre la acción opcional A0-3.
+HALLAZGOS_WEB_TECNICOS = (
+    "F-web-bots-bloqueados",
+    "F-web-descubrimiento",
+    "F-web-contenido",
+    "F-web-rendimiento",
+)
+
+
 def _action(id: str, finding_ids: list[str], brief: BriefSummary, **kw: object) -> Action:
     data: dict[str, object] = {
         "id": id,
@@ -148,6 +157,23 @@ def example_plan(findings: list[Finding], brief: BriefSummary, study_id: str = S
                     entregables=["Marcado schema.org validado", "Fichas de directorios"],
                     plazo_semanas=6,
                     kpi="Visibilidad espontánea en descubrimiento",
+                ),
+                # Solo con hallazgos técnicos de la auditoría web (ADR 0019): sin auditoría, o con
+                # auditoría fixture (sus hallazgos no entran en el plan), no aparece.
+                accion(
+                    "A0-3",
+                    list(HALLAZGOS_WEB_TECNICOS),
+                    descripcion="Corregir los fallos técnicos que señala la auditoría de la web "
+                    "en los hallazgos citados (acceso de los rastreadores de IA en robots.txt, "
+                    "texto legible sin JavaScript, datos estructurados, sitemap) y repetir la "
+                    "auditoría para verificarlo.",
+                    palanca="tecnico",
+                    esfuerzo="S",
+                    impacto="M",
+                    responsable="Agencia (desarrollo web)",
+                    entregables=["Cambios técnicos publicados", "Auditoría web repetida"],
+                    plazo_semanas=4,
+                    kpi="Puntuación de preparación técnica de la web",
                 ),
             ],
         ),

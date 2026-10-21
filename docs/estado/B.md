@@ -13,11 +13,21 @@
 - `LLMOutputError.trace` (ADR 0018, cambio de C): tokens y coste de todos los intentos fallidos;
   si la API falla tras un intento cobrado, también sale como `LLMOutputError` con su traza.
   `MissingCredentialError` dice «falta X (ni en el entorno ni en .env)».
+- Auditoría web (ADR 0019): `adapters/web/HttpxWebFetcher` (SSRF: destino `url_permitida`, IP
+  `ip_permitida` en cada salto y conexión a la IP validada; 5 redirecciones; 2 MB tras
+  descomprimir; 10 s totales; nunca lanza) y `FixtureWebFetcher` (CASO SINTÉTICO de
+  `alboradavision.example`, respuestas en `adapters/web/fixtures/<dominio>/`). `crear_web_fetcher`
+  aplica `off`/`fixture`/`real` (en modo kit, `real` → fixture). **Sin probar contra una web
+  real**: solo con DNS y red falsos. `FixtureLLM` añade `A0-3` (`tecnico`) solo con hallazgos
+  `F-web-*` técnicos.
 
 ## Falta
 - Claves en `.env` local (`TYPESAFE_API_KEY`, `DEEPSEEK_API_KEY`, claves de motores). Nunca en el repo.
 - Humo real de motores con pocos prompts y calibración real del juez (`docs/calibracion/`).
 - `PlanGuard` sin `DEEPSEEK_API_KEY` no evalúa la calidad del plan.
+
+- Auditoría web real: humo contra un dominio real propio (no `.example`) cuando C cablee el nodo
+  `web_audit` y `Settings.web_audit`. No necesita claves.
 
 ## Siguiente tarea
 - `feature/B-calibracion-real`: con claves, ejecutar `smoke_engines.py` y `calibrate_judge.py` y
