@@ -1,0 +1,9 @@
+# CASO SINTETICO del reto posiq.: web ficticia de Clinica Alborada Vision.
+# Todo es inventado (data/kit/00_LEEME_Guia_del_kit.md); el dominio .example no existe.
+User-agent: GPTBot
+Disallow: /
+
+User-agent: *
+Allow: /
+
+Sitemap: https://alboradavision.example/sitemap.xml

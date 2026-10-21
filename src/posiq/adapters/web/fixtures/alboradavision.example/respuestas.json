@@ -1,0 +1,11 @@
+{
+  "_aviso": "CASO SINTETICO del reto posiq.: respuestas inventadas de una web ficticia (data/kit/00_LEEME_Guia_del_kit.md). Nada de esto se ha descargado de internet; el dominio .example no existe.",
+  "duracion_ms": 180,
+  "rutas": {
+    "/robots.txt": {"estado": 200, "content_type": "text/plain; charset=utf-8", "fichero": "robots.txt"},
+    "/sitemap.xml": {"estado": 200, "content_type": "application/xml; charset=utf-8", "fichero": "sitemap.xml"},
+    "/": {"estado": 200, "content_type": "text/html; charset=utf-8", "fichero": "portada.html"},
+    "/cirugia-refractiva/": {"estado": 200, "content_type": "text/html; charset=utf-8", "fichero": "cirugia-refractiva.html"},
+    "/centros/barcelona/": {"estado": 200, "content_type": "text/html; charset=utf-8", "fichero": "centro-barcelona.html"}
+  }
+}

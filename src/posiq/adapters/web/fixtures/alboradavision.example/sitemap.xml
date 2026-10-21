@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- CASO SINTETICO del reto posiq.: web ficticia (data/kit/00_LEEME_Guia_del_kit.md). -->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://alboradavision.example/</loc></url>
+  <url><loc>https://alboradavision.example/cirugia-refractiva/</loc></url>
+  <url><loc>https://alboradavision.example/centros/barcelona/</loc></url>
+</urlset>
