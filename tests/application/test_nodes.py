@@ -451,6 +451,12 @@ async def test_write_declares_rule_based_evaluations(repo: SqlStudyRepo) -> None
 
     assert update["proposal"].contexto.limitaciones[:2] == [LIMITACION_KIT, LIMITACION_REGLAS]
 
+    # La demo sin claves mezcla etiquetas del kit y reglas: lo explica en sus supuestos, no aquí.
+    demo = await nodes.write(
+        merge(state, {"juez": "fixture-detection"}), make_deps(kit_llm(), [], repo)
+    )
+    assert LIMITACION_REGLAS not in demo["proposal"].contexto.limitaciones
+
 
 def test_fake_ports_satisfy_the_protocols() -> None:
     from posiq.ports import LLM, Engine

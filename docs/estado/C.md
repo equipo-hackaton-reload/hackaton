@@ -16,9 +16,10 @@
   devuelve `metrics_delta` (null en la primera medición). En modo kit el delta es 0: mide
   repetibilidad, no una mejora.
 - `JUDGE_PROVIDER=reglas` (por defecto `auto`): el juez de menciones y PlanGuard no llaman a ningún
-  LLM aunque haya claves; DeepSeek solo hace intake, plan y redacción (< 0,10 €, minutos). Si las
-  menciones se evaluaron por reglas (por elección, sin clave o en modo demo), la propuesta lo
-  declara en sus limitaciones. PlanGuard ya no bloquea el plan si su API falla.
+  LLM aunque haya claves; DeepSeek solo hace intake, plan y redacción (< 0,10 €, minutos). Si el
+  nodo `judge` evaluó por reglas (por elección o sin clave), la propuesta lo declara en sus
+  limitaciones; la demo en fixture explica en sus supuestos que usa etiquetas del kit y reglas.
+  PlanGuard ya no bloquea el plan si su API falla.
 - Demo sin claves: `LLM_PROVIDER=fixture` + `scripts/demo_kit.py`.
 
 ## Falta
