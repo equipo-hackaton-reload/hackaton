@@ -303,7 +303,7 @@ precios ni tamaños de mercado: no los hemos medido.
 
 ## 6. Qué hace HOY el producto
 
-Comprobado en la rama `develop` (punta `1eec259`). La columna «Dónde se ve» distingue entre lo
+Comprobado en la rama `develop` (punta `e843eea`). La columna «Dónde se ve» distingue entre lo
 que solo existe como cálculo probado (**dominio**) y lo que ya llega a la API o a la web.
 
 | Capacidad | PR | Dónde se ve hoy | Comprobación |
@@ -335,7 +335,7 @@ llegan vacíos (`null`) porque el grafo todavía no los rellena (`src/posiq/appl
 | Pieza | Estado |
 |---|---|
 | API de seguimiento: `GET /brands`, `GET /brands/{id}/serie`, coste previo de una re-medición | **PENDIENTE**: es la siguiente tarea de la zona C (`docs/estado/C.md`) |
-| Vista de seguimiento en la web (serie, cambios significativos, indicadores) | **En desarrollo** (rama `feature/D-cuentas-seguimiento`, sin fusionar; depende de la API de seguimiento) |
+| Vista de seguimiento en la web (serie, cambios significativos, indicadores) | **En desarrollo**: la vista está en `develop` (PR #38), pero sin datos hasta que exista la API de seguimiento; hoy muestra «Seguimiento no disponible todavía» |
 | Rellenar en el grafo los bloques de rigor, escenarios, fuentes, exactitud y competidores | **En desarrollo** (rama `feature/C-diferencial-grafo`, sin fusionar) |
 | Re-medición que reutiliza el banco de preguntas anterior | **En desarrollo** (ADR 0016; rama `feature/C-diferencial-grafo`, sin fusionar) |
 | Juez como condición de comparabilidad | **PENDIENTE**: ninguna rama lo implementa todavía |

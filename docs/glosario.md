@@ -243,8 +243,7 @@ API responde 404, igual que si no existiera. La re-medición hereda el propietar
 - **Dónde:** `src/posiq/interfaces/api/auth.py` (`/auth/register`, `/auth/verify`, `/auth/login`…),
   `src/posiq/application/accounts.py`, `src/posiq/application/security.py`,
   `src/posiq/adapters/repo/accounts.py`. ADR 0015.
-- **Estado:** la API está en develop. El login en la web está **en desarrollo** (rama
-  `feature/D-cuentas-seguimiento`).
+- **Estado:** la API y el login en la web están en develop (PR #36 y PR #38).
 
 ## E
 
@@ -725,8 +724,8 @@ que haya una mejora.
 - **Estado:** el endpoint está en develop, pero hoy **regenera** el banco de prompts. En modo real
   eso cambiaría la huella y la serie saldría «no comparable». Reutilizar el banco anterior está
   **en desarrollo** (rama `feature/C-diferencial-grafo`). En la web, el botón «Volver a medir» ya
-  está en develop (`apps/web/src/pages/DiagnosisPage.tsx`). La versión que pide confirmar el coste
-  antes de re-medir está **en desarrollo** (`feature/D-cuentas-seguimiento`).
+  está en develop (`apps/web/src/pages/DiagnosisPage.tsx`). Desde la PR #38 pide confirmar el coste
+  estimado antes de re-medir (con `GET /estimate`, marcado como aproximado).
 
 ### Reglas (juez por reglas)
 
@@ -795,8 +794,8 @@ error**. Si no hay ninguno, dice exactamente «Sin cambios fuera del margen de e
   `tests/golden/test_serie_alborada.py`. ADR 0016.
 - **Estado:** el cálculo está en develop. El endpoint `GET /brands/{id}/serie` está
   **PENDIENTE** (aún no hay código en la API: `docs/estado/C.md`, «Siguiente tarea»). La vista de
-  seguimiento en la web está **en desarrollo** (rama `feature/D-cuentas-seguimiento`), pero
-  todavía no tiene a qué llamar.
+  seguimiento en la web ya está en develop (PR #38), pero todavía no tiene a qué llamar: muestra
+  «Seguimiento no disponible todavía».
 
 ### Significancia
 
@@ -873,7 +872,7 @@ da límites negativos o un intervalo de anchura cero.
 | Campo de competidores declarados en la API | En desarrollo: todavía no existe en la API de develop (lo añade `feature/C-diferencial-grafo`) |
 | Cuentas y propiedad de estudios en la API | En develop |
 | Botón «Volver a medir» en la web | En develop |
-| Login, vista de seguimiento y re-medición con confirmación de coste en la web | En desarrollo (`feature/D-cuentas-seguimiento`) |
+| Login, vista de seguimiento y re-medición con confirmación de coste en la web | En develop (PR #38); la vista de seguimiento, sin datos hasta que exista `GET /brands/{id}/serie` |
 | Endpoint `GET /brands/{id}/serie` | PENDIENTE (sin código en la API) |
 | Re-medición que reutiliza el banco de prompts | En desarrollo |
 | Juez dentro de la regla de comparabilidad | PENDIENTE |

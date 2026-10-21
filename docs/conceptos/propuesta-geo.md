@@ -654,8 +654,8 @@ Método (`domain/tracking.py`, ADR 0016):
 - **API de serie** (`GET /brands`, `GET /brands/{id}/serie`, `GET /studies/{id}/remeasure/estimate`):
   **PENDIENTE** (no hay PR; es la siguiente tarea de la zona C, `docs/estado/C.md`). Hoy ningún
   endpoint construye la serie.
-- **Web de seguimiento:** **En desarrollo** (PR #38, `feature/D-cuentas-seguimiento`, abierta).
-  Sin datos hasta que existan los endpoints: muestra «Seguimiento no disponible todavía».
+- **Web de seguimiento:** la vista está en `develop` (PR #38, fusionada), pero **sin datos** hasta
+  que existan los endpoints: muestra «Seguimiento no disponible todavía».
 - **PENDIENTE: el juez.** Hoy la comparabilidad **no mira qué juez** evaluó cada medición. Como el
   juez cambia el resultado (25,93 con etiquetas frente a 25,87 con reglas en el caso sintético),
   una serie solo es comparable si todas las mediciones usan el mismo juez. Hay que añadirlo y
@@ -757,8 +757,8 @@ cambia, la prueba falla)
 - PR #43 (`feature/C-diferencial-grafo`): rigor, competidores, oportunidades, exactitud y
   escenarios en el grafo y la API; re-medición con el mismo banco.
 - PR #40 (fusionada): contrato de la auditoría técnica y ADR 0019. El análisis sigue sin existir.
-- PR #38 (`feature/D-cuentas-seguimiento`): web de seguimiento por marca (espera endpoints que aún
-  no existen).
+- PR #38 (fusionada): login en la web, vista de seguimiento por marca (espera endpoints que aún
+  no existen) y re-medición con coste confirmado.
 
 **Kit del reto**
 
