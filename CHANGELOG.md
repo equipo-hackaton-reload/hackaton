@@ -5,6 +5,7 @@ Formato [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); versionado 
 ## [Unreleased]
 
 ### Added
+- README de arranque reproducible (zona C): requisitos, demo sin claves con la API y la web o con `scripts/demo_kit.py`, variables con claves, estimación de coste, tabla de la API, desarrollo y limitaciones.
 - `JUDGE_PROVIDER=reglas` (zona C; campo aditivo en `settings.py` y `.env.example`): el juez de menciones y PlanGuard no llaman a ningún LLM aunque haya claves, para un estudio rápido con DeepSeek solo en intake, plan y redacción. `/estimate` lo refleja. La propuesta declara en sus limitaciones cuándo las menciones se evaluaron solo por reglas.
 - Re-medición (zona C): `POST /studies/{id}/remeasure` crea un estudio nuevo con el brief y el mercado confirmado de un estudio completado (409 si no lo está), arranca en `prompts` y compara con la medición anterior; `GET /studies/{id}` expone `metrics_delta`.
 - Demo canónica en pantalla (zona A, toca B/C): en fixture/kit el `FixtureJudge` devuelve las etiquetas humanas del kit donde existen (reglas en el resto), así la API muestra 25,93 → 30,8 como la deck; e2e en `tests/e2e/test_demo_canonica_api.py`.
