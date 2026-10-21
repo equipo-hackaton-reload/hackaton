@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Arquitectura posiq.</title>
+<style>
+  @page {
+    size: A4;
+    margin: 1.4cm 1.4cm;
+  }
+  body {
+    font-family:
+      -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    font-size: 8.5pt;
+    line-height: 1.35;
+    color: #1a202c;
+  }
+  h1 {
+    font-size: 14pt;
+    color: #1f3a5f;
+    margin-top: 0;
+    margin-bottom: 4px;
+    border-bottom: 2px solid #1f3a5f;
+    padding-bottom: 3px;
+  }
+  h2 {
+    font-size: 10.5pt;
+    color: #1f3a5f;
+    margin-top: 10px;
+    margin-bottom: 4px;
+    border-bottom: 1px solid #cbd5e1;
+    padding-bottom: 2px;
+  }
+  h3 {
+    font-size: 9pt;
+    color: #2d3748;
+    margin-top: 6px;
+    margin-bottom: 2px;
+  }
+  p {
+    margin-top: 3px;
+    margin-bottom: 4px;
+    text-align: justify;
+  }
+  hr {
+    border: none;
+    border-top: 1px solid #e2e8f0;
+    margin: 6px 0;
+  }
+  li {
+    margin-bottom: 2px;
+  }
+  pre {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+    padding: 6px;
+    font-size: 7.2pt;
+    line-height: 1.2;
+    margin: 4px 0;
+    overflow-x: auto;
+  }
+  code {
+    font-family: Consolas, 'Courier New', monospace;
+    font-size: 7.8pt;
+    background: #f1f5f9;
+    padding: 1px 3px;
+    border-radius: 3px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 7.5pt;
+    margin: 5px 0;
+  }
+  th, td {
+    border: 1px solid #cbd5e1;
+    padding: 3px 5px;
+    text-align: left;
+    vertical-align: top;
+  }
+  th {
+    background-color: #f1f5f9;
+    color: #1f3a5f;
+    font-weight: 600;
+  }
+  tr:nth-child(even) {
+    background-color: #f8fafc;
+  }
+</style>
+</head>
+<body>
+<h1>Arquitectura de posiq.</h1>
+<p><strong>posiq.</strong> (<em>posicionamiento + IQ</em>) es un sistema agéntico que, a partir del brief de una marca, mide su visibilidad en asistentes de IA (ChatGPT, Gemini, Perplexity y Claude), la compara con sus competidores y genera una propuesta con un plan de acción por fases. La propuesta es la puerta de entrada; el producto recurrente es el <strong>seguimiento con método</strong>: línea base, re-medición con el mismo banco de preguntas y los mismos motores, y solo se informa de los cambios que salen del margen de error, comparados con los competidores.</p>
+<p>Revisado contra <code>develop</code> (<code>1798244</code>, PR #37) el 2026-10-21. Lo que aún no está cableado en la API o la web se marca <strong>PENDIENTE</strong>.</p>
+<hr>
+<h2>1. Principio: capa de verdad determinista, capa de lenguaje acotada</h2>
+<p>Regla 1 del proyecto: <strong>toda cifra la calcula código determinista de <code>domain/</code></strong> (puro, sin I/O, probado sin red). Los modelos de lenguaje interpretan el brief, clasifican matices de las respuestas y redactan, pero solo reciben cifras ya calculadas y devuelven siempre un modelo Pydantic validado (<code>LLM.structured</code>). El texto que llega de los motores o de la web es <strong>dato</strong>: viaja en el <code>state</code> y nunca se interpola en instrucciones. La propuesta es la «capa de verdad»: cada <code>Finding</code> lleva sus <code>evaluation_ids</code> y cada <code>Action</code> sus <code>finding_ids</code>, y lo valida el esquema.</p>
+<pre><code> ┌──────────────────────────────────────────────────────────────────────────┐
+ │ INTERFACES   FastAPI (cuentas Bearer, estudios, export)  ·  React + Vite │
+ └───────────────────────────────────┬──────────────────────────────────────┘
+ ┌───────────────────────────────────▼──────────────────────────────────────┐
+ │ APLICACIÓN   Grafo LangGraph · checkpointer SQLite · 2 revisiones humanas │
+ │              estimación de coste · presupuesto por estudio · trazas      │
+ └──────┬─────────────────────────────┬─────────────────────────────┬───────┘
+ ┌──────▼──────────────┐  ┌───────────▼────────────────┐  ┌──────────▼──────────────┐
+ │ PUERTOS (ports.py)  │  │ DOMINIO PURO (domain/)      │  │ ADAPTADORES             │
+ │ LLM · Engine · Judge│  │ schemas · detección · score │  │ DeepSeek / FixtureLLM   │
+ │ StudyRepo · Exporter│  │ métricas · hallazgos        │  │ 4 motores reales · kit  │
+ │                     │  │ stats (IC) · simulación     │  │ Jev + fallback · reglas │
+ │                     │  │ escenarios · fuentes        │  │ SQLite (estudios,       │
+ │                     │  │ exactitud · competidores    │  │   cuentas) · Word / PDF │
+ │                     │  │ cobertura brief · serie     │  │                         │
+ └─────────────────────┘  └─────────────────────────────┘  └─────────────────────────┘</code></pre>
+<h2>2. Flujo de un estudio</h2>
+<pre><code>Brief ─► intake ─► market ─► [revisión 1: competidores] ─► prompts ─► run ─► judge ─► analyze
+      ─► plan (+ simulación, PlanGuard) ─► [revisión 2: plan] ─► write ─► Propuesta (Word / PDF)
+Re-medición: POST /studies/{id}/remeasure ─► arranca en prompts con el brief y el mercado confirmados</code></pre>
+<li><strong>intake / market:</strong> el LLM extrae el <code>BriefSummary</code> (objetivos, ciudades, equipo, presupuesto, restricciones) y propone el mercado. Una persona confirma los competidores <strong>antes de gastar</strong> en motores.</li>
+<li><strong>prompts / run:</strong> banco de preguntas por fase del embudo (descubrimiento, comparación, validación, decisión), perfil y ciudad; en modo kit, las 624 respuestas del reto (52 prompts × 4 motores × 3 repeticiones).</li>
+<li><strong>judge:</strong> aparición y posición por reglas; matiz (tipo de mención, fuerza, sentimiento, fuentes) con Jev o su fallback (ver §3).</li>
+<li><strong>analyze:</strong> métricas con visibilidad espontánea y asistida <strong>siempre separadas</strong>, Score de Citación 0–100 y 7 reglas de hallazgos con evidencias.</li>
+<li><strong>plan:</strong> acciones por fases con palanca, responsable, plazo, entregable y KPI; validación contra presupuesto y restricciones del brief; simulación de impacto (<code>simulate_plan</code>) y PlanGuard.</li>
+<li><strong>write:</strong> el LLM redacta (<code>write.v2</code>) y enlaza cada punto del brief con acciones o hallazgos; <code>domain/brief_coverage.py</code> valida la cobertura y el Word abre con <strong>«2. Lo que nos habéis pedido»</strong> (11 secciones; ADR 0013).</li>
+<h2>3. Capa determinista frente a no determinista (ADR 0003 y 0014)</h2>
+<table>
+<tr><th>Capa</th><th>Qué decide</th><th>¿Determinista?</th></tr>
+<tr><td><strong>Reglas</strong> (<code>domain/detection.py</code>)</td><td>Aparición y posición por alias. Es el suelo del score y audita al juez</td><td>Sí</td></tr>
+<tr><td><strong>Jev</strong> (TypeSafe System One, fijado a <code>jev-1.13</code>)</td><td>Tipo de mención, fuerza, sentimiento, apoyo en fuentes, con confianza por pregunta</td><td>No, acotado: versión fijada y caché por estado y versión de las preguntas</td></tr>
+<tr><td><strong>Fallback LLM</strong> (DeepSeek)</td><td>Las mismas preguntas (<code>domain/judge_questions.py</code>) cuando Jev duda (< 0,55)</td><td>No; solo actúa bajo umbral</td></tr>
+<tr><td><strong>Persona</strong></td><td>Toda evaluación con <code>necesita_revision</code> (confianza 0,55–0,80 o discrepancia reglas–juez)</td><td>—</td></tr>
+</table>
+<p>Si Jev contradice a las reglas sobre la aparición, la evaluación va al fallback y sale <strong>siempre</strong> a revisión humana; aparición y posición siguen siendo las de las reglas, así que el juez nunca sube el score inventando una mención. <em>«Las reglas ponen el suelo y auditan, Jev aporta la semántica calibrada y, si discrepan, revisa un humano.»</em></p>
+<h2>4. Rigor estadístico y seguimiento con método (ADR 0008 y 0016)</h2>
+<li><strong>Intervalos:</strong> Wilson al 95 % para tasas; bootstrap percentil (semilla fija, 2.000 réplicas) para el score; Newcombe para diferencias. Un cambio es significativo si su IC excluye 0. Alborada (kit): <strong>Score 25,9 [21,6–30,1]</strong>, 8.ª de 10; 6 de los 7 hallazgos admiten contraste y los 6 son significativos.</li>
+<li><strong>Límites declarados:</strong> las repeticiones de un prompt no son independientes (remuestreando prompts, el IC pasa a [19,7–31,8] y la caída del embudo deja de ser significativa); los IC no cubren el error del juez; el kit es sintético.</li>
+<li><strong>Serie temporal</strong> (<code>domain/tracking.py</code>): cada punto se compara con el anterior solo si coinciden metodología, versión del score, huella SHA-256 del banco y conjunto de motores; si cambia el modelo de un motor, se avisa. Se informa de score, aparición por motor, puesto y diferencia frente a la media de competidores, y el resumen solo recoge lo significativo. El kit medido dos veces da exactamente «Sin cambios fuera del margen de error».</li>
+<li><strong>Indicadores adelantados:</strong> cuota de citas a la web propia (Alborada 5,85 %), presencia en las 5 fuentes más citadas (74,1 %), inexactitudes (0) y afirmaciones a revisar por la clínica (21).</li>
+<h2>5. Cifras canónicas de la demo (golden)</h2>
+<table>
+<tr><th>Cifra</th><th>Valor</th><th>Dónde se fija</th></tr>
+<tr><td>Score de Citación de Alborada (etiquetas del kit)</td><td><strong>25,93</strong> (25,87 con juez solo por reglas; 25,9 con un decimal)</td><td><code>tests/golden/test_demo_canonico.py</code></td></tr>
+<tr><td>Puesto</td><td><strong>8.ª de 10</strong> (líder: Grupo Hospitalario Valdecruz, 66,46)</td><td>ídem</td></tr>
+<tr><td>Proyección del plan (9 acciones, 4 fases, 42 semanas, 22.000 €)</td><td><strong>25,9 → 30,8</strong> [27,8–34,0]</td><td>ídem y <code>tests/e2e/test_demo_canonica_api.py</code></td></tr>
+<tr><td>Visibilidad espontánea / asistida</td><td>38,8 % (93/240) / 100 % (108/108)</td><td><code>compute_metrics</code> sobre el kit</td></tr>
+</table>
+<h2>6. Cuentas, costes y trazas</h2>
+<li><strong>Cuentas (ADR 0015):</strong> registro con código de verificación, contraseñas con scrypt, tokens Bearer opacos (solo su sha256 en la base, 7 días). Cada estudio pertenece a quien lo crea; uno ajeno responde 404. La re-medición hereda el propietario: es la base de la suscripción por cliente. Sin proveedor de correo todavía (el código va al log).</li>
+<li><strong>Trazas:</strong> toda llamada externa registra nodo, modelo, versión de prompt, tokens, coste y duración en una <code>Trace</code>, también las que fallan (ADR 0018), y cuentan contra <code>BUDGET_EUR_MAX</code> (5 € por defecto).</li>
+<li><strong>Coste por medición</strong> (<code>application/estimate.py</code>, <code>GET /estimate</code>): modo kit, <strong>0 €</strong> siempre. Modo real con Jev, tamaño del kit (624 llamadas): <strong>≈ 11,25 € estimados</strong> (motores ≈ 10,56 €, juez ≈ 0,67 €, LLM de los nodos ≈ 0,02 €); una re-medición, ≈ 11,25 € (no repite intake ni market). Son órdenes de magnitud con precios provisionales de <code>settings.py</code> sin contrastar y superan el tope por defecto de 5 €. <strong>Coste real de una medición: PENDIENTE</strong> (no se ha hecho aún ninguna medición real completa).</li>
+<h2>7. Modelo de negocio que soporta la arquitectura</h2>
+<table>
+<tr><th>Producto</th><th>Qué lo hace posible</th></tr>
+<tr><td><strong>Estudio inicial</strong> (diagnóstico + propuesta)</td><td>Grafo completo, revisiones humanas, Word con cobertura del brief</td></tr>
+<tr><td><strong>Suscripción de re-mediciones</strong> (trimestral)</td><td><code>remeasure</code>, serie con comparabilidad, solo cambios fuera del margen, cuentas por cliente</td></tr>
+<tr><td><strong>Vigilancia de lo que la IA dice de la marca</strong></td><td><code>domain/accuracy.py</code> (afirmaciones verificadas contra el brief, lista de riesgo regulatorio)</td></tr>
+<tr><td><strong>Plan re-priorizado</strong></td><td><code>domain/scenarios.py</code> (preajustes mínimo viable, equilibrado y completo, re-simulados)</td></tr>
+</table>
+<p>Precio de la suscripción: <strong>PENDIENTE</strong> (el coste variable por medición aún es una estimación).</p>
+<h2>8. Decisiones (ADR)</h2>
+<table>
+<tr><th>ADR</th><th>Decisión</th></tr>
+<tr><td>0001</td><td><code>domain/</code> puro, sin I/O</td></tr>
+<tr><td>0002</td><td><code>study_id</code> en todo resultado (multiestudio, re-medición)</td></tr>
+<tr><td>0003</td><td>Juez Jev con fallback LLM y umbrales en código</td></tr>
+<tr><td>0004</td><td>Word con docxtpl reproducible; prompts versionados <code><nodo>.vN.md</code></td></tr>
+<tr><td>0005</td><td>LangGraph con <code>interrupt()</code>, checkpointer SQLite y modo fixture</td></tr>
+<tr><td>0006</td><td>4 motores reales con búsqueda web, caché y presupuesto</td></tr>
+<tr><td>0007</td><td>Simulación con rendimientos decrecientes y PlanGuard</td></tr>
+<tr><td>0008</td><td>Rigor estadístico: Wilson, bootstrap, Newcombe, consenso del juez</td></tr>
+<tr><td>0009</td><td>Escenarios del plan y recubrimiento mínimo</td></tr>
+<tr><td>0010</td><td>Mapa de fuentes del sector y oportunidades</td></tr>
+<tr><td>0011</td><td>Exactitud de marca con verificación conservadora</td></tr>
+<tr><td>0012</td><td>Competidores declarados frente a los que pone la IA</td></tr>
+<tr><td>0013</td><td>Trazabilidad brief → propuesta</td></tr>
+<tr><td>0014</td><td>Capa determinista frente a no determinista</td></tr>
+<tr><td>0015</td><td>Cuentas de usuario y propiedad de los estudios</td></tr>
+<tr><td>0016</td><td>Seguimiento con método: serie temporal</td></tr>
+<tr><td>0018</td><td>Modo kit sin coste, trazas de los fallos y estimación completa</td></tr>
+</table>
+<h2>9. Estado de integración y limitaciones</h2>
+<li><strong>En <code>domain/</code> y con golden, PENDIENTE de cablear en la API y la web:</strong> intervalos (<code>rigor</code> sale <code>null</code> en <code>GET /studies/{id}</code>), escenarios, mapa de fuentes, exactitud, brecha de competidores y serie de seguimiento. <code>ConsensusJudge</code> existe pero <code>build_judge</code> no lo usa (multiplicaría por N el coste del juez).</li>
+<li><strong>Datos del kit sintéticos:</strong> ilustran el método, no el mercado real; el origen se declara en la portada del Word.</li>
+<li><strong>No determinismo de los motores:</strong> se mide con repeticiones y se acota con IC; no se prometen posiciones.</li>
+<li><strong>Publicidad sanitaria:</strong> el plan no promete resultados ni hace comparativas denigratorias; cada contenido necesita revisión médica y jurídica del cliente.</li>
+<li><strong>PDF:</strong> depende de LibreOffice; sin él la API responde 503 y se entrega el <code>.docx</code>.</li>
+</body>
+</html>
