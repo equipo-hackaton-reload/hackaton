@@ -10,6 +10,17 @@
   `source_map_schemas` y `accuracy_schemas`. Las funciones llegan en `feature/A-rigor-estadistico`,
   `A-escenarios`, `A-mapa-fuentes` y `A-exactitud-marca` (ADR 0008–0011).
 
+- Mapa de fuentes del sector (`feature/A-mapa-fuentes`, ADR 0010): `source_map.mapa_fuentes`,
+  `cuota_por_tipo`, `oportunidades_fuente`, `hallazgo_web_propia` y `punto_de_partida`. Con el kit:
+  - **Top 5 fuentes del sector:** (webs propias) 11,3 %, directoriomedico 8,6 %, diariosalud 8,5 %,
+    comparaclinicas 8,3 % y saludactual 7,9 %.
+  - **Web propia de Alborada:** 5,9 % de sus citas (33/564), frente al 3,3 % de media de sus
+    competidores.
+  - **Top 3 oportunidades de Alborada:** wikipedia.org (Media), comparaclinicas (Baja) y
+    rankingclinicas (Baja). Las fuentes que acompañan a Alborada son casi las de la media de sus
+    competidores: su problema es que aparece menos.
+  - **Para que C lo enchufe:** falta `StudyRepo.list_by_sector`.
+
 ## Falta
 - Que la web (D) y el Word (E) muestren la simulación. La calidad del plan solo existe con claves de juez.
 
