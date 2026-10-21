@@ -97,8 +97,17 @@ curl "http://localhost:8000/estimate?modo=real"
 
 ## API
 
+Todo salvo `/health` y el alta de cuentas exige `Authorization: Bearer <token>`; cada usuario solo
+ve sus estudios (los ajenos dan 404). No hay correo real: el código de verificación sale en el log de
+la API y, con `LLM_PROVIDER=fixture`, también en la respuesta (`codigo_dev`). Detalle en
+[ADR 0015](docs/adr/0015-cuentas-y-propiedad.md).
+
 | Método | Ruta | Qué hace |
 |---|---|---|
+| `POST` | `/auth/register` | Alta `{email, password, nombre?}`; envía el código de verificación |
+| `POST` | `/auth/verify` | `{email, codigo}` verifica el correo (`/auth/verify/reenviar` pide otro) |
+| `POST` | `/auth/login` | `{email, password}` → `{token, expira_en, user}` |
+| `POST` | `/auth/logout` · `GET` `/auth/me` | Cierra la sesión · usuario de la sesión |
 | `POST` | `/studies` | Crea y lanza un estudio: JSON `{brief_texto, modo}`, Markdown, texto o Word |
 | `GET` | `/studies` | Lista de estudios (`?brand_id=` para una marca) |
 | `GET` | `/studies/{id}` | Estado, revisión pendiente, métricas, hallazgos, plan, simulación, delta y propuesta |
@@ -128,6 +137,8 @@ CHANGELOG y `docs/estado/<ZONA>.md`. Detalle en [CONTRIBUTING.md](CONTRIBUTING.m
 - Los datos del kit son sintéticos: no representan el comportamiento real de ningún motor.
 - Los modelos no son deterministas: una medición es una foto en una fecha. Por eso existe la
   re-medición; en modo kit su delta es 0, porque mide repetibilidad y no una mejora.
-- SQLite con un solo proceso: la API no está preparada para varios workers.
+- SQLite con un solo proceso: la API no está preparada para varios workers. El límite de intentos
+  de login y verificación vive en memoria del proceso.
+- Sin proveedor de correo ni recuperación de contraseña: el código de verificación se lee del log.
 - La calibración del juez con claves reales y la prueba real de los motores están pendientes
   ([`docs/calibracion/`](docs/calibracion/)).

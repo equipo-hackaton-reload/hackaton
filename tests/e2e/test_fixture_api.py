@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 
 from posiq.interfaces.api.main import create_app
 from posiq.settings import Settings
+from tests.auth_helpers import authenticate
 
 ROOT = Path(__file__).resolve().parents[2]
 BRIEF = ROOT / "data/kit/01_Briefings/Brief_de_ejemplo_Clinica_Alborada.md"
@@ -23,6 +24,7 @@ def test_fixture_wiring_completes_and_exports_word(tmp_path: Path, multipart: bo
         cache_enabled=False,
     )
     with TestClient(create_app(settings=settings)) as client:
+        authenticate(client)
         brief = BRIEF.read_text(encoding="utf-8")
         response = (
             client.post(
