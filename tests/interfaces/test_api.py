@@ -64,8 +64,9 @@ async def test_full_flow_with_both_reviews(client: httpx.AsyncClient) -> None:
     assert view["brief"]["marca"] == "Clínica Alborada Visión"
     assert view["market"]["confirmado_por_humano"] is False
     assert view["metrics"] is None and view["proposal"] is None
-    # Bloques del diferencial: presentes en el contrato, vacíos hasta que los calcule el dominio.
-    for bloque in ("rigor", "escenarios", "oportunidades_fuente", "exactitud", "mitigaciones"):
+    # Bloques del diferencial: presentes en el contrato, vacíos hasta que los calcula el grafo.
+    diferencial = ("rigor", "competidores", "oportunidades_fuente", "exactitud", "mitigaciones")
+    for bloque in (*diferencial, "escenarios"):
         assert bloque in view and view[bloque] is None
 
     market = view["market"]
@@ -85,6 +86,12 @@ async def test_full_flow_with_both_reviews(client: httpx.AsyncClient) -> None:
     assert view["simulacion"]["study_id"] == sid
     assert len(view["simulacion"]["proyecciones"]) == len(view["plan"]["fases"])
     assert view["calidad_plan"] is None
+    # Tras `analyze`, el nodo `diferencial` los rellena; los escenarios llegan con el plan.
+    for bloque in diferencial:
+        assert view[bloque] is not None, bloque
+    assert view["rigor"]["score_global"]["valor"] == view["metrics"]["score_global"]["score"]
+    assert [e["id"] for e in view["escenarios"]] == ["minimo_viable", "equilibrado", "completo"]
+    assert [e["id"] for e in view["escenarios"] if e["elegido"]] == ["completo"]
 
     response = await client.post(
         f"/studies/{sid}/resume", json={"revision": "plan", "payload": {"aprobado": True}}
@@ -183,6 +190,10 @@ async def test_remeasure_reuses_the_confirmed_market_and_compares(
     assert delta["comparado_con"] == original and delta["study_id"] == nuevo
     # El kit da las mismas respuestas: la re-medición mide repetibilidad, no una mejora.
     assert delta["score_delta"] == 0
+    # El mismo banco (huella igual) y cada delta con su significancia: ninguno sale del margen.
+    assert view["rigor"]["deltas"]["score_global"]["delta"] == 0
+    assert not any(d["significativa"] for d in view["rigor"]["deltas"].values())
+    assert before["rigor"]["deltas"] == {}
     nodos = {t["nodo"] for t in (await client.get(f"/studies/{nuevo}/traces")).json()}
     assert "intake.v2" not in nodos and "market.v1" not in nodos
 
@@ -233,6 +244,9 @@ async def test_editing_the_plan_recomputes_the_simulation(client: httpx.AsyncCli
     view = (await client.get(f"/studies/{sid}")).json()
     assert view["estado"] == "completado", view["errores"]
     assert [p["fase"] for p in view["simulacion"]["proyecciones"]] == ["Fase 1", "Fase 2"]
+    # Los escenarios también se recalculan sobre el plan editado.
+    completo = next(e["escenario"] for e in view["escenarios"] if e["id"] == "completo")
+    assert any(a.endswith("-bis") for a in completo["mantenidas"])
 
 
 async def test_traces_lists_the_traces_of_the_study(client: httpx.AsyncClient) -> None:

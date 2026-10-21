@@ -281,6 +281,7 @@ def create_app(
             simulacion=values.get("simulacion"),
             calidad_plan=values.get("calidad_plan"),
             rigor=values.get("rigor"),
+            competidores=values.get("competidores"),
             escenarios=values.get("escenarios"),
             oportunidades_fuente=values.get("oportunidades_fuente"),
             exactitud=values.get("exactitud"),

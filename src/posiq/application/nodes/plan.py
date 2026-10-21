@@ -7,6 +7,7 @@ para que la persona las vea en la revisión.
 
 Junto al plan van dos ayudas para la revisión (`plan_checks`), que no bloquean nada:
 - `simulacion`: impacto proyectado sobre el Score de Citación (`domain.simulation`, código puro).
+- `escenarios`: los tres preajustes del plan (`domain.scenarios`), con el completo elegido.
 - `calidad_plan`: juicio de PlanGuard por acción. Si no hay claves de juez o la API falla, queda en
   None y se anota; solo `BudgetExceeded` para el estudio.
 """
@@ -27,6 +28,7 @@ from posiq.application.deps import (
     study_budget,
     trazas_si_falla,
 )
+from posiq.application.nodes.diferencial import escenarios_del_plan
 from posiq.application.state import StudyState
 from posiq.domain.schemas import (
     BriefSummary,
@@ -39,6 +41,9 @@ from posiq.domain.schemas import (
 from posiq.domain.simulation import simulate_plan
 
 log = logging.getLogger(__name__)
+
+PROMPT = "plan.v2"
+"""Claves del `state`: las de la cabecera de `plan.v2.md` (lo comprueba tests/application)."""
 
 
 def metrics_summary(metrics: Metrics) -> dict[str, Any]:
@@ -75,16 +80,17 @@ async def plan_checks(state: StudyState, deps: Deps, plan: Plan) -> dict[str, An
     """Simulación del impacto y calidad del plan, con las trazas nuevas de PlanGuard.
 
     `state["traces"]` debe incluir ya las trazas de este nodo, para que el presupuesto las cuente.
-    Devuelve `simulacion`, `calidad_plan`, `traces` (solo las nuevas) y `errores`.
+    Devuelve `simulacion`, `escenarios`, `calidad_plan`, `traces` (solo las nuevas) y `errores`.
     """
     simulacion = simulate_plan(plan, state["metrics"], state["findings"])
+    escenarios, errores = escenarios_del_plan(plan, state["findings"], state["metrics"])
+    base = {"simulacion": simulacion, "escenarios": escenarios}
     if deps.plan_guard_factory is None:
-        return {"simulacion": simulacion, "calidad_plan": None, "traces": [], "errores": []}
+        return {**base, "calidad_plan": None, "traces": [], "errores": errores}
 
     budget = study_budget(deps, state)
     antes = len(budget.traces)
     guard = deps.plan_guard_factory(budget)
-    errores: list[str] = []
     try:
         calidad = await guard.aassess(plan, state["findings"], state["brief"])
     except BudgetExceeded as exc:
@@ -98,7 +104,7 @@ async def plan_checks(state: StudyState, deps: Deps, plan: Plan) -> dict[str, An
         calidad = None
         errores.append(f"plan_guard: {type(exc).__name__}: {exc}. Calidad del plan sin evaluar.")
     nuevas: list[Trace] = budget.traces[antes:]
-    return {"simulacion": simulacion, "calidad_plan": calidad, "traces": nuevas, "errores": errores}
+    return {**base, "calidad_plan": calidad, "traces": nuevas, "errores": errores}
 
 
 async def plan(state: StudyState, deps: Deps) -> dict[str, Any]:
@@ -111,7 +117,7 @@ async def plan(state: StudyState, deps: Deps) -> dict[str, Any]:
         "diferencia_anterior": dump(state.get("metrics_delta")),
         "market": dump(state["market"]),
     }
-    propuesto, trace = await structured(deps, state, Plan, "plan.v1", payload)
+    propuesto, trace = await structured(deps, state, Plan, PROMPT, payload)
     propuesto = own_plan(propuesto, sid)
     traces = [trace]
     violaciones = plan_violations(propuesto, brief, findings)
@@ -122,7 +128,7 @@ async def plan(state: StudyState, deps: Deps) -> dict[str, Any]:
                 deps,
                 retry_state,
                 Plan,
-                "plan.v1",
+                PROMPT,
                 {**payload, "plan_anterior": dump(propuesto), "violaciones": violaciones},
             )
             propuesto = own_plan(propuesto, sid)
@@ -142,6 +148,7 @@ async def plan(state: StudyState, deps: Deps) -> dict[str, Any]:
         "plan": propuesto,
         "plan_violaciones": violaciones,
         "simulacion": checks["simulacion"],
+        "escenarios": checks["escenarios"],
         "calidad_plan": checks["calidad_plan"],
         "revision_pendiente": "plan",
         "errores": [f"plan: {v}" for v in violaciones] + checks["errores"],

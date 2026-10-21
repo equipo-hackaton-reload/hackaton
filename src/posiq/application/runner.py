@@ -14,6 +14,7 @@ from langgraph.types import Command
 from pydantic import ValidationError
 
 from posiq.application.deps import Deps, db, new_study, trazas_de_fallo
+from posiq.application.diferencial import MedicionAnterior
 from posiq.application.graph import StudyGraph, build_graph
 from posiq.application.nodes.review import parse_market, parse_plan
 from posiq.application.state import StudyState, initial_state
@@ -78,6 +79,12 @@ class StudyRunner:
         El hilo nuevo se siembra como si ya hubiera pasado la revisión de competidores, así que
         `continue_` arranca en `prompts`: las dos mediciones comparan las mismas marcas y `analyze`
         calcula la diferencia con la medición anterior. `KeyError` si el original no existe.
+
+        También se siembran los prompts del original (el nodo `prompts` los reutiliza): en modo
+        real, generarlos de nuevo con el LLM daría otro banco y otra huella
+        (`domain.tracking.huella_banco`), y las dos mediciones dejarían de ser comparables. Y la
+        `medicion_anterior` (métricas, prompts, ejecuciones y evaluaciones del original), para que
+        el nodo `diferencial` diga qué deltas salen del margen de error.
         """
         original = self.repo.get_study(original_id)
         if original.estado != "completado":
@@ -98,6 +105,16 @@ class StudyRunner:
             "brief": values["brief"],
             "market": market,
         }
+        if values.get("prompts"):
+            seed["prompts"] = list(values["prompts"])
+        if all(k in values for k in ("metrics", "prompts", "runs", "evaluations")):
+            seed["medicion_anterior"] = MedicionAnterior(
+                study_id=original_id,
+                metrics=values["metrics"],
+                prompts=values["prompts"],
+                runs=values["runs"],
+                evaluations=values["evaluations"],
+            )
         await self.graphs[study.modo].aupdate_state(
             self.config(study.id), seed, as_node=REVIEW_NODES["competidores"]
         )

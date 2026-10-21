@@ -96,9 +96,9 @@ async def test_plan_retry_failure_keeps_the_first_paid_call(repo: SqlStudyRepo) 
         intentos.append(1)
         if len(intentos) == 1:
             return plan_from_findings(s, restricciones=[])  # incumple el brief: reintenta
-        raise LLMOutputError("plan.v1", 3, "no valida", trace("?", "plan.v1", 0.02))
+        raise LLMOutputError("plan.v2", 3, "no valida", trace("?", "plan.v2", 0.02))
 
-    llm = StudyLLM({"plan.v1": handler}, coste=0.01)
+    llm = StudyLLM({"plan.v2": handler}, coste=0.01)
     with pytest.raises(LLMOutputError) as info:
         await nodes.plan(state, make_deps(llm, [], repo))
     costes = sorted(t.coste_eur for t in trazas_de_fallo(info.value))

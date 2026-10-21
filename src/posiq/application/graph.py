@@ -1,7 +1,7 @@
 """Grafo LangGraph de un estudio.
 
-    intake → market → [revisión: competidores] → prompts → run → judge → analyze → plan
-           → [revisión: plan] → write → END
+    intake → market → [revisión: competidores] → prompts → run → judge → analyze → diferencial
+           → plan → [revisión: plan] → write → END
 
 Las revisiones son nodos con `interrupt()`; se reanudan con `Command(resume=payload)`. El hilo del
 checkpointer es el estudio (`thread_id = study_id`), así que un estudio pausado sobrevive a un
@@ -29,6 +29,7 @@ from posiq.application.deps import Deps
 from posiq.application.state import StudyState
 from posiq.domain import (
     accuracy_schemas,
+    competitor_gap_schemas,
     quality_schemas,
     scenario_schemas,
     schemas,
@@ -50,6 +51,7 @@ PIPELINE: list[tuple[str, Node, bool]] = [
     ("run", nodes.run, True),
     ("judge", nodes.judge, True),
     ("analyze", nodes.analyze, False),
+    ("diferencial", nodes.diferencial, False),
     ("plan", nodes.plan, True),
     ("review_plan", nodes.review_plan, False),
     ("write", nodes.write, True),
@@ -89,6 +91,7 @@ STATE_MODULES = (
     scenario_schemas,
     source_map_schemas,
     accuracy_schemas,
+    competitor_gap_schemas,
     diferencial,
 )
 

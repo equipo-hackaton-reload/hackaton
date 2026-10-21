@@ -7,7 +7,7 @@ from posiq.application.graph import serializer
 from posiq.domain.accuracy_schemas import AccionMitigacion, HallazgoExactitud
 from posiq.domain.scenario_schemas import EntradaEscenario, EscenarioPlan
 from posiq.domain.source_map_schemas import OportunidadFuente
-from posiq.domain.stats_schemas import Intervalo, Significancia
+from posiq.domain.stats_schemas import Intervalo, Significancia, SignificanciaHallazgo
 
 
 def roundtrip(value: BaseModel) -> object:
@@ -29,8 +29,19 @@ def test_rigor_survives_the_checkpointer() -> None:
         score_global=intervalo(25.93),
         score_por_motor={"Claude": intervalo(30.0)},
         aparicion_por_motor={"Gemini": intervalo(0.39)},
-        hallazgos={"F-brecha-lider": delta},
+        hallazgos={
+            "F-brecha-lider": SignificanciaHallazgo(
+                finding_id="F-brecha-lider",
+                contraste="score foco − score líder",
+                significancia=delta,
+            ),
+            "F-fuente-lider": SignificanciaHallazgo(
+                finding_id="F-fuente-lider", contraste="recuento", sin_contraste="Sin contraste."
+            ),
+        },
         deltas={"score_global": delta},
+        replicas_bootstrap=2000,
+        semilla_bootstrap=20261021,
     )
     assert roundtrip(rigor) == rigor
 

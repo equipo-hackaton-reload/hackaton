@@ -90,7 +90,7 @@ async def test_market_in_kit_mode_uses_kit_ids_and_asks_for_review(repo: SqlStud
     assert [b.id for b in market.marcas] == [b.id for b in KIT.brands_in_runs()]
     assert not market.confirmado_por_humano
     assert update["revision_pendiente"] == "competidores"
-    candidatos = llm.calls[-1][1]["candidatos"]
+    candidatos = llm.calls[-1][1]["marcas_candidatas"]
     assert {c["id"] for c in candidatos} == {b.id for b in KIT.brands_in_runs()}
     study = repo.get_study(state["study_id"])
     assert study.estado == "esperando_revision_competidores"
@@ -120,7 +120,7 @@ async def test_market_in_real_mode_has_no_candidates(repo: SqlStudyRepo) -> None
         marcas=[Brand(id="alborada", nombre="Clínica Alborada Visión", rol="foco")]
     )
     update = await nodes.market(state, deps)
-    assert llm.calls[-1][1]["candidatos"] == []
+    assert llm.calls[-1][1]["marcas_candidatas"] == []
     assert [b.id for b in update["market"].marcas] == ["alborada"]
 
 
@@ -320,7 +320,7 @@ async def test_plan_is_validated_against_the_brief(repo: SqlStudyRepo) -> None:
     llm = kit_llm()
     update = await nodes.plan(state, make_deps(llm, [], repo))
 
-    assert llm.names() == ["plan.v1"]
+    assert llm.names() == ["plan.v2"]
     assert update["plan"].study_id == state["study_id"]
     assert update["plan_violaciones"] == [] and update["errores"] == []
     assert update["revision_pendiente"] == "plan"
@@ -340,7 +340,7 @@ async def test_plan_retries_once_with_the_violations(repo: SqlStudyRepo) -> None
         intentos.append(s)
         return plan_from_findings(s, restricciones=[] if len(intentos) == 1 else None)
 
-    llm = FakeLLM({"plan.v1": handler})
+    llm = FakeLLM({"plan.v2": handler})
     update = await nodes.plan(state, make_deps(llm, [], repo))
     assert len(intentos) == 2
     assert any(RESTRICCIONES[0] in v for v in intentos[1]["violaciones"])
@@ -349,7 +349,7 @@ async def test_plan_retries_once_with_the_violations(repo: SqlStudyRepo) -> None
 
 async def test_plan_keeps_persistent_violations_for_the_human(repo: SqlStudyRepo) -> None:
     state = await analyzed_state(repo)
-    llm = FakeLLM({"plan.v1": lambda s: plan_from_findings(s, restricciones=[])})
+    llm = FakeLLM({"plan.v2": lambda s: plan_from_findings(s, restricciones=[])})
     update = await nodes.plan(state, make_deps(llm, [], repo))
     assert len(llm.calls) == 2
     assert update["plan_violaciones"]
@@ -366,7 +366,7 @@ async def test_plan_simulates_its_impact_without_a_guard(repo: SqlStudyRepo) -> 
     assert simulacion.score_actual == state["metrics"].score_global.score
     assert [p.fase for p in simulacion.proyecciones] == [f.nombre for f in update["plan"].fases]
     assert update["calidad_plan"] is None
-    assert [t.nodo for t in update["traces"]] == ["plan.v1"]
+    assert [t.nodo for t in update["traces"]] == ["plan.v2"]
 
 
 async def test_plan_quality_is_assessed_when_a_guard_is_available(repo: SqlStudyRepo) -> None:
@@ -381,7 +381,7 @@ async def test_plan_quality_is_assessed_when_a_guard_is_available(repo: SqlStudy
 
     assert guards[0].planes == [update["plan"]]
     assert update["calidad_plan"].nota == f"{len(update['plan'].acciones)} acciones evaluadas"
-    assert [t.nodo for t in update["traces"]] == ["plan.v1", "plan_guard:fake"]
+    assert [t.nodo for t in update["traces"]] == ["plan.v2", "plan_guard:fake"]
     assert update["coste_acumulado_eur"] == pytest.approx(state["coste_acumulado_eur"] + 0.01)
     assert "plan_guard:fake" in {t.nodo for t in repo.get_traces(state["study_id"])}
 

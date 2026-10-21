@@ -1,6 +1,7 @@
 """Nodos del grafo: `async def nodo(state, deps) -> dict` con la actualización del estado."""
 
 from posiq.application.nodes.analyze import analyze
+from posiq.application.nodes.diferencial import diferencial
 from posiq.application.nodes.intake import intake
 from posiq.application.nodes.judge import judge
 from posiq.application.nodes.market import market
@@ -12,6 +13,7 @@ from posiq.application.nodes.write import write
 
 __all__ = [
     "analyze",
+    "diferencial",
     "intake",
     "judge",
     "market",
