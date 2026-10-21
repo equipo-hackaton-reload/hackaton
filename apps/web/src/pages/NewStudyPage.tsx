@@ -4,6 +4,7 @@ import { ApiError } from "../api/client";
 import { useCreateStudy, useEstimate } from "../api/hooks";
 import briefEjemplo from "../assets/brief-ejemplo.md?raw";
 import { AppShell } from "../components/AppShell";
+import { guardarAvisoKit } from "../lib/avisoKit";
 import { PageTitle } from "../components/PageTitle";
 import { fmtEur, fmtInt } from "../lib/format";
 import type { ModoEstudio } from "../types/schemas";
@@ -85,7 +86,12 @@ export function NewStudyPage() {
     if (!brief.trim()) return;
     create.mutate(
       { brief_texto: brief, modo },
-      { onSuccess: ({ study_id }) => navigate(`/studies/${study_id}/competidores`) },
+      {
+        onSuccess: ({ study_id, aviso }) => {
+          guardarAvisoKit(study_id, aviso); // «Modo kit: datos sintéticos de Alborada…»
+          navigate(`/studies/${study_id}/competidores`);
+        },
+      },
     );
   }
 

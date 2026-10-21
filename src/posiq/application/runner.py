@@ -13,7 +13,7 @@ from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.types import Command
 from pydantic import ValidationError
 
-from posiq.application.deps import Deps, new_study, trazas_de_fallo
+from posiq.application.deps import Deps, db, new_study, trazas_de_fallo
 from posiq.application.graph import StudyGraph, build_graph
 from posiq.application.nodes.review import parse_market, parse_plan
 from posiq.application.state import StudyState, initial_state
@@ -135,7 +135,8 @@ class StudyRunner:
             values = cast(StudyState, snapshot.values)
             coste = values.get("coste_acumulado_eur", 0.0) + sum(t.coste_eur for t in nuevas)
             await graph.aupdate_state(config, {"traces": nuevas, "coste_acumulado_eur": coste})
-            self.repo.save_traces(study.id, [*values.get("traces", []), *nuevas])
+            # Fuera del bucle de eventos, como el resto de escrituras del repo (`deps.db`).
+            await db(self.repo.save_traces, study.id, [*values.get("traces", []), *nuevas])
         except Exception:  # registrar el coste no debe tapar el fallo original
             log.exception("no se pudieron registrar las trazas del fallo de %s", study.id)
 

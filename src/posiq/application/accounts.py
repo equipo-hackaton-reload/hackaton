@@ -7,6 +7,18 @@ sus errores a códigos HTTP.
 
 No hay proveedor de correo: el código de verificación se escribe en el log del servidor y, con
 `Settings.auth_dev_codes` activo, se devuelve también en la respuesta (`codigo_dev`).
+
+Endurecimiento (revisión de #36):
+- Cada intento de verificación se contabiliza de forma atómica en la base ANTES de comparar el
+  código (`AccountRepo.count_attempt`): peticiones concurrentes no pasan de `CODIGO_MAX_INTENTOS`
+  comparaciones por código.
+- Reenviar da un código nuevo con sus intentos, pero cada correo solo puede pedir
+  `REENVIOS_POR_HORA` códigos por hora (exista o no): como mucho
+  `(1 + REENVIOS_POR_HORA) · CODIGO_MAX_INTENTOS` comparaciones por correo y hora.
+- Registro y reenvío calculan los mismos hashes exista o no el correo (tiempo parecido).
+- La cuenta de demo con credenciales fijas en el repo (`DEMO_EMAIL`, `scripts/demo_kit.py`) y los
+  privilegios de `AUTH_DEMO_USER` solo existen en modo demo (`demo_activo`: códigos de desarrollo
+  activos, por defecto solo con `LLM_PROVIDER=fixture`).
 """
 
 import logging
@@ -33,6 +45,9 @@ log = logging.getLogger(__name__)
 
 CODIGO_TTL = timedelta(minutes=15)
 CODIGO_MAX_INTENTOS = 5
+REENVIOS_POR_HORA = 3
+# Cuenta de demo con contraseña fija en `scripts/demo_kit.py`: solo vale en modo demo.
+DEMO_EMAIL = "demo@posiq.local"
 PASSWORD_MIN = 8
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
@@ -163,6 +178,12 @@ class TooManyAttempts(AccountError):
     codigo = "demasiados_intentos"
 
 
+class DemoDisabled(AccountError):
+    """La cuenta de demo (credenciales fijas en el repo) fuera del modo demo."""
+
+    codigo = "cuenta_demo_desactivada"
+
+
 # --- Puerto ---------------------------------------------------------------------------------------
 
 
@@ -182,6 +203,14 @@ class AccountRepo(Protocol):
     def save_verification(self, verificacion: Verificacion) -> None: ...
 
     def get_verification(self, email: str) -> Verificacion | None: ...
+
+    def count_attempt(self, email: str, maximo: int) -> Verificacion | None:
+        """Suma un intento de forma ATÓMICA si el código pendiente tiene menos de `maximo`.
+
+        Devuelve la verificación con el intento ya sumado, o None si no hay código pendiente o ya
+        agotó sus intentos. Dos peticiones a la vez nunca ven el mismo contador.
+        """
+        ...
 
     def delete_verification(self, email: str) -> None: ...
 
@@ -210,6 +239,16 @@ def dev_codes(settings: Settings) -> bool:
     return settings.llm_provider == "fixture"
 
 
+def demo_activo(settings: Settings) -> bool:
+    """Modo demo: la cuenta de demo y `AUTH_DEMO_USER` solo valen con los códigos de desarrollo.
+
+    Por defecto eso es `LLM_PROVIDER=fixture`; con el LLM real hace falta `AUTH_DEV_CODES=true`
+    explícito. Así, una base usada en la demo y luego en real no deja entrar con la contraseña
+    publicada en el repo ni da a nadie los estudios sin propietario.
+    """
+    return dev_codes(settings)
+
+
 class AccountService:
     def __init__(self, repo: AccountRepo, settings: Settings) -> None:
         self.repo = repo
@@ -218,14 +257,35 @@ class AccountService:
             settings.auth_scrypt_n, settings.auth_scrypt_r, settings.auth_scrypt_p
         )
         self.dev_codes = dev_codes(settings)
+        self.demo = demo_activo(settings)
         self.limiter = RateLimiter(settings.auth_rate_limit_por_min)
+        self.reenvios = RateLimiter(REENVIOS_POR_HORA, ventana_s=3600.0)
         # Hash de relleno: un login con un correo inexistente tarda lo mismo que uno real.
         self._dummy_hash = hash_secret(new_token(), self.params)
+        if settings.auth_demo_user and not self.demo:
+            log.warning(
+                "AUTH_DEMO_USER=%s se ignora: el usuario demo solo existe en modo demo "
+                "(LLM_PROVIDER=fixture o AUTH_DEV_CODES=true)",
+                settings.auth_demo_user,
+            )
+
+    def _demo_bloqueado(self, email: str) -> bool:
+        """Cuenta de demo (contraseña publicada o `AUTH_DEMO_USER`) fuera del modo demo."""
+        if self.demo:
+            return False
+        demo = normalize_email(self.settings.auth_demo_user)
+        return email == DEMO_EMAIL or (bool(demo) and email == demo)
 
     # Registro y verificación
 
     def register(self, body: RegisterBody) -> Registro:
+        if self._demo_bloqueado(body.email):
+            raise DemoDisabled()
         if self.repo.get_user_by_email(body.email) is not None:
+            # Mismo trabajo que un alta (hash de la contraseña y del código) para no revelar por
+            # tiempo que el correo existe. El 409 sí lo revela: riesgo aceptado (ADR 0015).
+            hash_secret(body.password, self.params)
+            hash_secret(new_code(), self.params)
             raise EmailTaken()
         user = UsuarioGuardado(
             id=uuid4().hex,
@@ -239,25 +299,32 @@ class AccountService:
         return Registro(user=user.publico(), codigo=self._issue_code(user.email))
 
     def resend(self, email: str) -> str | None:
-        """Código nuevo si el correo existe y no está verificado; si no, None (sin revelarlo)."""
+        """Código nuevo si el correo existe y no está verificado; si no, None (sin revelarlo).
+
+        `TooManyAttempts` si el correo ya pidió `REENVIOS_POR_HORA` códigos en la última hora,
+        exista o no. Sin código que enviar se calcula igualmente un hash, para tardar lo mismo.
+        """
+        if not self.reenvios.hit(email):
+            raise TooManyAttempts()
         user = self.repo.get_user_by_email(email)
-        if user is None or user.verificado:
+        if user is None or user.verificado or self._demo_bloqueado(email):
+            hash_secret(new_code(), self.params)
             return None
         return self._issue_code(email)
 
     def verify(self, email: str, codigo: str) -> Usuario:
-        pendiente = self.repo.get_verification(email)
         user = self.repo.get_user_by_email(email)
-        if pendiente is None or user is None:
+        # El intento cuenta (de forma atómica) antes de comparar nada.
+        pendiente = self.repo.count_attempt(email, CODIGO_MAX_INTENTOS)
+        if pendiente is None:
+            if self.repo.get_verification(email) is not None:
+                raise TooManyAttempts()
             raise InvalidCode()
-        if pendiente.intentos >= CODIGO_MAX_INTENTOS:
-            raise TooManyAttempts()
+        if user is None:
+            raise InvalidCode()
         if as_utc(pendiente.expira_en) <= now_utc():
             raise InvalidCode("codigo_caducado")
         if not verify_secret(codigo, pendiente.codigo_hash):
-            self.repo.save_verification(
-                pendiente.model_copy(update={"intentos": pendiente.intentos + 1})
-            )
             raise InvalidCode()
         self.repo.delete_verification(email)
         verificado = user.model_copy(update={"verificado": True})
@@ -280,6 +347,9 @@ class AccountService:
     # Sesiones
 
     def login(self, email: str, password: str) -> SesionNueva:
+        if self._demo_bloqueado(email):
+            verify_secret(password, self._dummy_hash)
+            raise DemoDisabled()
         user = self.repo.get_user_by_email(email)
         if user is None:
             verify_secret(password, self._dummy_hash)
@@ -303,7 +373,9 @@ class AccountService:
             self.repo.delete_session(clave)
             return None
         user = self.repo.get_user(sesion.user_id)
-        return user.publico() if user is not None and user.verificado else None
+        if user is None or not user.verificado or self._demo_bloqueado(user.email):
+            return None
+        return user.publico()
 
     def logout(self, token: str) -> None:
         self.repo.delete_session(token_hash(token))
@@ -311,8 +383,9 @@ class AccountService:
     # Propiedad de estudios
 
     def is_demo(self, user: Usuario) -> bool:
+        """El usuario de `AUTH_DEMO_USER`, y solo en modo demo (`demo_activo`)."""
         demo = normalize_email(self.settings.auth_demo_user)
-        return bool(demo) and user.email == demo
+        return self.demo and bool(demo) and user.email == demo
 
     def can_access(self, user: Usuario, study_id: str) -> bool:
         """Del usuario; o, sin propietario (estudios anteriores a las cuentas), del usuario demo."""

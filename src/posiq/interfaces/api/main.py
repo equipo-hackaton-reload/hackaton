@@ -47,6 +47,7 @@ from posiq.domain.schemas import ModoEstudio, Study, Trace
 from posiq.interfaces.api.auth import CurrentUser, require_json
 from posiq.interfaces.api.auth import router as auth_router
 from posiq.interfaces.api.schemas import (
+    AVISO_KIT,
     Evidence,
     RemeasureCreated,
     ResumeAccepted,
@@ -92,17 +93,37 @@ def too_large(limite: int) -> HTTPException:
     )
 
 
+async def read_capped(request: Request, maximo: int, limite: int) -> bytes:
+    """Cuerpo leído en streaming; 413 en cuanto pasa de `maximo` bytes.
+
+    No se fía de `Content-Length` (puede faltar, p. ej. con `Transfer-Encoding: chunked`): corta
+    al leer, sin cargar en memoria más de `maximo` bytes más un trozo. El cuerpo leído queda en
+    `request._body`, que es lo que Starlette reutiliza en `request.body()` y `request.form()`.
+    """
+    partes: list[bytes] = []
+    total = 0
+    async for trozo in request.stream():
+        total += len(trozo)
+        if total > maximo:
+            raise too_large(limite)
+        partes.append(trozo)
+    data = b"".join(partes)
+    request._body = data
+    return data
+
+
 async def read_brief(request: Request, modo: ModoEstudio | None, limite: int) -> StudyCreate:
     content_type = request.headers.get("content-type", "")
     declarado = request.headers.get("content-length", "")
+    multipart = content_type.startswith("multipart/form-data")
     # Margen para la cabecera multipart; el tamaño exacto se comprueba al leer.
-    if declarado.isdigit() and int(declarado) > limite + MARGEN_MULTIPART:
+    maximo = limite + MARGEN_MULTIPART if multipart else limite
+    if declarado.isdigit() and int(declarado) > maximo:
         raise too_large(limite)
+    data = await read_capped(request, maximo, limite)
     try:
-        if content_type.startswith("multipart/form-data"):
+        if multipart:
             body = await read_form(request, modo, limite)
-        elif len(data := await request.body()) > limite:
-            raise too_large(limite)
         elif content_type.startswith("application/json"):
             body = StudyCreate.model_validate_json(data)
         else:
@@ -225,7 +246,7 @@ def create_app(
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
         get_accounts(request).repo.set_owner(study.id, user.id)
         background.add_task(r.start, study, body.brief_texto)
-        return StudyCreated(study_id=study.id)
+        return StudyCreated(study_id=study.id, aviso=AVISO_KIT if body.modo == "kit" else None)
 
     @app.get("/studies")
     async def list_studies(

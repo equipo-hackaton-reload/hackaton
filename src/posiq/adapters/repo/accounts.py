@@ -9,7 +9,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import datetime
 
-from sqlalchemy import Engine, delete
+from sqlalchemy import Engine, delete, update
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Field, Session, SQLModel, col, select
 
@@ -106,6 +106,23 @@ class SqlAccountRepo:
         with Session(self.engine) as s:
             row = s.get(VerificationRow, email)
         return Verificacion.model_validate(row.model_dump()) if row else None
+
+    def count_attempt(self, email: str, maximo: int) -> Verificacion | None:
+        """`UPDATE … SET intentos = intentos + 1 WHERE … AND intentos < maximo RETURNING …`.
+
+        Una sola sentencia: la base serializa las escrituras, así que dos peticiones concurrentes
+        nunca leen el mismo contador (la lectura-modificación-escritura anterior sí podía).
+        """
+        tabla = VerificationRow.__table__  # type: ignore[attr-defined]
+        sentencia = (
+            update(tabla)
+            .where(tabla.c.email == email, tabla.c.intentos < maximo)
+            .values(intentos=tabla.c.intentos + 1)
+            .returning(tabla.c.email, tabla.c.codigo_hash, tabla.c.expira_en, tabla.c.intentos)
+        )
+        with self.engine.begin() as conn:
+            fila = conn.execute(sentencia).mappings().first()
+        return Verificacion.model_validate(dict(fila)) if fila else None
 
     def delete_verification(self, email: str) -> None:
         with self._session() as s:

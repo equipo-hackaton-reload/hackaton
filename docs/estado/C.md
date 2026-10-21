@@ -41,6 +41,14 @@
   en `/auth/*` y `resume`, 413 por encima de `BRIEF_MAX_BYTES`, rate limit en memoria. Los tests de
   API se autentican con `tests/auth_helpers.py`; `demo_kit.py` entra como `demo@posiq.local`.
   **La web necesita login (zona D)**: sin él, contra la API real todo da 401.
+- Revisión de cuentas (`feature/C-cuentas-coste-fixes`): intentos de verificación atómicos
+  (`AccountRepo.count_attempt`, `UPDATE … RETURNING`, contado antes de comparar); 3 reenvíos por
+  correo y hora; límite también por correo (verificar y reenviar comparten clave); tiempo igual
+  exista o no el correo en alta y reenvío; el 409 del alta se mantiene (riesgo aceptado, ADR 0015
+  punto 11); brief leído en streaming con tope (413 sin `Content-Length`); cuenta de demo y
+  `AUTH_DEMO_USER` solo en modo demo (`demo_activo`, si no 403 `cuenta_demo_desactivada`). El
+  nodo `run` adjunta las trazas ya pagadas a su excepción y el runner las guarda con `db`.
+  `POST /studies` devuelve `aviso` en modo kit (`AVISO_KIT` en `interfaces/api/schemas.py`).
 - Coste (ADR 0018): el modo kit es siempre gratis aunque haya claves (`FixtureLLM`,
   `FixtureJudge` con las etiquetas del kit, sin PlanGuard); `KIT_IA_REAL=true` es el opt-in para
   usar el LLM y el juez de pago sobre el kit. Lo ya pagado en un nodo que falla (intentos de

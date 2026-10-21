@@ -84,14 +84,17 @@ class Settings(BaseSettings):
     # Cuentas (ADR 0015). Sesiones de `auth_token_ttl_h` horas (7 días). `auth_dev_codes`: devolver
     # el código de verificación en la respuesta (`codigo_dev`); sin fijar, solo con
     # LLM_PROVIDER=fixture. `auth_demo_user`: correo que ve los estudios anteriores a las cuentas
-    # (sin propietario); vacío, no los ve nadie. scrypt: n=2**14, r=8, p=1 por defecto (OWASP).
+    # (sin propietario); vacío, no los ve nadie. Solo en modo demo (`accounts.demo_activo`: códigos
+    # de desarrollo activos), igual que la cuenta `demo@posiq.local` de `scripts/demo_kit.py`; con
+    # el LLM real se ignora. scrypt: n=2**14, r=8, p=1 por defecto (OWASP).
     auth_token_ttl_h: int = 168
     auth_dev_codes: bool | None = None
     auth_demo_user: str = ""
     auth_scrypt_n: int = 2**14
     auth_scrypt_r: int = 8
     auth_scrypt_p: int = 1
-    # Intentos por minuto y cliente en login y verificación (en memoria del proceso).
+    # Intentos por minuto en /auth/* por IP y ruta y, en login/verify/reenviar, por correo
+    # (en memoria del proceso).
     auth_rate_limit_por_min: int = 10
     # Tamaño máximo del brief subido (bytes); por encima, 413.
     brief_max_bytes: int = 200_000

@@ -20,7 +20,14 @@ from typing import Any
 from posiq.adapters.budget import Budget, BudgetExceeded
 from posiq.adapters.engines.base import RealEngine
 from posiq.adapters.engines.kit import KitMissError
-from posiq.application.deps import Deps, cost_update, db, persist_traces, study_budget
+from posiq.application.deps import (
+    Deps,
+    adjuntar_trazas,
+    cost_update,
+    db,
+    persist_traces,
+    study_budget,
+)
 from posiq.application.state import StudyState
 from posiq.domain.schemas import PromptInstance, Run, Trace
 from posiq.ports import Engine
@@ -119,17 +126,25 @@ async def run(state: StudyState, deps: Deps) -> dict[str, Any]:
         raise RuntimeError(f"no hay motores configurados para el modo {state['modo']}")
     semaphore = asyncio.Semaphore(CONCURRENCIA)
     pairs = [(p, e) for p in state["prompts"] for e in engines]
-    async with asyncio.TaskGroup() as tg:
-        tasks = [tg.create_task(_pair(ctx, state, p, e, semaphore)) for p, e in pairs]
-    runs = [r for t in tasks for r in t.result()]
-    ctx.traces = ctx.budget.traces[initial_traces:]
+    try:
+        async with asyncio.TaskGroup() as tg:
+            tasks = [tg.create_task(_pair(ctx, state, p, e, semaphore)) for p, e in pairs]
+        runs = [r for t in tasks for r in t.result()]
+        ctx.traces = ctx.budget.traces[initial_traces:]
 
-    for prompt_id, motores in ctx.sin_kit.items():
-        ctx.errores.append(f"run: el kit no tiene {prompt_id} para {', '.join(motores)}; se salta")
-    if not runs:
-        raise RuntimeError("run: ninguna ejecución; no hay nada que juzgar")
+        for prompt_id, motores in ctx.sin_kit.items():
+            ctx.errores.append(
+                f"run: el kit no tiene {prompt_id} para {', '.join(motores)}; se salta"
+            )
+        if not runs:
+            raise RuntimeError("run: ninguna ejecución; no hay nada que juzgar")
 
-    await db(deps.repo.save_runs, state["study_id"], runs)
-    if ctx.traces:
-        await persist_traces(deps, state, ctx.traces)
+        await db(deps.repo.save_runs, state["study_id"], runs)
+        if ctx.traces:
+            await persist_traces(deps, state, ctx.traces)
+    except BaseException as exc:
+        # Las llamadas a motores ya cobradas cuentan aunque el nodo falle (ADR 0018), como en
+        # `judge`: viajan en la excepción y `StudyRunner` las suma al estudio.
+        adjuntar_trazas(exc, ctx.budget.traces[initial_traces:])
+        raise
     return {"runs": runs, "errores": ctx.errores, **cost_update(state, ctx.traces)}

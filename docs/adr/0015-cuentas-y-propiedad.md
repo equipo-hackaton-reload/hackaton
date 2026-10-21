@@ -45,11 +45,41 @@ solo del navegador y `GET /studies` listaba los estudios de todo el mundo.
    (200 KB, 413). Registro, verificación, reenvío y login admiten `AUTH_RATE_LIMIT_POR_MIN`
    intentos por minuto y cliente (429).
 
+## Revisión posterior (fixes de #36)
+
+9. **Intentos atómicos.** `AccountRepo.count_attempt` suma el intento con un solo
+   `UPDATE verification SET intentos = intentos + 1 WHERE email = ? AND intentos < 5 RETURNING …`
+   **antes** de comparar el código. Antes era lectura-modificación-escritura sin bloqueo y, con las
+   rutas `def` en el threadpool, peticiones simultáneas comparaban más de 5 veces.
+10. **Reenvíos limitados.** Reenviar da un código nuevo (con sus 5 intentos), pero cada correo
+    solo puede pedir 3 por hora (`REENVIOS_POR_HORA`; el cuarto, 429, exista o no el correo). Cota:
+    20 comparaciones por correo y hora. El límite por minuto cuenta también por correo en login,
+    verificación y reenvío; verificar y reenviar comparten la clave del correo, así que repartir
+    los intentos entre IPs o entre las dos rutas no da más intentos.
+11. **Enumeración.** `POST /auth/register` sigue respondiendo **409** si el correo existe: la web
+    (PR #38) lo usa para ofrecer el login y `scripts/demo_kit.py` para saltarse el alta. **Riesgo
+    aceptado**: revela qué correos están registrados, acotado por el límite de intentos por IP. Lo
+    que sí se iguala es el tiempo: el alta de un correo existente calcula los mismos dos hashes
+    scrypt que una nueva, y `/auth/verify/reenviar` calcula un hash también cuando el correo no
+    existe o ya está verificado (responde 202 en ambos casos).
+12. **Cuenta de demo solo en modo demo.** La contraseña de `demo@posiq.local` está en el repo
+    (`scripts/demo_kit.py`). Esa cuenta y los privilegios de `AUTH_DEMO_USER` (ver los estudios
+    sin propietario) solo existen con `demo_activo`: los códigos de desarrollo activos, que por
+    defecto solo lo están con `LLM_PROVIDER=fixture`. Con el LLM real (y sin
+    `AUTH_DEV_CODES=true` explícito), alta y login de esa cuenta responden 403
+    `cuenta_demo_desactivada`, sus sesiones dejan de valer y `AUTH_DEMO_USER` se ignora con un
+    aviso en el log. Así una base usada en la demo y luego en real no deja entrar con la
+    contraseña publicada.
+13. **Brief en streaming.** `POST /studies` lee el cuerpo por trozos y corta con 413 en cuanto pasa
+    de `BRIEF_MAX_BYTES` (más 64 KB de margen en multipart), sin fiarse de `Content-Length`
+    (que falta con `Transfer-Encoding: chunked`).
+
 ## Consecuencias
 
 - La web tiene que pedir login y mandar el token (zona D). Hasta entonces, la web contra la API
   real recibe 401; con mocks sigue funcionando.
 - `scripts/demo_kit.py` registra, verifica (con `codigo_dev`) y entra como `demo@posiq.local`.
 - **Limitaciones conocidas:** el límite de intentos vive en memoria del proceso (se pierde al
-  reiniciar y no se comparte entre workers); no hay recuperación de contraseña ni correo real; las
-  sesiones caducadas se borran solo cuando alguien intenta usarlas.
+  reiniciar y no se comparte entre workers), y lo mismo el de reenvíos por hora; no hay
+  recuperación de contraseña ni correo real; las sesiones caducadas se borran solo cuando alguien
+  intenta usarlas; el 409 del alta revela si un correo existe (riesgo aceptado, punto 11).

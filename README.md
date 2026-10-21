@@ -144,7 +144,11 @@ CHANGELOG y `docs/estado/<ZONA>.md`. Detalle en [CONTRIBUTING.md](CONTRIBUTING.m
 - Los modelos no son deterministas: una medición es una foto en una fecha. Por eso existe la
   re-medición; en modo kit su delta es 0, porque mide repetibilidad y no una mejora.
 - SQLite con un solo proceso: la API no está preparada para varios workers. El límite de intentos
-  de login y verificación vive en memoria del proceso.
+  de login y verificación (y el de reenvíos por hora) vive en memoria del proceso.
+- La cuenta de demo (`demo@posiq.local`, contraseña en `scripts/demo_kit.py`) y `AUTH_DEMO_USER`
+  solo funcionan en modo demo (`LLM_PROVIDER=fixture` o `AUTH_DEV_CODES=true`).
+- `POST /auth/register` responde 409 si el correo ya existe: revela qué correos están dados de alta
+  (riesgo aceptado, ADR 0015).
 - Sin proveedor de correo ni recuperación de contraseña: el código de verificación se lee del log.
 - La calibración del juez con claves reales y la prueba real de los motores están pendientes
   ([`docs/calibracion/`](docs/calibracion/)).

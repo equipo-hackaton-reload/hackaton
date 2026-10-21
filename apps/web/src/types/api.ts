@@ -24,6 +24,8 @@ export interface CreateStudyRequest {
 }
 export interface CreateStudyResponse {
   study_id: string;
+  /** Solo en modo kit: «Modo kit: datos sintéticos de Alborada; el brief no cambia las mediciones». */
+  aviso?: string | null;
 }
 
 export interface RemeasureResponse {

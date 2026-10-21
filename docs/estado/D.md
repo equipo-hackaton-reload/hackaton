@@ -9,6 +9,10 @@
 - El diagnóstico ya ofrece re-medición mock y vista del delta; queda probarlo cuando C publique
   `POST /studies/{id}/remeasure`.
 
+- Aviso del modo kit: `POST /studies` devuelve `aviso` (solo en kit); `NewStudyPage` lo guarda
+  por estudio en sessionStorage (`lib/avisoKit.ts`) y `CompetitorsPage` lo enseña con
+  `components/AvisoKit.tsx`. Hecho por zona C con autorización; los mocks aún no lo devuelven.
+
 ## Falta
 - Probar la integración con la API de C usando `LLM_PROVIDER=fixture`.
 - Pulir la interfaz, ejecutar build de producción y capturar la demo.
