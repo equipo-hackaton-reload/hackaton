@@ -21,6 +21,23 @@
 - **Después del squash:** la rama se borra y la siguiente tarea empieza en una rama nueva desde
   `develop`. Nadie rebasa una rama sobre su propio squash.
 
+- **CHANGELOG por PR:** cada PR añade al menos una línea en `CHANGELOG.md` → `[Unreleased]`
+  (sección `Added`, `Changed` o `Fixed`), indicando la zona. Una PR sin línea en el CHANGELOG no se fusiona.
+- **Estado por zona:** cada PR actualiza `docs/estado/<LETRA>.md` de su zona (qué hay, qué falta,
+  siguiente tarea).
+
+## Pre-commit
+
+Obligatorio en cada worktree antes del primer commit:
+
+```sh
+uv run pre-commit install
+```
+
+Los hooks (`.pre-commit-config.yaml`) ejecutan `ruff --fix`, `ruff format` y `mypy src`. No se
+salta ningún hook (`--no-verify` prohibido); si un hook falla, se corrige y se vuelve a hacer commit.
+Antes de abrir la PR, además: `uv run pytest` en verde (es lo mismo que comprueba el CI).
+
 ## Commits
 
 [Conventional Commits](https://www.conventionalcommits.org/es/): `feat(domain): ...`, `fix(api): ...`,
@@ -72,30 +89,23 @@ cd ../posiq-<LETRA-ZONA> && uv sync
 
 Al terminar: `git worktree remove ../posiq-<LETRA-ZONA>`.
 
-## Protección de ramas (configurar en GitHub)
+## Protección de ramas
 
-Requiere permisos de **admin** en el repo, que tiene su propietario. Se configura después de hacer
-push de `develop` y de que el CI haya corrido al menos una vez, para que aparezca el check `check`.
+El repo `equipo-hackaton-reload/hackaton` es **privado y está en plan gratuito**: GitHub no aplica
+reglas de protección de ramas ni *rulesets* a repos privados en ese plan. La protección es por
+convención y la hacen cumplir los propios agentes:
 
-1. GitHub → repo → **Settings** → **Branches** (o **Rules → Rulesets**) → **Add branch protection rule**.
-2. *Branch name pattern*: `main`.
-3. Marca **Require a pull request before merging**, con *Required approvals* = **1**.
-4. Marca **Require status checks to pass before merging** → *Require branches to be up to date* →
-   busca y añade el check **`check`** (job del workflow CI).
-5. Marca **Do not allow bypassing the above settings**.
-6. Deja desmarcados *Allow force pushes* y *Allow deletions*. Guarda.
-7. Repite los pasos 2–6 con `develop`.
-8. Opcional, en **Settings → General → Pull Requests**: deja solo **Allow squash merging**.
+- **Sin push directo** a `main` ni a `develop`: todo entra por PR. `.claude/settings.json` deniega
+  `git push origin main|develop` y los `push --force` sin `--force-with-lease`.
+- **CI en verde** (`check` y `web`) antes de fusionar: `gh pr checks <n>` y luego
+  `gh pr merge <n> --squash --delete-branch`.
+- **Solo squash** a nivel de repo y borrado automático de la rama tras fusionar (lo configura un admin):
 
-Equivalente con `gh`, ejecutado por un admin:
+  ```sh
+  gh api -X PATCH repos/equipo-hackaton-reload/hackaton     -f allow_merge_commit=false -f allow_rebase_merge=false -F delete_branch_on_merge=true
+  ```
 
-```sh
-for b in main develop; do
-  gh api -X PUT repos/walterandres-dybek-sanchez/hackaton/branches/$b/protection --input - <<'JSON'
-{"required_status_checks":{"strict":true,"contexts":["check"]},
- "enforce_admins":true,
- "required_pull_request_reviews":{"required_approving_review_count":1},
- "restrictions":null}
-JSON
-done
-```
+- `main` solo recibe la PR `develop → main` de cada hito, abierta por la zona A.
+
+Si el repo pasa a público o a un plan de pago, se activan reglas reales para `main` y `develop`
+(PR obligatoria, check `check` requerido, sin force push ni borrado).

@@ -72,3 +72,4 @@ uv run uvicorn posiq.interfaces.api.main:app --reload
 1. Lee este fichero.
 2. Comprueba que estás en una rama `feature/<LETRA-ZONA>-<tarea>` de tu zona (y en tu worktree), no en `develop` ni en `main`.
 3. Lee `src/posiq/domain/schemas.py` y `src/posiq/ports.py`.
+4. Antes de empezar lee `docs/estado/<tu letra>.md` y actualízalo en tu PR.

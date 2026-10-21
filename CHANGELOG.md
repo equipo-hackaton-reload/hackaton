@@ -5,6 +5,7 @@ Formato [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); versionado 
 ## [Unreleased]
 
 ### Added
+- Cierre e integración (zona A): `.claude/settings.json` con permisos de PR, push y uv; reglas de pre-commit, CHANGELOG por PR y protección de ramas en plan gratuito en CONTRIBUTING; `docs/estado/A–E.md` y `docs/plan-b.md`.
 - Endpoints que consume la web (zona C): `GET /studies/{id}/evaluations?ids=` (evidencias con motor, prompt, respuesta truncada a 2.000 caracteres y fuentes), `GET /studies/{id}/traces` y `GET /estimate` (coste previo de motores y juez con los precios de `settings`; 0 en modo kit sin claves).
 - Demo HTTP sin claves con `LLM_PROVIDER=fixture`, `FixtureLLM`, juez por detección, `ProposalDraft`, exportación real Word/PDF y `scripts/demo_kit.py`; subida multipart incluida (zona C, ADR 0005).
 - Dominio puro (zona A): esquemas, cargador del kit, detección, preguntas del juez, score de citación, métricas, hallazgos, tests golden y ADR 0001.
