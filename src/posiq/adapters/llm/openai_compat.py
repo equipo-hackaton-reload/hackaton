@@ -43,15 +43,23 @@ Schema, sin texto adicional:
 
 
 class LLMOutputError(RuntimeError):
-    """La salida del LLM no valida contra el esquema tras los reintentos."""
+    """La llamada al LLM no dio una salida válida: no valida contra el esquema tras los
+    reintentos, o la API falló después de intentos ya cobrados.
 
-    def __init__(self, prompt_name: str, attempts: int, last_error: str) -> None:
+    `trace` lleva los tokens y el coste de TODOS los intentos (se han pagado aunque fallen); la
+    orquestación la suma a las trazas y al presupuesto del estudio.
+    """
+
+    def __init__(
+        self, prompt_name: str, attempts: int, last_error: str, trace: Trace | None = None
+    ) -> None:
         super().__init__(
             f"{prompt_name}: salida inválida tras {attempts} intentos. Último error: {last_error}"
         )
         self.prompt_name = prompt_name
         self.attempts = attempts
         self.last_error = last_error
+        self.trace = trace
 
 
 @dataclass(frozen=True)
@@ -134,13 +142,23 @@ class OpenAICompatLLM:
         ]
         tokens_in = tokens_out = 0
         last_error = ""
-        for _attempt in range(1 + MAX_RETRIES):
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=messages,
-                response_format={"type": "json_object"},
-                temperature=0,
-            )
+        for attempt in range(1 + MAX_RETRIES):
+            try:
+                response = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=messages,
+                    response_format={"type": "json_object"},
+                    temperature=0,
+                )
+            except Exception as exc:
+                if tokens_in or tokens_out:  # intentos previos ya cobrados: que consten
+                    raise LLMOutputError(
+                        prompt_name,
+                        attempt + 1,
+                        f"{type(exc).__name__}: {exc}",
+                        self._trace(study_id, prompt, tokens_in, tokens_out, start),
+                    ) from exc
+                raise
             usage = getattr(response, "usage", None)
             tokens_in += getattr(usage, "prompt_tokens", 0) or 0
             tokens_out += getattr(usage, "completion_tokens", 0) or 0
@@ -161,7 +179,12 @@ class OpenAICompatLLM:
             if self.cache is not None:
                 self.cache.set(cache_key, output.model_dump(mode="json"))
             return output, self._trace(study_id, prompt, tokens_in, tokens_out, start)
-        raise LLMOutputError(prompt_name, 1 + MAX_RETRIES, last_error)
+        raise LLMOutputError(
+            prompt_name,
+            1 + MAX_RETRIES,
+            last_error,
+            self._trace(study_id, prompt, tokens_in, tokens_out, start),
+        )
 
     def _trace(
         self, study_id: str, prompt: PromptFile, tokens_in: int, tokens_out: int, start: float

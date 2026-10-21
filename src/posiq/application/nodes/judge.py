@@ -11,12 +11,45 @@ En los dos, `juez` queda en `"reglas"` y la propuesta lo declara entre sus limit
 from typing import Any
 
 from posiq.adapters.errors import MissingCredentialError
-from posiq.application.deps import Deps, cost_update, db, persist_traces, study_budget
+from posiq.application.deps import (
+    Deps,
+    adjuntar_trazas,
+    cost_update,
+    db,
+    persist_traces,
+    study_budget,
+)
 from posiq.application.state import StudyState
 from posiq.domain.detection import detect_in_run, evaluation_from_detection
 from posiq.domain.schemas import Brand, Evaluation, Run, Trace
 
 JUEZ_REGLAS = "reglas"
+
+
+def trazas_del_juez(juez: object) -> list[Trace]:
+    """Trazas del juez y de los que usa por dentro (su `fallback`, los `jueces` de un consenso).
+
+    El fallback de DeepSeek lleva sus propias trazas: sin esto, sus llamadas se pagaban y
+    contaban en el presupuesto del nodo, pero no quedaban en el estudio.
+    """
+    trazas: list[Trace] = []
+    vistas: set[int] = set()
+    visitados: set[int] = set()
+
+    def visita(j: object | None) -> None:
+        if j is None or id(j) in visitados:
+            return
+        visitados.add(id(j))
+        for t in getattr(j, "traces", []):
+            if id(t) not in vistas:
+                vistas.add(id(t))
+                trazas.append(t)
+        visita(getattr(j, "fallback", None))
+        for interno in getattr(j, "jueces", []):
+            visita(interno)
+
+    visita(juez)
+    return trazas
 
 
 def judge_pairs(runs: list[Run], marcas: list[Brand]) -> list[tuple[Run, Brand]]:
@@ -43,7 +76,10 @@ async def judge(state: StudyState, deps: Deps) -> dict[str, Any]:
         except MissingCredentialError as exc:
             evaluations, nombre = _por_reglas(pairs, marcas), JUEZ_REGLAS
             errores.append(f"judge: {exc} Evaluaciones solo por reglas (aparición y posición).")
-        nuevas = list(juez.traces)
+        except BaseException as exc:  # lo ya pagado (Jev y fallback) cuenta aunque el nodo falle
+            adjuntar_trazas(exc, trazas_del_juez(juez))
+            raise
+        nuevas = trazas_del_juez(juez)
 
     await db(deps.repo.save_evaluations, state["study_id"], evaluations)
     await persist_traces(deps, state, nuevas)

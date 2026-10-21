@@ -15,8 +15,19 @@ from posiq.application.deps import AsyncJudge, Deps, JudgeFactory, PlanGuardFact
 from posiq.application.graph import sqlite_checkpointer
 from posiq.application.runner import StudyRunner
 from posiq.domain.schemas import Market, ModoEstudio
-from posiq.ports import Engine
+from posiq.ports import LLM, Engine
 from posiq.settings import Settings
+
+
+def kit_sin_coste(modo: ModoEstudio, settings: Settings) -> bool:
+    """¿El estudio corre sin ninguna llamada de pago? Siempre en modo kit, salvo el opt-in
+    explícito `KIT_IA_REAL=true` (ADR 0018); en modo real, nunca."""
+    return modo == "kit" and not settings.kit_ia_real
+
+
+def fixture_judge_factory(settings: Settings) -> JudgeFactory:
+    """`FixtureJudge` con las etiquetas del kit: da la cifra canónica y no llama a nada."""
+    return lambda market, _budget: FixtureJudge(market, kit_dir=settings.kit_dir)
 
 
 def judge_factory(settings: Settings, cache: DiskCache) -> JudgeFactory:
@@ -48,19 +59,27 @@ def engines_for(modo: ModoEstudio, settings: Settings) -> list[Engine]:
     return build_engines(settings, modo) if modo == "kit" else []
 
 
+def llm_for(settings: Settings, cache: DiskCache) -> LLM:
+    """LLM de pago salvo `LLM_PROVIDER=fixture`."""
+    if settings.llm_provider == "fixture":
+        return FixtureLLM(settings)
+    return OpenAICompatLLM(settings, cache=cache)
+
+
 def build_deps(settings: Settings, repo: SqlStudyRepo) -> dict[ModoEstudio, Deps]:
+    """Un `Deps` por modo. El kit sin opt-in no lleva ningún adaptador de pago: `FixtureLLM`,
+    `FixtureJudge` y sin PlanGuard, aunque haya claves en el entorno o en `.env`."""
     cache = DiskCache.from_settings(settings)
-    llm = (
-        FixtureLLM(settings)
-        if settings.llm_provider == "fixture"
-        else OpenAICompatLLM(settings, cache=cache)
-    )
+    llm = llm_for(settings, cache)
+    fixture_llm = FixtureLLM(settings)
     modos: tuple[ModoEstudio, ...] = ("kit", "real")
     return {
         modo: Deps(
-            llm=llm,
+            llm=fixture_llm if kit_sin_coste(modo, settings) else llm,
             engines=engines_for(modo, settings),
-            judge_factory=judge_factory(settings, cache),
+            judge_factory=fixture_judge_factory(settings)
+            if kit_sin_coste(modo, settings)
+            else judge_factory(settings, cache),
             repo=repo,
             budget=lambda study_id: Budget.from_settings(settings, study_id),
             settings=settings,
@@ -69,7 +88,9 @@ def build_deps(settings: Settings, repo: SqlStudyRepo) -> dict[ModoEstudio, Deps
             )
             if modo == "real"
             else None,
-            plan_guard_factory=plan_guard_factory(settings, cache),
+            plan_guard_factory=None
+            if kit_sin_coste(modo, settings)
+            else plan_guard_factory(settings, cache),
         )
         for modo in modos
     }

@@ -25,8 +25,10 @@ powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
 
 ## Arranque rápido: demo sin claves
 
-Con `LLM_PROVIDER=fixture` y el modo kit no se llama a ninguna API ni se gasta nada: el sistema usa
-las 624 respuestas sintéticas del kit y textos de ejemplo para el caso **Clínica Alborada Visión**.
+El modo kit no llama a ninguna API ni gasta nada, haya o no claves en el entorno o en `.env`
+(ADR 0018): usa las 624 respuestas sintéticas del kit, las etiquetas del kit como juez y textos de
+ejemplo para el caso **Clínica Alborada Visión**. Con `LLM_PROVIDER=fixture` tampoco el modo real
+llama al LLM.
 
 ```sh
 git clone https://github.com/equipo-hackaton-reload/hackaton.git
@@ -88,8 +90,12 @@ Antes de lanzar un estudio, mira cuánto costará:
 curl "http://localhost:8000/estimate?modo=real"
 ```
 
-- **Modo kit con DeepSeek:** respuestas del kit y LLM real. Con `JUDGE_PROVIDER=reglas` cuesta
-  céntimos y tarda minutos. Con el juez LLM son unas 2.928 evaluaciones (≈ 20–30 min).
+- **Modo kit:** 0 €, siempre. Para ensayar el LLM y el juez de pago sobre las respuestas del kit
+  hay que pedirlo con `KIT_IA_REAL=true`. Entonces, con `JUDGE_PROVIDER=reglas` cuesta céntimos y
+  tarda minutos; con el juez LLM son unas 2.928 evaluaciones (≈ 20–30 min).
+- **Qué cuenta la estimación:** motores, LLM de intake, market, prompts, plan y redacción (tokens
+  típicos, con el reintento de plan y redacción), juez con su fallback y PlanGuard. Los intentos
+  fallidos también quedan en `/traces` y cuentan en `BUDGET_EUR_MAX`.
 - **Modo real:** consulta los motores con búsqueda web. Con los precios provisionales de
   `settings.py`, un estudio del tamaño del kit (52 preguntas × 4 motores × 3 repeticiones = 624
   llamadas) supera el tope de 5 €: sube `BUDGET_EUR_MAX` o reduce el estudio. Los precios están sin
