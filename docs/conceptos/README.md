@@ -38,6 +38,11 @@ anteriores.
 | 6 | [../propuesta-valor.md](../propuesta-valor.md) | Propuesta de valor y modelo de negocio: «no vendemos un score, vendemos un seguimiento con método», las cinco críticas y qué hace hoy el producto. |
 | 7 | [../glosario.md](../glosario.md) | Glosario alfabético de todos los términos, para consultar cuando surja una duda. |
 
+Los entregables ya redactados a partir de estos conceptos están en
+[`../deck.md`](../deck.md) (diapositivas), [`../arquitectura.md`](../arquitectura.md),
+[`../revision-word.md`](../revision-word.md) y [`../demo/guion.md`](../demo/guion.md). Si un
+entregable y estos documentos no dicen lo mismo, mandan el código y los tests.
+
 Si solo hay tiempo para dos: **kit-vs-real.md** (qué se puede decir) y **score-de-citacion.md**
 (qué es la cifra principal).
 

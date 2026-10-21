@@ -20,7 +20,7 @@
   jueces posibles y mismo juez en toda la serie, PENDIENTE en la comparabilidad). Al cambiar una
   cifra golden o el estado de una PR, actualizar estos documentos.
 
-## En la PR #23 (`feature/E-entregable`, rebasada sobre `1798244`)
+## En develop desde la PR #23 (`feature/E-entregable`)
 - `docs/arquitectura.md` (+ `.html` y `.pdf` con `scripts/build_architecture_pdf.py`): capa de verdad
   determinista, capa determinista/no determinista (ADR 0014), rigor (25,9 [21,6–30,1]), seguimiento
   con método (ADR 0016), cuentas (ADR 0015), coste por medición estimado (≈ 11,25 € en real, 0 € en
