@@ -46,13 +46,21 @@ Antes de abrir la PR, además: `uv run pytest` en verde (es lo mismo que comprue
 ## Versionado
 
 - `VERSION` sigue SemVer: **MINOR** por cada nivel del reto completado, **PATCH** por correcciones.
-- Al cerrar un hito: subir `VERSION`, mover `[Unreleased]` a `[X.Y.Z] - AAAA-MM-DD` en el CHANGELOG,
-  abrir el PR `develop → main` y, tras el merge, etiquetar en `main`:
+- Al cerrar un hito, la zona A:
+  1. En una PR normal a `develop`: sube `VERSION` y mueve `[Unreleased]` a `[X.Y.Z] - AAAA-MM-DD`
+     en el CHANGELOG.
+  2. Con esa PR fusionada y el CI de `develop` en verde, publica la release **por fast-forward**, a
+     mano (no hay PR `develop → main`: el repo solo admite squash y un squash rompería la historia
+     común entre `main` y `develop`):
 
-  ```sh
-  git checkout main && git pull
-  git tag vX.Y.Z && git push origin vX.Y.Z
-  ```
+     ```sh
+     git fetch origin
+     git merge-base --is-ancestor origin/main origin/develop   # si falla, parar y avisar
+     git push origin develop:main                              # fast-forward; Claude pide confirmación
+     git tag -a vX.Y.Z origin/main -m "vX.Y.Z" && git push origin vX.Y.Z
+     ```
+
+  `git push` rechaza el paso 2 si no es fast-forward; nunca se fuerza.
 
 ## Reparto por zonas
 
@@ -105,7 +113,7 @@ convención y la hacen cumplir los propios agentes:
   gh api -X PATCH repos/equipo-hackaton-reload/hackaton     -f allow_merge_commit=false -f allow_rebase_merge=false -F delete_branch_on_merge=true
   ```
 
-- `main` solo recibe la PR `develop → main` de cada hito, abierta por la zona A.
+- `main` solo avanza por fast-forward desde `develop` en cada hito, a mano y por la zona A (ver Versionado).
 
 Si el repo pasa a público o a un plan de pago, se activan reglas reales para `main` y `develop`
 (PR obligatoria, check `check` requerido, sin force push ni borrado).

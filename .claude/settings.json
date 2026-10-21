@@ -15,11 +15,17 @@
       "Bash(python -m uv sync:*)",
       "Bash(python -m uv lock:*)"
     ],
+    "ask": [
+      "Bash(git push origin develop:main)"
+    ],
     "deny": [
       "Bash(git push --force:*)",
       "Bash(git push -f:*)",
       "Bash(git push origin main:*)",
-      "Bash(git push origin develop:*)",
+      "Bash(git push origin HEAD:main:*)",
+      "Bash(git push origin develop)",
+      "Bash(git push origin develop:develop:*)",
+      "Bash(git push origin HEAD:develop:*)",
       "Read(./.env)"
     ]
   }
