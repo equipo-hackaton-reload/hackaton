@@ -22,7 +22,7 @@ node_modules/
 apps/web/dist/
 
 # Datos locales
-posiq.db
+posiq.db*
 *.db-journal
 .cache/
 
