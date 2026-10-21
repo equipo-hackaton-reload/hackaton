@@ -6,12 +6,13 @@
 - Tests de dominio y golden de Alborada; `scripts/evaluate_system.py` (informe en `docs/evaluacion/`).
 
 ## Falta
-- Cuadrar el score de Alborada: la API (fixture, juez por detección) da **25,87**; `evaluate_system.py` da **25,93**.
-  Decidir cuál es la cifra canónica y fijarla en un golden.
 - Que `simulate_plan` y la calidad del plan lleguen a la API (la integración es de C).
 
 ## Siguiente tarea
-- `feature/A-score-canonico`: explicar la diferencia 25,87 / 25,93 y añadir golden de la cifra de la demo.
+- Hecho en `feature/A-score-canonico`: cifra canónica **25,93** (etiquetas del kit; 25,9 en la deck),
+  8.ª de 10, proyección 25,9 → 30,8, fijadas en `tests/golden/test_demo_canonico.py`. La API en
+  fixture da 25,87 porque su juez por reglas no clasifica tipo de fuente ni gradúa la fuerza.
+- Medir la cifra con Jev real cuando haya `TYPESAFE_API_KEY` y compararla con la canónica.
 - Cierre de hito: CHANGELOG, `VERSION`, PR `develop → main` y tag.
 
 ## No tocar
