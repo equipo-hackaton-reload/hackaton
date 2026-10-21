@@ -84,6 +84,29 @@
   - ADR 0016: la huella del banco incluye el texto; la re-medición real debe reutilizar el banco
     (pendiente en C: runner/nodo de prompts).
 
+## Serie: juez, núcleo común y configuración versionada (`feature/A-comparabilidad-nucleo`)
+
+Todo aditivo en `tracking.py`/`tracking_schemas.py` (ADR 0016 actualizado):
+
+- **Juez:** `juez_medicion(med)` → `PuntoSerie.juez` («proveedor/modelo»). Orden:
+  `MedicionSerie.juez` declarado → trazas `judge:<proveedor>` del estudio (`MedicionSerie.trazas`)
+  → `Evaluation.origen` (`jev` > `humano` > `reglas`). Si cambia: no comparable, «Cambia el juez
+  (a → b).». Si falta en un punto: aviso.
+- **Núcleo común:** `clave_pregunta(p)` (lo que se pregunta, sin id), `restringir_a_preguntas`.
+  Si el banco cambia y hay preguntas comunes, el par se compara sobre ellas:
+  `PuntoSerie.nucleo_comun` (`NucleoComun`) y `CambioSerie.sobre_nucleo_comun=True`. Sin
+  preguntas comunes, sigue siendo no comparable. `comparabilidad(..., n_comunes=N)`.
+- **Configuración:** `MedicionSerie.version_perfil/version_mercado` → `PuntoSerie`;
+  `SerieMarca.cambios_configuracion` (`study_id`, `que_cambia`, `texto`). Cambio de versión del
+  mercado → puesto y diferencia no comparables; cambio de perfil → nada.
+- **Exactitud por fecha:** `VersionPerfil`, `VersionMercado`, `vigente_en`,
+  `exactitud_con_perfil` y `exactitud_en_fecha`.
+- **Para C:** pasar a `MedicionSerie` `juez` (o `trazas` del estudio), `version_perfil` y
+  `version_mercado` de cada medición; calcular `exactitud` con `exactitud_en_fecha` y las versiones
+  del perfil. **Para D:** marcas verticales en `cambios_configuracion[].study_id`; si
+  `nucleo_comun` existe, decir que la comparación es sobre N preguntas comunes.
+- Golden del kit sin cambios (25,93, 8.º de 10, «Sin cambios fuera del margen de error»).
+
 ## Exactitud de marca (`feature/A-exactitud-marca`, ADR 0011)
 
 - `domain/accuracy.py` (puro):
