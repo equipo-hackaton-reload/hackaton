@@ -5,6 +5,10 @@
   métricas, hallazgos, evidencias, `plan_questions`, `quality_schemas`, `simulation.simulate_plan`.
 - Tests de dominio y golden de Alborada; `scripts/evaluate_system.py` (informe en `docs/evaluacion/`).
 - `simulacion` y `calidad_plan` ya llegan a `GET /studies/{id}` (#11, zona C).
+- Contratos del diferencial (aditivos, sin `contract-change`): `stats_schemas`, `scenario_schemas`
+  (`EscenarioPlan`, no `Escenario`, para no chocar con `simulation_schemas.Escenario`),
+  `source_map_schemas` y `accuracy_schemas`. Las funciones llegan en `feature/A-rigor-estadistico`,
+  `A-escenarios`, `A-mapa-fuentes` y `A-exactitud-marca` (ADR 0008–0011).
 
 ## Falta
 - Que la web (D) y el Word (E) muestren la simulación. La calidad del plan solo existe con claves de juez.
