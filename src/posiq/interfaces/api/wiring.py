@@ -26,7 +26,7 @@ def judge_factory(settings: Settings, cache: DiskCache) -> JudgeFactory:
             and not settings.typesafe_api_key.get_secret_value()
             and not settings.deepseek_api_key.get_secret_value()
         ):
-            return FixtureJudge(market)
+            return FixtureJudge(market, kit_dir=settings.kit_dir)
         return build_judge(settings, market.marcas, budget=budget, cache=cache)
 
     return factory

@@ -20,6 +20,6 @@ Fijadas en `tests/golden/test_demo_canonico.py`.
 - **Posición: 8.ª de 10** marcas.
 - **Proyección del plan: 25,9 → 30,8** esperado tras la fase 3 (rango 27,8–34,0).
 
-Si en pantalla sale **25,87**: es la API en modo fixture, que usa el juez por reglas. Tiene la misma
-aparición, posición y ranking, pero no clasifica el tipo de fuente ni gradúa la fuerza (cambian 3
-evaluaciones de Alborada). Con un decimal ambas son 25,9.
+La API en modo fixture (kit) muestra estas mismas cifras: su juez devuelve las etiquetas humanas del
+kit donde existen (`tests/e2e/test_demo_canonica_api.py`). Solo el juez por reglas puro daría 25,87
+(no clasifica el tipo de fuente ni gradúa la fuerza); con un decimal ambas son 25,9.
