@@ -37,6 +37,10 @@ class ResumeError(ValueError):
         self.conflict = conflict
 
 
+class RemeasureError(ValueError):
+    """El estudio no se puede re-medir: no está completado o le falta el mercado confirmado."""
+
+
 class StudyRunner:
     def __init__(
         self,
@@ -68,7 +72,42 @@ class StudyRunner:
     async def resume(self, study_id: str, payload: Any) -> None:
         await self._drive(self.repo.get_study(study_id), Command(resume=payload))
 
-    async def _drive(self, study: Study, graph_input: StudyState | Command[Any]) -> None:
+    async def prepare_remeasure(self, original_id: str) -> Study:
+        """Estudio nuevo de la misma marca con el brief y el mercado confirmado de `original_id`.
+
+        El hilo nuevo se siembra como si ya hubiera pasado la revisión de competidores, así que
+        `continue_` arranca en `prompts`: las dos mediciones comparan las mismas marcas y `analyze`
+        calcula la diferencia con la medición anterior. `KeyError` si el original no existe.
+        """
+        original = self.repo.get_study(original_id)
+        if original.estado != "completado":
+            raise RemeasureError(
+                f"solo se re-mide un estudio completado; {original_id} está «{original.estado}»"
+            )
+        values, _ = await self.state(original_id)
+        market = values.get("market")
+        if market is None or not market.confirmado_por_humano:
+            raise RemeasureError(f"el estudio {original_id} no tiene el mercado confirmado")
+
+        study = new_study(original.modo).model_copy(
+            update={"brand_id": original.brand_id, "brief": original.brief}
+        )
+        self.repo.save_study(study)
+        seed: StudyState = {
+            **initial_state(study, values.get("brief_texto", "")),
+            "brief": values["brief"],
+            "market": market,
+        }
+        await self.graphs[study.modo].aupdate_state(
+            self.config(study.id), seed, as_node=REVIEW_NODES["competidores"]
+        )
+        return study
+
+    async def continue_(self, study: Study) -> None:
+        """Avanza el grafo desde su último checkpoint (estudio sembrado por `prepare_remeasure`)."""
+        await self._drive(study, None)
+
+    async def _drive(self, study: Study, graph_input: StudyState | Command[Any] | None) -> None:
         self.en_marcha.add(study.id)
         self.fallos.pop(study.id, None)
         try:

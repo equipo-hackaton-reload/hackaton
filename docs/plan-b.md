@@ -12,5 +12,14 @@ Si falla X, enseñamos Y. Todo lo de la columna Y funciona sin red y sin claves.
 | La web no arranca | API + Word descargado, o la web con mocks MSW | `VITE_USE_MOCKS=true` en `apps/web/.env` y `npm run dev` |
 | Todo lo anterior | Word de ejemplo e informe de evaluación ya generados | `docs/ejemplos/propuesta_alborada_ejemplo.docx`, `docs/evaluacion/` |
 
-Cifras de referencia (Alborada, kit): 8.ª de 10 marcas; score 25,93 en `evaluate_system.py`
-(25,87 por la API en modo fixture, ver `docs/estado/A.md`); proyección esperada 25,9 → 30,8.
+## Cifras de la demo (Alborada, kit)
+
+Fijadas en `tests/golden/test_demo_canonico.py`.
+
+- **Score de Citación: 25,93** (canónica, etiquetas del kit). En la deck: **25,9**.
+- **Posición: 8.ª de 10** marcas.
+- **Proyección del plan: 25,9 → 30,8** esperado tras la fase 3 (rango 27,8–34,0).
+
+La API en modo fixture (kit) muestra estas mismas cifras: su juez devuelve las etiquetas humanas del
+kit donde existen (`tests/e2e/test_demo_canonica_api.py`). Solo el juez por reglas puro daría 25,87
+(no clasifica el tipo de fuente ni gradúa la fuerza); con un decimal ambas son 25,9.

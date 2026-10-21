@@ -4,9 +4,9 @@ import sys
 from typing import Any
 
 import pytest
-from pydantic import BaseModel
+from pydantic import BaseModel, SecretStr
 
-from posiq.adapters.budget import Budget
+from posiq.adapters.budget import Budget, BudgetExceeded
 from posiq.adapters.engines.kit import KitEngine
 from posiq.adapters.errors import MissingCredentialError
 from posiq.adapters.repo.sql import SqlStudyRepo
@@ -15,7 +15,7 @@ from posiq.application.deps import new_study
 from posiq.application.kit import load_kit
 from posiq.application.nodes.market import reconcile
 from posiq.application.nodes.review import parse_market, parse_plan
-from posiq.application.nodes.write import LIMITACION_KIT
+from posiq.application.nodes.write import LIMITACION_KIT, LIMITACION_REGLAS
 from posiq.application.state import StudyState, initial_state
 from posiq.domain.schemas import Brand, Market, PromptInstance, Run, Trace
 from tests.application.fakes import (
@@ -23,9 +23,11 @@ from tests.application.fakes import (
     RESTRICCIONES,
     DetectionJudge,
     FakeEngine,
+    FakeGuard,
     FakeLLM,
     brief_alborada,
     kit_llm,
+    kit_settings,
     make_deps,
     plan_from_findings,
 )
@@ -251,6 +253,7 @@ async def test_judge_evaluates_market_brands_eligible_in_each_run(repo: SqlStudy
     assert judges[0].budget is not None and judges[0].budget.study_id == state["study_id"]
     assert len(repo.get_evaluations(state["study_id"])) == esperadas
     assert [t.nodo for t in update["traces"]] == ["judge:deteccion"]
+    assert update["juez"] == "deteccion"
 
 
 async def test_judge_without_credentials_falls_back_to_rules(repo: SqlStudyRepo) -> None:
@@ -263,6 +266,22 @@ async def test_judge_without_credentials_falls_back_to_rules(repo: SqlStudyRepo)
     update = await nodes.judge(state, make_deps(kit_llm(), [], repo, judge_factory=NoKeyJudge))
     assert update["evaluations"] and all(e.origen == "fallback" for e in update["evaluations"])
     assert "DEEPSEEK_API_KEY" in update["errores"][0]
+    assert update["juez"] == "reglas"
+
+
+async def test_judge_can_be_forced_to_rules_even_with_keys(repo: SqlStudyRepo) -> None:
+    state = await kit_state_until_judge(repo, n_prompts=2)
+
+    def no_llm_judge(market: Market, budget: Budget) -> DetectionJudge:
+        raise AssertionError("con JUDGE_PROVIDER=reglas no se construye el juez")
+
+    settings = kit_settings(judge_provider="reglas", deepseek_api_key=SecretStr("k"))
+    deps = make_deps(kit_llm(), [], repo, settings=settings, judge_factory=no_llm_judge)
+    update = await nodes.judge(state, deps)
+
+    assert update["evaluations"] and all(e.origen == "fallback" for e in update["evaluations"])
+    assert update["juez"] == "reglas"
+    assert update["errores"] == [] and update["traces"] == []
 
 
 async def test_analyze_computes_metrics_findings_and_compares_with_previous(
@@ -337,6 +356,63 @@ async def test_plan_keeps_persistent_violations_for_the_human(repo: SqlStudyRepo
     assert update["plan"] is not None
 
 
+async def test_plan_simulates_its_impact_without_a_guard(repo: SqlStudyRepo) -> None:
+    state = await analyzed_state(repo)
+    update = await nodes.plan(state, make_deps(kit_llm(), [], repo))
+
+    simulacion = update["simulacion"]
+    assert simulacion.study_id == state["study_id"]
+    assert simulacion.score_actual == state["metrics"].score_global.score
+    assert [p.fase for p in simulacion.proyecciones] == [f.nombre for f in update["plan"].fases]
+    assert update["calidad_plan"] is None
+    assert [t.nodo for t in update["traces"]] == ["plan.v1"]
+
+
+async def test_plan_quality_is_assessed_when_a_guard_is_available(repo: SqlStudyRepo) -> None:
+    state = await analyzed_state(repo)
+    guards: list[FakeGuard] = []
+
+    def factory(budget: Budget) -> FakeGuard:
+        guards.append(FakeGuard(budget, coste=0.01))
+        return guards[-1]
+
+    update = await nodes.plan(state, make_deps(kit_llm(), [], repo, plan_guard_factory=factory))
+
+    assert guards[0].planes == [update["plan"]]
+    assert update["calidad_plan"].nota == f"{len(update['plan'].acciones)} acciones evaluadas"
+    assert [t.nodo for t in update["traces"]] == ["plan.v1", "plan_guard:fake"]
+    assert update["coste_acumulado_eur"] == pytest.approx(state["coste_acumulado_eur"] + 0.01)
+    assert "plan_guard:fake" in {t.nodo for t in repo.get_traces(state["study_id"])}
+
+
+async def test_plan_guard_without_credentials_does_not_block(repo: SqlStudyRepo) -> None:
+    state = await analyzed_state(repo)
+    deps = make_deps(kit_llm(), [], repo, plan_guard_factory=lambda b: FakeGuard(b, sin_clave=True))
+    update = await nodes.plan(state, deps)
+
+    assert update["plan"] is not None and update["simulacion"] is not None
+    assert update["calidad_plan"] is None
+    assert any("TYPESAFE_API_KEY" in e and "sin evaluar" in e for e in update["errores"])
+
+
+async def test_plan_guard_api_failure_does_not_block(repo: SqlStudyRepo) -> None:
+    state = await analyzed_state(repo)
+    caido = RuntimeError("HTTP 500 del proveedor")
+    deps = make_deps(kit_llm(), [], repo, plan_guard_factory=lambda b: FakeGuard(b, error=caido))
+    update = await nodes.plan(state, deps)
+
+    assert update["plan"] is not None and update["calidad_plan"] is None
+    assert any("plan_guard" in e and "HTTP 500" in e for e in update["errores"])
+
+
+async def test_plan_guard_budget_exceeded_stops_the_study(repo: SqlStudyRepo) -> None:
+    state = await analyzed_state(repo)
+    agotado = BudgetExceeded("coste acumulado 5.1 € supera el máximo de 5.00 €")
+    deps = make_deps(kit_llm(), [], repo, plan_guard_factory=lambda b: FakeGuard(b, error=agotado))
+    with pytest.raises(BudgetExceeded):
+        await nodes.plan(state, deps)
+
+
 async def test_parse_plan_accepts_approval_or_an_edited_plan(repo: SqlStudyRepo) -> None:
     state = await analyzed_state(repo)
     state = merge(state, await nodes.plan(state, make_deps(kit_llm(), [], repo)))
@@ -362,8 +438,24 @@ async def test_write_overwrites_every_figure_with_the_computed_ones(repo: SqlStu
     assert p.contexto.datos_sinteticos and p.contexto.origen_datos == "kit"
     assert p.contexto.motores == ["ChatGPT", "Claude", "Gemini", "Perplexity"]
     assert p.contexto.limitaciones[0] == LIMITACION_KIT
+    assert LIMITACION_REGLAS not in p.contexto.limitaciones
     assert repo.get_proposal(state["study_id"]) == p
     assert repo.get_study(state["study_id"]).estado == "completado"
+
+
+async def test_write_declares_rule_based_evaluations(repo: SqlStudyRepo) -> None:
+    state = await analyzed_state(repo)
+    state = merge(state, await nodes.plan(state, make_deps(kit_llm(), [], repo)))
+    state = merge(state, {"juez": "reglas"})
+    update = await nodes.write(state, make_deps(kit_llm(), [], repo))
+
+    assert update["proposal"].contexto.limitaciones[:2] == [LIMITACION_KIT, LIMITACION_REGLAS]
+
+    # La demo sin claves mezcla etiquetas del kit y reglas: lo explica en sus supuestos, no aquí.
+    demo = await nodes.write(
+        merge(state, {"juez": "fixture-detection"}), make_deps(kit_llm(), [], repo)
+    )
+    assert LIMITACION_REGLAS not in demo["proposal"].contexto.limitaciones
 
 
 def test_fake_ports_satisfy_the_protocols() -> None:

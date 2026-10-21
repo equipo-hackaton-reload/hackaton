@@ -60,7 +60,10 @@ def engine_call_eur(settings: Settings) -> float:
 
 
 def judge_of(settings: Settings) -> Juez:
-    """Juez que usará el estudio según las claves: Jev, el fallback de DeepSeek o solo reglas."""
+    """Juez que usará el estudio: reglas si se fuerza (`JUDGE_PROVIDER=reglas`); si no, según las
+    claves, Jev, el fallback de DeepSeek o solo reglas."""
+    if settings.judge_provider == "reglas":
+        return "reglas"
     if settings.typesafe_api_key.get_secret_value():
         return "jev"
     if settings.deepseek_api_key.get_secret_value():

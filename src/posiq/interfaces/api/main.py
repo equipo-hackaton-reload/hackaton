@@ -3,6 +3,7 @@
 - `POST /studies` crea el estudio y lanza el grafo en segundo plano → `{study_id}`.
 - `GET /studies/{id}` estado, revisión pendiente, coste, errores y lo producido hasta ahora.
 - `POST /studies/{id}/resume` reanuda una revisión (`competidores` o `plan`) → 202.
+- `POST /studies/{id}/remeasure` re-mide un estudio completado (mismo brief y mercado) → 201.
 - `GET /studies/{id}/export?formato=docx|pdf` Word o PDF (409 sin propuesta; PDF sin soffice, 503).
 - `GET /studies/{id}/evaluations?ids=a,b` evidencias: evaluación con motor, prompt y respuesta.
 - `GET /studies/{id}/traces` trazas del estudio (modelo, tokens, coste por llamada).
@@ -34,10 +35,11 @@ from posiq.application.estimate import (
     CostEstimate,
     estimate_study,
 )
-from posiq.application.runner import ResumeError, StudyRunner
+from posiq.application.runner import RemeasureError, ResumeError, StudyRunner
 from posiq.domain.schemas import ModoEstudio, Study, Trace
 from posiq.interfaces.api.schemas import (
     Evidence,
+    RemeasureCreated,
     ResumeAccepted,
     ResumeBody,
     StudyCreate,
@@ -189,8 +191,11 @@ def create_app(runner: StudyRunner | None = None, settings: Settings | None = No
             brief=values.get("brief"),
             market=values.get("market"),
             metrics=values.get("metrics"),
+            metrics_delta=values.get("metrics_delta"),
             findings=values.get("findings"),
             plan=values.get("plan"),
+            simulacion=values.get("simulacion"),
+            calidad_plan=values.get("calidad_plan"),
             proposal=values.get("proposal"),
         )
 
@@ -210,6 +215,20 @@ def create_app(runner: StudyRunner | None = None, settings: Settings | None = No
         r.en_marcha.add(study_id)  # evita un segundo resume antes de que arranque el primero
         background.add_task(r.resume, study_id, body.payload)
         return ResumeAccepted(study_id=study_id, revision=body.revision)
+
+    @app.post("/studies/{study_id}/remeasure", status_code=status.HTTP_201_CREATED)
+    async def remeasure_study(
+        request: Request, study_id: str, background: BackgroundTasks
+    ) -> RemeasureCreated:
+        r = get_runner(request)
+        get_study(r, study_id)
+        try:
+            study = await r.prepare_remeasure(study_id)
+        except RemeasureError as exc:
+            raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
+        r.en_marcha.add(study.id)  # en_curso desde ya, antes de que arranque la tarea
+        background.add_task(r.continue_, study)
+        return RemeasureCreated(study_id=study.id, remedicion_de=study_id)
 
     @app.get("/studies/{study_id}/evaluations")
     async def read_evaluations(request: Request, study_id: str, ids: str = "") -> list[Evidence]:

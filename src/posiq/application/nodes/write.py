@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from posiq.application.deps import Deps, cost_update, db, dump, persist_traces, structured
+from posiq.application.nodes.judge import JUEZ_REGLAS
 from posiq.application.nodes.plan import metrics_summary
 from posiq.application.schemas_draft import ProposalDraft
 from posiq.application.state import StudyState
@@ -24,6 +25,12 @@ from posiq.domain.schemas import (
 
 LIMITACION_KIT = (
     "Datos sintéticos del kit del reto (ejecuciones grabadas), no mediciones reales de los motores."
+)
+# Solo cuando el nodo `judge` evaluó por reglas (por elección o sin clave). La demo sin claves
+# (`FixtureJudge`) mezcla etiquetas humanas del kit y reglas, y lo explica en sus propios supuestos.
+LIMITACION_REGLAS = (
+    "Menciones evaluadas solo por reglas (aparición y posición), sin juez LLM: el tipo de mención, "
+    "el sentimiento y la fuerza de la recomendación no se han juzgado."
 )
 
 
@@ -47,6 +54,8 @@ def assemble_proposal(draft: ProposalDraft, state: StudyState) -> Proposal:
             "el borrador debe interpretar exactamente los ids de hallazgos del estudio"
         )
     limitaciones = list(draft.supuestos)
+    if state.get("juez") == JUEZ_REGLAS:
+        limitaciones.insert(0, LIMITACION_REGLAS)
     if state["modo"] == "kit":
         limitaciones.insert(0, LIMITACION_KIT)
     hitos = []

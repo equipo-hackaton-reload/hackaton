@@ -5,6 +5,7 @@ No importa tests ni pytest y no pretende interpretar briefs de otras marcas.
 
 from collections.abc import Sequence
 from datetime import UTC, datetime
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -16,6 +17,7 @@ from posiq.adapters.llm._fixture_data import (
     example_plan,
 )
 from posiq.application.schemas_draft import ProposalDraft
+from posiq.domain import kit_loader as kl
 from posiq.domain.detection import detect_in_run, evaluation_from_detection
 from posiq.domain.schemas import Brand, BriefSummary, Evaluation, Finding, Market, Plan, Run, Trace
 from posiq.prompts import PromptSet
@@ -99,7 +101,10 @@ class FixtureLLM:
             output = ProposalDraft(
                 resumen_ejecutivo="DEMO SIN IA: textos y plan de ejemplo, datos sintéticos. "
                 + proposal.resumen_ejecutivo,
-                contexto_alcance="Kit Alborada; evaluación por reglas sin juez semántico.",
+                contexto_alcance=(
+                    "Kit Alborada; sin juez semántico: etiquetas del kit donde existen, "
+                    "reglas en el resto."
+                ),
                 diagnostico=proposal.diagnostico.texto,
                 competencia=proposal.competencia.texto,
                 interpretacion_hallazgos={f.id: f.descripcion for f in proposal.hallazgos},
@@ -108,7 +113,8 @@ class FixtureLLM:
                 riesgos=proposal.riesgos,
                 supuestos=[
                     "Textos, objetivos y plan de ejemplo; no son recomendaciones generadas por IA.",
-                    "Todas las evaluaciones se basan en detección; fuerza neutra si aparece.",
+                    "Evaluaciones: etiquetas humanas del kit donde existen; en el resto, detección "
+                    "por reglas con fuerza neutra si aparece.",
                     "Datos sintéticos; ninguna acción garantiza resultados.",
                 ],
                 hoja_ruta=proposal.hoja_ruta.seguimiento,
@@ -120,16 +126,34 @@ class FixtureLLM:
         ), fixture_trace(study_id, prompt_name)
 
 
+@lru_cache(maxsize=4)
+def _kit_labels(kit_dir: str) -> dict[str, Evaluation]:
+    """Etiquetas humanas de `muestra_evaluada.csv` por id `run_id:brand_id`."""
+    path = Path(kit_dir)
+    brands = kl.load_brands(path / "marcas.csv")
+    sample = kl.load_evaluated_sample(path / "muestra_evaluada.csv", brands, "kit")
+    return {e.id: e for e in sample}
+
+
 class FixtureJudge:
-    """Suelo por reglas: fuerza 1 si aparece, sin inventar sentimiento o recomendación."""
+    """Sin juez semántico: etiquetas del kit donde existen y, en el resto, suelo por reglas.
+
+    Con `kit_dir`, una ejecución del kit (`origen == "kit"`) etiquetada en `muestra_evaluada.csv`
+    devuelve esa etiqueta humana (la verdad de referencia del reto); si no, fuerza 1 si aparece,
+    sin inventar sentimiento o recomendación.
+    """
 
     name = "fixture-detection"
 
-    def __init__(self, market: Market) -> None:
+    def __init__(self, market: Market, kit_dir: str | Path | None = None) -> None:
         self.market = market
+        self.labels = _kit_labels(str(Path(kit_dir).resolve())) if kit_dir else {}
         self.traces: list[Trace] = []
 
     def evaluate(self, run: Run, brand: Brand) -> Evaluation:
+        label = self.labels.get(f"{run.id}:{brand.id}") if run.origen == "kit" else None
+        if label is not None:
+            return label.model_copy(update={"study_id": run.study_id})
         detection = detect_in_run(run, self.market.marcas).get(brand.id)
         return evaluation_from_detection(run, brand, detection)
 

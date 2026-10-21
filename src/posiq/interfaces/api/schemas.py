@@ -4,18 +4,21 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
+from posiq.domain.quality_schemas import PlanQuality
 from posiq.domain.schemas import (
     BriefSummary,
     Evaluation,
     Finding,
     Market,
     Metrics,
+    MetricsDelta,
     ModoEstudio,
     Motor,
     Plan,
     Proposal,
     Study,
 )
+from posiq.domain.simulation_schemas import SimulationResult
 
 EstadoApi = Literal[
     "en_curso",
@@ -35,6 +38,13 @@ class StudyCreated(BaseModel):
     study_id: str
 
 
+class RemeasureCreated(BaseModel):
+    """Estudio nuevo que re-mide `remedicion_de` con su brief y su mercado confirmado."""
+
+    study_id: str
+    remedicion_de: str
+
+
 class StudyView(BaseModel):
     study: Study
     estado: EstadoApi
@@ -44,8 +54,14 @@ class StudyView(BaseModel):
     brief: BriefSummary | None = None
     market: Market | None = None
     metrics: Metrics | None = None
+    # Diferencia con la medición anterior de la marca (None en la primera medición).
+    metrics_delta: MetricsDelta | None = None
     findings: list[Finding] | None = None
     plan: Plan | None = None
+    # Ayudas a la revisión del plan: proyección del score (estimación con supuestos, no promesa)
+    # y calidad por acción (None si no hay claves de juez).
+    simulacion: SimulationResult | None = None
+    calidad_plan: PlanQuality | None = None
     proposal: Proposal | None = None
 
 
