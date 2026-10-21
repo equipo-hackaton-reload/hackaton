@@ -1,9 +1,10 @@
 """Cifras canónicas de la demo de Alborada: las que van a la deck y a `docs/plan-b.md`.
 
 La canónica sale de las etiquetas del kit (`kit.evaluations()`), la verdad de referencia del reto.
-La API en modo fixture usa el juez por reglas (`evaluation_from_detection`): misma aparición,
-posición y ranking, pero no clasifica el tipo de fuente ni gradúa la fuerza, así que da 25,87. Con
-un decimal las dos coinciden en 25,9.
+La API en modo fixture/kit usa también esas etiquetas (`tests/e2e/test_demo_canonica_api.py`). El
+juez por reglas puro (`evaluation_from_detection`) tiene misma aparición, posición y ranking, pero
+no clasifica el tipo de fuente ni gradúa la fuerza, así que da 25,87. Con un decimal coinciden en
+25,9.
 """
 
 import pytest

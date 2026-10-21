@@ -10,8 +10,9 @@
 
 ## Siguiente tarea
 - Hecho en `feature/A-score-canonico`: cifra canónica **25,93** (etiquetas del kit; 25,9 en la deck),
-  8.ª de 10, proyección 25,9 → 30,8, fijadas en `tests/golden/test_demo_canonico.py`. La API en
-  fixture da 25,87 porque su juez por reglas no clasifica tipo de fuente ni gradúa la fuerza.
+  8.ª de 10, proyección 25,9 → 30,8, fijadas en `tests/golden/test_demo_canonico.py`. Hecho en
+  `feature/A-demo-canonica`: la API en fixture/kit también da 25,93 → 30,8 (el `FixtureJudge` usa
+  las etiquetas del kit donde existen), fijado en `tests/e2e/test_demo_canonica_api.py`.
 - Medir la cifra con Jev real cuando haya `TYPESAFE_API_KEY` y compararla con la canónica.
 - Cierre de hito: CHANGELOG y `VERSION` por PR; luego `git push origin develop:main` (fast-forward, a mano) y tag.
 
