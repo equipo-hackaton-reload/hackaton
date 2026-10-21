@@ -6,10 +6,12 @@ from pydantic import BaseModel, Field
 
 from posiq.domain.schemas import (
     BriefSummary,
+    Evaluation,
     Finding,
     Market,
     Metrics,
     ModoEstudio,
+    Motor,
     Plan,
     Proposal,
     Study,
@@ -36,7 +38,7 @@ class StudyCreated(BaseModel):
 class StudyView(BaseModel):
     study: Study
     estado: EstadoApi
-    revision_pendiente: Literal["none", "competidores", "plan"]
+    revision_pendiente: Literal["competidores", "plan"] | None
     coste_acumulado_eur: float
     errores: list[str]
     brief: BriefSummary | None = None
@@ -55,3 +57,13 @@ class ResumeBody(BaseModel):
 class ResumeAccepted(BaseModel):
     study_id: str
     revision: Literal["competidores", "plan"]
+
+
+class Evidence(BaseModel):
+    """Una evaluación con el motor, el prompt y un extracto de la respuesta de su ejecución."""
+
+    evaluation: Evaluation
+    motor: Motor
+    prompt: str
+    texto_respuesta: str
+    fuentes: list[str]

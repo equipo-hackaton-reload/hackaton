@@ -3,7 +3,10 @@
 - `POST /studies` crea el estudio y lanza el grafo en segundo plano → `{study_id}`.
 - `GET /studies/{id}` estado, revisión pendiente, coste, errores y lo producido hasta ahora.
 - `POST /studies/{id}/resume` reanuda una revisión (`competidores` o `plan`) → 202.
-- `GET /studies/{id}/export?formato=docx|pdf` exportación (Zona E; hoy 501).
+- `GET /studies/{id}/export?formato=docx|pdf` Word o PDF (409 sin propuesta; PDF sin soffice, 503).
+- `GET /studies/{id}/evaluations?ids=a,b` evidencias: evaluación con motor, prompt y respuesta.
+- `GET /studies/{id}/traces` trazas del estudio (modelo, tokens, coste por llamada).
+- `GET /estimate?modo=&n_prompts=&n_motores=&repeticiones=` coste estimado antes de ejecutar.
 - `GET /studies?brand_id=` lista de estudios.
 - `GET /health`.
 
@@ -24,15 +27,24 @@ from pydantic import ValidationError
 
 from posiq.adapters.export import DocxExporter, PdfExporter, SofficeNotFoundError
 from posiq.application.deps import db
+from posiq.application.estimate import (
+    KIT_MOTORES,
+    KIT_PROMPTS,
+    KIT_REPETICIONES,
+    CostEstimate,
+    estimate_study,
+)
 from posiq.application.runner import ResumeError, StudyRunner
-from posiq.domain.schemas import ModoEstudio, Study
+from posiq.domain.schemas import ModoEstudio, Study, Trace
 from posiq.interfaces.api.schemas import (
+    Evidence,
     ResumeAccepted,
     ResumeBody,
     StudyCreate,
     StudyCreated,
     StudyView,
 )
+from posiq.interfaces.api.views import evidence
 from posiq.interfaces.api.wiring import runner_from_settings
 from posiq.settings import Settings
 
@@ -102,12 +114,14 @@ def create_app(runner: StudyRunner | None = None, settings: Settings | None = No
         if runner is not None:
             yield
             return
-        async with runner_from_settings(settings or Settings()) as built:
+        app.state.settings = settings or Settings()
+        async with runner_from_settings(app.state.settings) as built:
             app.state.runner = built
             yield
 
     app = FastAPI(title="posiq.", lifespan=lifespan)
     app.state.runner = runner
+    app.state.settings = settings
     app.add_middleware(
         CORSMiddleware,
         allow_origin_regex=LOCALHOST,
@@ -128,6 +142,10 @@ def create_app(runner: StudyRunner | None = None, settings: Settings | None = No
             raise HTTPException(
                 status.HTTP_404_NOT_FOUND, f"no existe el estudio {study_id}"
             ) from None
+
+    def get_settings(request: Request) -> Settings:
+        current: Settings | None = request.app.state.settings
+        return current or Settings()
 
     @app.get("/health")
     async def health() -> dict[str, str]:
@@ -160,10 +178,12 @@ def create_app(runner: StudyRunner | None = None, settings: Settings | None = No
         errores = list(values.get("errores", []))
         if study_id in r.fallos:
             errores.append(r.fallos[study_id])
+        # El grafo guarda "none" en su estado; la web recibe null.
+        pendiente = values.get("revision_pendiente", "none")
         return StudyView(
             study=study,
             estado=r.estado(study),  # type: ignore[arg-type]
-            revision_pendiente=values.get("revision_pendiente", "none"),
+            revision_pendiente=None if pendiente == "none" else pendiente,
             coste_acumulado_eur=values.get("coste_acumulado_eur", 0.0),
             errores=errores,
             brief=values.get("brief"),
@@ -191,6 +211,36 @@ def create_app(runner: StudyRunner | None = None, settings: Settings | None = No
         background.add_task(r.resume, study_id, body.payload)
         return ResumeAccepted(study_id=study_id, revision=body.revision)
 
+    @app.get("/studies/{study_id}/evaluations")
+    async def read_evaluations(request: Request, study_id: str, ids: str = "") -> list[Evidence]:
+        r = get_runner(request)
+        get_study(r, study_id)
+        values, _ = await r.state(study_id)
+        return evidence(values, [i for i in ids.split(",") if i])
+
+    @app.get("/studies/{study_id}/traces")
+    async def read_traces(request: Request, study_id: str) -> list[Trace]:
+        r = get_runner(request)
+        get_study(r, study_id)
+        values, _ = await r.state(study_id)
+        return list(values.get("traces", []))
+
+    @app.get("/estimate")
+    async def estimate(
+        request: Request,
+        modo: ModoEstudio,
+        n_prompts: Annotated[int, Query(ge=1)] = KIT_PROMPTS,
+        n_motores: Annotated[int, Query(ge=1)] = KIT_MOTORES,
+        repeticiones: Annotated[int, Query(ge=1)] = KIT_REPETICIONES,
+    ) -> CostEstimate:
+        return estimate_study(
+            modo,
+            get_settings(request),
+            n_prompts=n_prompts,
+            n_motores=n_motores,
+            repeticiones=repeticiones,
+        )
+
     @app.get("/studies/{study_id}/export")
     async def export_study(
         request: Request, study_id: str, formato: Literal["docx", "pdf"] = "docx"
@@ -200,7 +250,7 @@ def create_app(runner: StudyRunner | None = None, settings: Settings | None = No
         values, _ = await r.state(study_id)
         proposal = values.get("proposal")
         if proposal is None:
-            raise HTTPException(status.HTTP_409_CONFLICT, "la propuesta a?n no est? completada")
+            raise HTTPException(status.HTTP_409_CONFLICT, "la propuesta aún no está completada")
         from posiq.ports import Exporter
 
         exporter: Exporter = DocxExporter() if formato == "docx" else PdfExporter()
