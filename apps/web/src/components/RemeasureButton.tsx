@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ApiError } from "../api/client";
-import { useRemeasure, useRemeasureEstimate } from "../api/hooks";
+import { RemedicionRealNoDisponible, useRemeasure, useRemeasureEstimate } from "../api/hooks";
 import { fmtEur } from "../lib/format";
 import { CostEstimateView } from "./CostEstimateView";
 
@@ -95,10 +95,14 @@ function RemeasureDialog({ studyId, onClose }: { studyId: string; onClose: () =>
               {est.aproximada && (
                 <p className="mt-2 text-meta text-muted" data-testid="estimacion-aproximada">
                   Esta API todavía no calcula el coste propio de la re-medición: se muestra su estimación para un
-                  estudio nuevo del mismo modo.
+                  estudio nuevo en modo kit, que no tiene coste de motores.
                 </p>
               )}
             </>
+          ) : estimate.error instanceof RemedicionRealNoDisponible ? (
+            <p className="text-negative" data-testid="remedicion-no-disponible">
+              {estimate.error.message}
+            </p>
           ) : (
             <p className="text-negative">
               No se pudo obtener la estimación del coste

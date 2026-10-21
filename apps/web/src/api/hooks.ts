@@ -52,14 +52,27 @@ export function useResume(id: string) {
   });
 }
 
-/** Coste de volver a medir `id` con el mismo modo que el original. Siempre fresco. */
 /** Estimación de la re-medición; `aproximada` si viene de `GET /estimate` por falta de la ruta propia. */
 export type EstimacionRemedicion = CostEstimate & { aproximada?: boolean };
 
 /**
- * `GET /studies/{id}/remeasure/estimate`. Si la API todavía no ofrece esa ruta (404 «Not Found»), se
- * usa `GET /estimate` con el modo del estudio y se marca como aproximada: el coste sigue saliendo de la
- * API, nunca de la web.
+ * La API no ofrece `GET /remeasure/estimate` y el estudio es de modo real: no hay coste propio que
+ * confirmar y `POST /remeasure` todavía no valida `confirmado` ni `coste_estimado_eur`, así que la web
+ * no deja lanzar un gasto de pago con una cifra aproximada.
+ */
+export class RemedicionRealNoDisponible extends Error {
+  constructor() {
+    super(
+      "Esta API todavía no calcula el coste propio de la re-medición ni lo valida al lanzarla. En modo real no se puede volver a medir hasta que lo haga.",
+    );
+    this.name = "RemedicionRealNoDisponible";
+  }
+}
+
+/**
+ * `GET /studies/{id}/remeasure/estimate`. Si la API todavía no ofrece esa ruta (404 «Not Found»), solo
+ * en modo kit (0 €) se usa `GET /estimate` y se marca como aproximada; en modo real se rechaza con
+ * `RemedicionRealNoDisponible`. El coste sigue saliendo de la API, nunca de la web.
  */
 async function estimacionRemedicion(id: string): Promise<EstimacionRemedicion> {
   try {
@@ -67,6 +80,7 @@ async function estimacionRemedicion(id: string): Promise<EstimacionRemedicion> {
   } catch (e) {
     if (!rutaNoDisponible(e)) throw e;
     const { study } = await api.getStudy(id);
+    if (study.modo !== "kit") throw new RemedicionRealNoDisponible();
     return { ...(await api.estimate(study.modo)), aproximada: true };
   }
 }

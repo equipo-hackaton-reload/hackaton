@@ -185,4 +185,36 @@ describe("API sin las rutas de seguimiento (404 «Not Found»)", () => {
     expect(nb(within(dialogo).getByTestId("estimacion").textContent)).toContain("0,00 €");
     expect(within(dialogo).getByRole("button", { name: /Confirmar y medir/ })).toBeEnabled();
   });
+
+  it("sin estimación propia, en modo real no deja confirmar ni envía el POST", async () => {
+    const { user: cuenta } = iniciarSesion();
+    const id = db.crear("real", cuenta.id);
+    db.completar(id);
+    let posts = 0;
+    let estimacionNueva = 0;
+    server.use(
+      http.get(`${API_URL}/studies/:id/remeasure/estimate`, rutaInexistente),
+      http.get(`${API_URL}/estimate`, () => {
+        estimacionNueva += 1;
+        return HttpResponse.json(ESTIMACION_KIT);
+      }),
+      http.post(`${API_URL}/studies/:id/remeasure`, () => {
+        posts += 1;
+        return HttpResponse.json({}, { status: 500 });
+      }),
+    );
+    const user = userEvent.setup();
+    render(<App initialPath={`/studies/${id}/diagnostico`} client={testClient()} requireLogin />);
+    await user.click(await screen.findByRole("button", { name: "Volver a medir" }));
+    const dialogo = screen.getByRole("dialog", { name: "Volver a medir" });
+    expect(await within(dialogo).findByTestId("remedicion-no-disponible")).toHaveTextContent(
+      "En modo real no se puede volver a medir",
+    );
+    expect(within(dialogo).queryByTestId("estimacion")).not.toBeInTheDocument();
+    const confirmar = within(dialogo).getByRole("button", { name: /Confirmar y medir/ });
+    expect(confirmar).toBeDisabled();
+    await user.click(confirmar);
+    expect(posts).toBe(0);
+    expect(estimacionNueva).toBe(0);
+  });
 });

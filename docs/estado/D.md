@@ -28,8 +28,10 @@
   plan que sobrevive al cambio de pestaña (`lib/planDraft.ts`).
 - Degradación sin las rutas de seguimiento: un 404 «Not Found» de FastAPI (`rutaNoDisponible` en
   `api/client.ts`) en `/brands` o `/brands/{id}/serie` muestra «Seguimiento no disponible todavía»
-  sin «Reintentar»; sin `/remeasure/estimate`, el diálogo usa `GET /estimate` del modo del estudio y
-  lo avisa («estimación aproximada»). TanStack Query ya no reintenta los 4xx. Estimación con el
+  sin «Reintentar»; sin `/remeasure/estimate`, solo en modo kit (0 €) el diálogo usa `GET /estimate`
+  y lo avisa («estimación aproximada»); en modo real no deja confirmar (`RemedicionRealNoDisponible`)
+  porque `POST /remeasure` aún no valida `confirmado` ni el coste y no se lanza gasto de pago con una
+  cifra aproximada. TanStack Query ya no reintenta los 4xx. Estimación con el
   desglose de #37 (motores, LLM, juez, PlanGuard; kit a 0 €).
 - Probado de punta a punta con la API real (fixture, kit, BD temporal, `VITE_USE_MOCKS=false`):
   registro → verificación con `codigo_dev` → login → estudio kit → competidores → diagnóstico
@@ -41,7 +43,10 @@
 ## Falta
 - Integrar `/brands`, `/brands/{id}/serie` y `/studies/{id}/remeasure/estimate` cuando los publique
   la etapa «Seguimiento API» (zona C; hoy responden 404 y la web degrada). `POST /remeasure` ya existe
-  pero ignora `{confirmado, coste_estimado_eur}`: el 409 por coste cambiado solo lo da el mock; `types/tracking.ts` ya replica `domain/tracking_schemas.py` (#35).
+  pero ignora `{confirmado, coste_estimado_eur}`: el 409 por coste cambiado solo lo da el mock y la
+  única protección del gasto es la de la web. Zona C: validar `confirmado` y `coste_estimado_eur` en el
+  servidor y exigir un indicador explícito cuando supere `presupuesto_max_eur`; entonces se puede
+  reactivar «Volver a medir» en real sin la ruta de estimación propia; `types/tracking.ts` ya replica `domain/tracking_schemas.py` (#35).
 - `Objective` no trae `unidad`: la web la infiere (KPI de tasa con valores 0-1 → porcentaje). Si A
   añade `unidad` al objetivo, la web ya la usa.
 - Mostrar `proposal.encargo` (ver abajo).
