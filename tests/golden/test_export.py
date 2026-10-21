@@ -121,7 +121,16 @@ def proposal(kit: Kit, alborada_brief: BriefSummary) -> Proposal:
     return Proposal(
         study_id=STUDY_ID,
         resumen_ejecutivo=(
-            "Alborada aparece poco cuando nadie la nombra.\nProponemos un plan por fases."
+            "Clínica Alborada Visión cuenta con un sólido reconocimiento asistido en los "
+            "asistentes de IA analizados, alcanzando una presencia del 100 % cuando los usuarios "
+            "consultan directamente por la marca.\n"
+            "Sin embargo, ante consultas abiertas y espontáneas sobre cirugía refractiva y control "
+            "de miopía infantil, la recomendación desciende significativamente, situándose por "
+            "detrás del líder del sector (Grupo Hospitalario Valdecruz).\n"
+            "Se propone un plan estratégico por fases orientado a reforzar la presencia en fuentes "
+            "sanitarias de referencia, generar contenido especializado para momentos de decisión y "
+            "recuperar visibilidad en Barcelona, respetando escrupulosamente la normativa de "
+            "publicidad sanitaria y los recursos del equipo."
         ),
         contexto=Contexto(
             marca=alborada_brief.marca,
@@ -131,20 +140,30 @@ def proposal(kit: Kit, alborada_brief: BriefSummary) -> Proposal:
             origen_datos="kit",
             datos_sinteticos=True,
             limitaciones=[
-                "Datos sintéticos del kit",
-                "Los motores no son deterministas",
-                "No se garantizan resultados",
+                "Datos sintéticos del kit del reto: reproducen con fidelidad la estructura de "
+                "un estudio GEO, pero no reflejan cuotas reales de mercado.",
+                "Naturaleza probabilística de los modelos de lenguaje: las respuestas varían en "
+                "el tiempo y requieren seguimiento periódico.",
+                "Publicidad sanitaria regulada (RD 1907/1996): el plan no promete resultados ni "
+                "hace comparativas denigratorias, y cada contenido necesita revisión médica y "
+                "jurídica de la clínica antes de publicarse. Las mejoras de visibilidad son "
+                "hipótesis técnicas y no garantizan resultados clínicos ni comerciales.",
             ],
         ),
         diagnostico=Diagnostico(
-            texto="Diagnóstico sobre la visibilidad espontánea.", metrics=metrics
+            texto="Diagnóstico detallado sobre la visibilidad espontánea y asistida por motor, "
+            "fase del embudo y ciudad.",
+            metrics=metrics,
         ),
         competencia=Competencia(
-            texto="El líder concentra las recomendaciones.", ranking=metrics.ranking
+            texto="Análisis comparativo de posicionamiento y brecha de fuentes frente al líder "
+            "del mercado y competidores.",
+            ranking=metrics.ranking,
         ),
         hallazgos=findings,
         estrategia=Estrategia(
-            texto="Ganar recomendación espontánea en Madrid y Barcelona.",
+            texto="Estrategia orientada a consolidar la prescripción espontánea en Madrid y "
+            "Barcelona, impulsando la autoridad en fuentes médicas clave.",
             objetivos=[
                 Objective(
                     kpi="Score de Citación",
@@ -161,12 +180,24 @@ def proposal(kit: Kit, alborada_brief: BriefSummary) -> Proposal:
             metodologia="Re-ejecución del estudio con el mismo banco de prompts",
             cadencia="Trimestral",
         ),
-        riesgos=[Riesgo(riesgo="Cambios de modelo", mitigacion="Re-medición periódica")],
+        riesgos=[
+            Riesgo(
+                riesgo="Variabilidad de fuentes y modelos de IA",
+                mitigacion="Protocolo de re-medición periódica para monitorizar cambios "
+                "algorítmicos",
+            ),
+            Riesgo(
+                riesgo="Marco regulatorio en publicidad sanitaria",
+                mitigacion="Revisión médica previa de todo contenido divulgativo sin promesas de "
+                "resultados",
+            ),
+        ],
         hoja_ruta=HojaRuta(
             hitos=[Hito(semana=0, descripcion="Medición inicial")],
             responsabilidades={"agencia": ["A1"], "tercero": ["A2"]},
             presupuesto_eur=22000,
-            seguimiento="Comité mensual",
+            seguimiento="Comité mensual de seguimiento y presentación de informe evolutivo al "
+            "comité de dirección",
         ),
         marcas={b.id: b.nombre for b in kit.brands},
     )

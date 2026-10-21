@@ -297,11 +297,12 @@ def alborada_proposal(
     return Proposal(
         study_id=metrics.study_id,
         resumen_ejecutivo=(
-            f"{brief.marca} aparece en los asistentes de IA sobre todo cuando la pregunta la "
-            "nombra, pero mucho menos cuando el usuario pregunta en general, y queda por detrás "
-            "del líder del mercado. Se propone un plan por fases centrado en las fuentes que citan "
-            "los motores, contenido que responde a preguntas reales y Barcelona. Datos sintéticos "
-            "del kit del hackathon."
+            f"{brief.marca} cuenta con un sólido reconocimiento asistido en los asistentes de IA, "
+            "pero su prescripción desciende sensiblemente ante consultas abiertas sobre cirugía "
+            "refractiva y control de miopía infantil, situándose por detrás del líder del mercado. "
+            "Se propone un plan estratégico por fases centrado en fuentes sanitarias de autoridad, "
+            "contenido clínico para momentos de decisión y refuerzo local en Barcelona, respetando "
+            "escrupulosamente la normativa de publicidad sanitaria y los recursos del equipo."
         ),
         contexto=Contexto(
             marca=brief.marca,
@@ -311,23 +312,33 @@ def alborada_proposal(
             origen_datos="kit",
             datos_sinteticos=True,
             limitaciones=[
-                "Datos sintéticos: reproducen la estructura de un estudio real, no su resultado.",
-                "Evaluaciones de la muestra etiquetadas por personas; el resto, solo por reglas.",
-                "Foto en una fecha: los asistentes cambian y hay que volver a medir.",
+                "Datos sintéticos del kit del reto: reproducen con fidelidad la estructura de "
+                "un estudio GEO, no cuotas reales.",
+                "Evaluaciones de la muestra etiquetadas por personas; el resto calculadas por "
+                "reglas deterministas.",
+                "Naturaleza probabilística de los asistentes de IA: foto temporal que precisa "
+                "de re-medición periódica.",
+                "Publicidad sanitaria regulada (RD 1907/1996): el plan no promete resultados ni "
+                "hace comparativas denigratorias, y cada contenido necesita revisión médica y "
+                "jurídica de la clínica antes de publicarse. Las mejoras de visibilidad son "
+                "estimaciones técnicas y no garantizan resultados clínicos ni comerciales.",
             ],
         ),
         diagnostico=Diagnostico(
-            texto="Diagnóstico de visibilidad espontánea y asistida por motor, fase y ciudad.",
+            texto="Diagnóstico de visibilidad espontánea y asistida segmentado por motor, "
+            "fase del embudo y ámbito geográfico.",
             metrics=metrics,
         ),
         competencia=Competencia(
-            texto="Ranking por Score de Citación espontáneo frente a competidores y líder.",
+            texto="Ranking comparativo por Score de Citación espontáneo y brecha de fuentes "
+            "frente al líder del sector.",
             ranking=list(metrics.ranking),
         ),
         hallazgos=findings,
         estrategia=Estrategia(
-            texto="Ganar presencia en las fuentes que citan los motores y responder a las "
-            "preguntas de comparación y decisión, empezando por los motores más débiles.",
+            texto="Consolidar la prescripción espontánea en Madrid y Barcelona, impulsando "
+            "la presencia en fuentes médicas citadas por los motores y respondiendo a dudas "
+            "clave de decisión.",
             objetivos=list(plan.objetivos),
             prioridades=["Autoridad en terceros", "Contenido de decisión", "Barcelona"],
         ),
@@ -343,15 +354,16 @@ def alborada_proposal(
                 mitigacion="Re-medición trimestral y comparación solo entre estudios compatibles",
             ),
             Riesgo(
-                riesgo="Publicidad sanitaria regulada",
-                mitigacion="Revisión de cada contenido frente a las restricciones del brief",
+                riesgo="Publicidad sanitaria regulada (RD 1907/1996)",
+                mitigacion="Supervisión facultativa de cada contenido divulgativo sin promesas "
+                "de resultados ni comparativas",
             ),
         ],
         hoja_ruta=HojaRuta(
             hitos=hitos,
             responsabilidades=responsabilidades,
             presupuesto_eur=plan.presupuesto_estimado_eur,
-            seguimiento="Informe de evolución trimestral al comité de dirección",
+            seguimiento="Informe de evolución trimestral presentado al comité de dirección",
         ),
         marcas={b.id: b.nombre for b in brands},
     )
