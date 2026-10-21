@@ -159,7 +159,8 @@ def test_mismas_condiciones_son_comparables() -> None:
     [
         ({"version_metodologia": "metodo-2"}, "versión de la metodología"),
         (
-            {"prompts": [PROMPTS[0], PROMPTS[1].model_copy(update={"texto": "Otra pregunta"})]},
+            # Ninguna pregunta en común: no hay núcleo común sobre el que comparar.
+            {"prompts": [p.model_copy(update={"texto": f"Otra {p.id}"}) for p in PROMPTS]},
             "banco de prompts",
         ),
         ({"motores": ("ChatGPT", "Gemini", "Claude")}, "motores"),

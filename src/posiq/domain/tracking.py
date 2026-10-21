@@ -5,11 +5,19 @@ prompts y la misma versión de la metodología. Este módulo convierte varias me
 de una marca en una `SerieMarca` y solo informa de los cambios que salen del margen de error.
 
 - **Comparabilidad** (`comparabilidad`): dos mediciones consecutivas se comparan si coinciden la
-  versión de la metodología, la del score, la huella del banco de prompts (`huella_banco`) y el
-  conjunto de motores. Si cambia el modelo de un motor (`Run.modelo`), siguen siendo comparables,
-  con un aviso. Si no lo son, se dicen los motivos y no se calcula ningún cambio entre ellas.
-  Si cambia el conjunto de marcas del mercado, el score y la aparición siguen siendo comparables,
-  pero el puesto y la diferencia frente a los competidores no se calculan como cambio.
+  versión de la metodología, la del score, el juez (`juez_medicion`), el banco de prompts
+  (`huella_banco`) y el conjunto de motores. Si cambia el modelo de un motor (`Run.modelo`), siguen
+  siendo comparables, con un aviso. Si no lo son, se dicen los motivos y no se calcula ningún
+  cambio entre ellas. Si cambia el conjunto de marcas del mercado (o su versión), el score y la
+  aparición siguen siendo comparables, pero el puesto y la diferencia frente a los competidores no
+  se calculan como cambio.
+- **Núcleo común del banco:** si el banco crece o se recorta pero quedan preguntas comunes
+  (`clave_pregunta`), el par se compara solo sobre ellas: se recalculan las métricas de cada
+  medición con esas preguntas y los cambios llevan `sobre_nucleo_comun=True`. El score del banco
+  completo se informa aparte (`PuntoSerie.score`) y no se compara.
+- **Configuración versionada:** `version_perfil` y `version_mercado` de cada medición; la serie
+  marca dónde cambian (`SerieMarca.cambios_configuracion`). La exactitud se verifica contra el
+  perfil vigente en la fecha de la medición (`exactitud_con_perfil`, `vigente_en`).
 - **Cambios** entre puntos consecutivos comparables:
   - Score de la marca: bootstrap independiente de cada estudio (`stats.significancia_remedicion`).
   - Aparición espontánea global y por motor: Newcombe (`stats.significancia_remedicion`).
@@ -29,13 +37,26 @@ import hashlib
 import json
 import random
 from collections.abc import Iterable, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime
 from statistics import fmean
 from typing import Final, NamedTuple
 
-from posiq.domain.accuracy_schemas import HallazgoExactitud
-from posiq.domain.schemas import Dimension, Market, Metrics, Motor, PromptInstance, Source, Study
+from posiq.domain.accuracy import evaluar_exactitud
+from posiq.domain.accuracy_schemas import AccionMitigacion, Afirmacion, HallazgoExactitud
+from posiq.domain.metrics import compute_metrics
+from posiq.domain.schemas import (
+    Brand,
+    Dimension,
+    Market,
+    Metrics,
+    Motor,
+    PromptInstance,
+    Run,
+    Source,
+    Study,
+    Trace,
+)
 from posiq.domain.scoring import (
     AppearanceProfile,
     appearance_quality,
@@ -63,11 +84,16 @@ from posiq.domain.stats import (
 )
 from posiq.domain.stats_schemas import Intervalo, Significancia
 from posiq.domain.tracking_schemas import (
+    CambioConfiguracion,
     CambioSerie,
     IndicadorAdelantado,
+    NucleoComun,
     PuntoSerie,
+    QueCambia,
     SerieMarca,
     ValorIndicador,
+    VersionMercado,
+    VersionPerfil,
 )
 
 SIN_CAMBIOS: Final = "Sin cambios fuera del margen de error"
@@ -78,6 +104,10 @@ RESUMEN_SIN_MEDICIONES: Final = "Sin mediciones: aún no hay con qué comparar."
 NO_COMPARABLE: Final = "No comparable con la medición anterior"
 SIN_DATOS_CAMBIOS: Final = "No hay datos para calcular cambios con la medición anterior."
 MOTIVO_COMPETIDORES: Final = "Cambian los competidores del mercado"
+MOTIVO_JUEZ: Final = "Cambia el juez"
+MOTIVO_BANCO: Final = "Cambia el banco de prompts"
+PREFIJO_JUEZ_TRAZA: Final = "judge:"
+"""Las trazas del juez se llaman `judge:<proveedor>` (`adapters/judge/base.py`)."""
 TOP_FUENTES_MERCADO: Final = 5
 """Fuentes ganadas más citadas del mercado del estudio para el indicador de presencia."""
 
@@ -92,7 +122,12 @@ class MedicionSerie:
     """Una medición de la marca: su estudio, sus métricas y la muestra con la que se calcularon.
 
     `market` y `catalogo` (opcionales) permiten los indicadores de fuentes; `exactitud` (opcional,
-    de `accuracy.evaluar_exactitud`), los de exactitud. Sin ellos, esos indicadores valen None.
+    de `accuracy.evaluar_exactitud` o `exactitud_con_perfil`), los de exactitud. Sin ellos, esos
+    indicadores valen None.
+
+    `juez` (opcional, «proveedor/modelo») declara quién evaluó; si falta, se deduce de `trazas` y
+    de `Evaluation.origen` (`juez_medicion`). `version_perfil`/`version_mercado` (opcionales): la
+    configuración de la marca vigente en la fecha de la medición.
     """
 
     study: Study
@@ -101,17 +136,27 @@ class MedicionSerie:
     market: Market | None = None
     catalogo: Sequence[Source] = field(default_factory=tuple)
     exactitud: HallazgoExactitud | None = None
+    juez: str | None = None
+    trazas: Sequence[Trace] = field(default_factory=tuple)
+    version_perfil: str | None = None
+    version_mercado: str | None = None
 
 
 class Comparabilidad(NamedTuple):
     """`comparable`: el score y la aparición se comparan. `motivos_competidores` no vacío: cambió
     el mercado y el puesto y la diferencia frente a los competidores NO se comparan (solo se
-    rellena si el par es comparable; si no, ya lo explican `motivos`)."""
+    rellena si el par es comparable; si no, ya lo explican `motivos`). `avisos_banco` no vacío: el
+    banco cambió y el par se compara sobre el núcleo común (`nucleo_comun`)."""
 
     comparable: bool
     motivos: list[str]
     avisos: list[str]
     motivos_competidores: list[str]
+    avisos_banco: list[str] = []
+
+    @property
+    def nucleo_comun(self) -> bool:
+        return self.comparable and bool(self.avisos_banco)
 
     @property
     def competidores_comparables(self) -> bool:
@@ -155,36 +200,82 @@ def _conclusion(s: Significancia | None) -> str:
 # --- Huella y comparabilidad ----------------------------------------------------------------------
 
 
+def clave_pregunta(p: PromptInstance) -> str:
+    """Clave estable de una pregunta entre mediciones: todo lo que se pregunta, sin el id.
+
+    Plantilla, familia, fase, instanciación, perfil, ciudad, texto, marcas nombradas y prioridad,
+    como JSON. Dos prompts de bancos distintos son «la misma pregunta» si y solo si coinciden en
+    todo esto (el id de instancia cambia entre mediciones y no cuenta). Es la fila de
+    `huella_banco` y la clave del núcleo común.
+    """
+    return json.dumps(
+        [
+            p.template_id,
+            p.familia,
+            p.fase_embudo,
+            p.instanciacion,
+            p.perfil,
+            p.ciudad,
+            p.texto,
+            p.marca_nombrada,
+            p.marca_nombrada_b,
+            p.prioridad,
+        ],
+        ensure_ascii=False,
+    )
+
+
 def huella_banco(prompts: Iterable[PromptInstance]) -> str:
     """Huella determinista del banco de prompts (no depende del orden ni de los ids de instancia).
 
-    Entra todo lo que cambia lo que se pregunta: plantilla, familia, fase, instanciación, perfil,
-    ciudad, texto, marcas nombradas y prioridad. `sha256:` + los 16 primeros hex.
+    Entra todo lo que cambia lo que se pregunta (`clave_pregunta`). `sha256:` + los 16 primeros
+    hex.
     """
-    filas = sorted(
-        json.dumps(
-            [
-                p.template_id,
-                p.familia,
-                p.fase_embudo,
-                p.instanciacion,
-                p.perfil,
-                p.ciudad,
-                p.texto,
-                p.marca_nombrada,
-                p.marca_nombrada_b,
-                p.prioridad,
-            ],
-            ensure_ascii=False,
-        )
-        for p in prompts
-    )
+    filas = sorted(clave_pregunta(p) for p in prompts)
     digest = hashlib.sha256("\n".join(filas).encode("utf-8")).hexdigest()
     return f"sha256:{digest[:16]}"
 
 
-def comparabilidad(anterior: PuntoSerie, actual: PuntoSerie) -> Comparabilidad:
-    """Si `actual` se puede comparar con `anterior`, por qué no, y avisos que no lo impiden."""
+def juez_medicion(med: MedicionSerie) -> str | None:
+    """Quién evaluó las respuestas de la medición, para la comparabilidad.
+
+    1. `med.juez` si se declara (p. ej. la API con el proveedor y modelo de `Settings`).
+    2. Si no, las trazas del juez del estudio (`nodo` = `judge:<proveedor>`): «proveedor/modelo»,
+       varios unidos con « + » (p. ej. un juez de consenso).
+    3. Si no hay trazas, el origen de las evaluaciones: `jev` si alguna es de Jev; si no, `humano`
+       (etiquetas del kit o revisión humana); si todas son `fallback`, `reglas`. Que una persona
+       revise algunas evaluaciones del juez no cambia el juez de la medición.
+
+    None si no hay evaluaciones ni nada declarado.
+    """
+    if med.juez:
+        return med.juez
+    de_trazas = sorted(
+        {
+            f"{t.nodo.removeprefix(PREFIJO_JUEZ_TRAZA)}/{t.modelo}"
+            for t in med.trazas
+            if t.nodo.startswith(PREFIJO_JUEZ_TRAZA) and t.study_id == med.study.id
+        }
+    )
+    if de_trazas:
+        return " + ".join(de_trazas)
+    origenes = {e.origen for e in med.muestra.evaluations}
+    if not origenes:
+        return None
+    if "jev" in origenes:
+        return "jev"
+    return "humano" if "humano" in origenes else "reglas"
+
+
+def comparabilidad(
+    anterior: PuntoSerie, actual: PuntoSerie, *, n_comunes: int = 0
+) -> Comparabilidad:
+    """Si `actual` se puede comparar con `anterior`, por qué no, y avisos que no lo impiden.
+
+    `n_comunes`: preguntas comunes a los dos bancos (`clave_pregunta`). Si el banco cambia y hay
+    alguna, el par se compara sobre ese núcleo común (aviso en `avisos_banco`) en vez de dejar de
+    ser comparable.
+    """
     motivos: list[str] = []
     if actual.version_metodologia != anterior.version_metodologia:
         motivos.append(
@@ -195,16 +286,30 @@ def comparabilidad(anterior: PuntoSerie, actual: PuntoSerie) -> Comparabilidad:
         motivos.append(
             f"Cambia la versión del score ({anterior.score_version} → {actual.score_version})."
         )
+    if actual.juez and anterior.juez and actual.juez != anterior.juez:
+        motivos.append(f"{MOTIVO_JUEZ} ({anterior.juez} → {actual.juez}).")
+    avisos_banco: list[str] = []
     if actual.banco_prompts != anterior.banco_prompts:
-        motivos.append(
-            f"Cambia el banco de prompts ({anterior.banco_prompts} → {actual.banco_prompts})."
-        )
+        cambio = f"{MOTIVO_BANCO} ({anterior.banco_prompts} → {actual.banco_prompts})"
+        if n_comunes > 0:
+            preguntas = "pregunta común" if n_comunes == 1 else "preguntas comunes"
+            avisos_banco.append(
+                f"{cambio}. El score, la aparición y la posición se comparan sobre las "
+                f"{n_comunes} {preguntas} a las dos mediciones (núcleo común); el banco completo "
+                "se informa aparte, sin comparar."
+            )
+        else:
+            motivos.append(f"{cambio}.")
     if set(actual.motores) != set(anterior.motores):
         motivos.append(
             f"Cambian los motores ({', '.join(anterior.motores) or 'ninguno'} → "
             f"{', '.join(actual.motores) or 'ninguno'})."
         )
     avisos: list[str] = []
+    if bool(actual.juez) != bool(anterior.juez):
+        avisos.append(
+            "No consta el juez en una de las dos mediciones: no se puede comprobar si ha cambiado."
+        )
     for motor in sorted(set(actual.motores) & set(anterior.motores)):
         antes, ahora = anterior.modelos_motor.get(motor), actual.modelos_motor.get(motor)
         if antes and ahora and antes != ahora:
@@ -220,12 +325,21 @@ def comparabilidad(anterior: PuntoSerie, actual: PuntoSerie) -> Comparabilidad:
     # Si el par no es comparable, nada se compara: el motivo de competidores (que dice que el score
     # y la aparición sí) sobraría y contradiría `comparable=False`.
     competidores = [] if motivos else _motivos_competidores(anterior, actual)
-    return Comparabilidad(not motivos, motivos, avisos, competidores)
+    return Comparabilidad(
+        not motivos, motivos, avisos, competidores, [] if motivos else avisos_banco
+    )
 
 
 def _motivos_competidores(anterior: PuntoSerie, actual: PuntoSerie) -> list[str]:
-    """Motivo si cambia el conjunto de marcas del mercado (vacío en un punto = no consta)."""
+    """Motivo si cambia el conjunto de marcas del mercado (vacío en un punto = no consta) o, con
+    las mismas marcas, la versión del mercado (pueden cambiar alias o dominios de los rivales)."""
     antes, ahora = set(anterior.marcas_mercado), set(actual.marcas_mercado)
+    va, vb = anterior.version_mercado, actual.version_mercado
+    if antes and ahora and antes == ahora and va and vb and va != vb:
+        return [
+            f"{MOTIVO_COMPETIDORES}: cambia la versión del mercado ({va} → {vb}). El score y la "
+            "aparición se comparan; el puesto y la diferencia frente a los competidores, no."
+        ]
     if not antes or not ahora or antes == ahora:
         return []
     partes = []
@@ -409,6 +523,9 @@ def _punto(
         motivos_no_comparable=[MOTIVO_LINEA_BASE],
         avisos=avisos,
         marcas_mercado=sorted(m.ranking),
+        juez=juez_medicion(med),
+        version_perfil=med.version_perfil,
+        version_mercado=med.version_mercado,
     )
 
 
@@ -566,10 +683,12 @@ def _cambios(
     nivel: float,
     *,
     competidores: bool = True,
+    etiqueta: str = "",
 ) -> list[CambioSerie]:
     """Cambios entre dos puntos comparables. Sin `competidores` (cambió el mercado), no se
-    calculan el puesto ni la diferencia frente a los competidores."""
-    periodo = _periodo(a, b)
+    calculan el puesto ni la diferencia frente a los competidores. `etiqueta` se añade al periodo
+    del texto (p. ej. « (núcleo común de 12 preguntas)»)."""
+    periodo = f"{_periodo(a, b)}{etiqueta}"
     rem = significancia_remedicion(
         med_b.metrics,
         med_a.metrics,
@@ -696,6 +815,183 @@ def _indicadores(puntos: list[PuntoSerie], meds: list[MedicionSerie]) -> list[In
     ]
 
 
+# --- Núcleo común del banco -----------------------------------------------------------------------
+
+
+def _claves_comunes(anterior: MedicionSerie, actual: MedicionSerie) -> set[str]:
+    """Claves de las preguntas que están en los dos bancos (`clave_pregunta`)."""
+    antes = {clave_pregunta(p) for p in anterior.muestra.prompts}
+    return antes & {clave_pregunta(p) for p in actual.muestra.prompts}
+
+
+def _etiqueta_nucleo(n: int) -> str:
+    return f" (núcleo común de {n} {'pregunta' if n == 1 else 'preguntas'})"
+
+
+def _mercado_metricas(med: MedicionSerie) -> Market:
+    """Mercado con el que recalcular las métricas: el de la medición si cuadra con su ranking; si
+    no, uno mínimo con los brand_ids del ranking (la foco con el nombre del brief)."""
+    m = med.metrics
+    if med.market is not None and {b.id for b in med.market.marcas} == set(m.ranking):
+        return med.market
+    return Market(
+        marcas=[
+            Brand(
+                id=b,
+                nombre=med.study.brief.marca if b == m.marca_foco_id else b,
+                rol="foco" if b == m.marca_foco_id else "lider" if b == m.lider_id else "contexto",
+            )
+            for b in m.ranking
+        ]
+    )
+
+
+def restringir_a_preguntas(med: MedicionSerie, claves: set[str]) -> MedicionSerie:
+    """La medición con solo las preguntas de `claves` y sus métricas recalculadas (`metrics`)."""
+    prompts = [p for p in med.muestra.prompts if clave_pregunta(p) in claves]
+    ids = {p.id for p in prompts}
+    runs = [r for r in med.muestra.runs if r.prompt_id in ids]
+    run_ids = {r.id for r in runs}
+    evals = [e for e in med.muestra.evaluations if e.run_id in run_ids]
+    metrics = compute_metrics(
+        med.study.brief,
+        _mercado_metricas(med),
+        prompts,
+        runs,
+        evals,
+        list(med.catalogo),
+        study_id=med.study.id,
+    )
+    return replace(med, metrics=metrics, muestra=Muestra(evals, runs, prompts))
+
+
+@dataclass(frozen=True)
+class _ParNucleo:
+    med_anterior: MedicionSerie
+    med_actual: MedicionSerie
+    anterior: PuntoSerie
+    actual: PuntoSerie
+    nucleo: NucleoComun
+
+
+def _par_nucleo(
+    med_a: MedicionSerie,
+    med_b: MedicionSerie,
+    comunes: set[str],
+    replicas: int,
+    semilla: int,
+    nivel: float,
+) -> _ParNucleo:
+    ca, cb = restringir_a_preguntas(med_a, comunes), restringir_a_preguntas(med_b, comunes)
+    pa = _punto(ca, _mercado(ca), replicas, semilla, nivel)
+    pb = _punto(cb, _mercado(cb), replicas, semilla, nivel)
+    nucleo = NucleoComun(
+        huella=huella_banco(cb.muestra.prompts),
+        n_prompts_comunes=len(comunes),
+        n_prompts_anterior=len({clave_pregunta(p) for p in med_a.muestra.prompts}),
+        n_prompts_actual=len({clave_pregunta(p) for p in med_b.muestra.prompts}),
+        score_anterior=pa.score,
+        score_actual=pb.score,
+    )
+    return _ParNucleo(ca, cb, pa, pb, nucleo)
+
+
+# --- Configuración versionada ---------------------------------------------------------------------
+
+
+def _cambio_configuracion(anterior: PuntoSerie, actual: PuntoSerie) -> CambioConfiguracion | None:
+    """Marca del gráfico si cambia la versión del perfil o del mercado (ambas deben constar)."""
+    que: list[QueCambia] = []
+    partes: list[str] = []
+    if anterior.version_perfil and actual.version_perfil:
+        if anterior.version_perfil != actual.version_perfil:
+            que.append("perfil")
+            partes.append(
+                f"el perfil de la marca ({anterior.version_perfil} → {actual.version_perfil}; "
+                "no afecta al score)"
+            )
+    if anterior.version_mercado and actual.version_mercado:
+        if anterior.version_mercado != actual.version_mercado:
+            que.append("mercado")
+            partes.append(
+                f"el mercado ({anterior.version_mercado} → {actual.version_mercado}; el puesto y "
+                "la diferencia frente a los competidores no se comparan)"
+            )
+    if not que:
+        return None
+    texto = f"Desde el {_fecha(actual.fecha)} cambia {' y '.join(partes)}."
+    return CambioConfiguracion(study_id=actual.study_id, que_cambia=que, texto=texto)
+
+
+def vigente_en[V: (VersionPerfil, VersionMercado)](
+    versiones: Sequence[V], fecha: datetime
+) -> V | None:
+    """La versión vigente en `fecha`: la de `vigente_desde` más reciente que no sea posterior.
+
+    None si ninguna estaba vigente. Lanza `ValueError` si dos versiones empiezan a la vez.
+    """
+    inicios = [v.vigente_desde for v in versiones]
+    if len(inicios) != len(set(inicios)):
+        raise ValueError("dos versiones de la configuración empiezan en la misma fecha")
+    candidatas = [v for v in versiones if v.vigente_desde <= fecha]
+    return max(candidatas, key=lambda v: v.vigente_desde) if candidatas else None
+
+
+def exactitud_con_perfil(
+    study: Study,
+    brand: Brand,
+    version: VersionPerfil,
+    runs: Sequence[Run],
+    *,
+    marcas: Iterable[Brand] = (),
+    ciudades: Iterable[str] = (),
+    afirmaciones_llm: Sequence[Afirmacion] = (),
+) -> tuple[HallazgoExactitud, list[AccionMitigacion]]:
+    """Exactitud de la medición `study` verificada contra el perfil `version`, que debe ser el
+    vigente en la fecha de la medición (no el actual): una afirmación correcta en marzo no pasa a
+    ser inexacta porque el perfil cambie en junio. Lanza `ValueError` si la versión es posterior
+    a la medición."""
+    if version.vigente_desde > study.creado_en:
+        raise ValueError(
+            f"el perfil {version.version} es posterior a la medición {study.id} "
+            f"({_fecha(version.vigente_desde)} > {_fecha(study.creado_en)})"
+        )
+    return evaluar_exactitud(
+        study.id,
+        brand,
+        version.perfil,
+        runs,
+        marcas=marcas,
+        ciudades=ciudades,
+        afirmaciones_llm=afirmaciones_llm,
+    )
+
+
+def exactitud_en_fecha(
+    study: Study,
+    brand: Brand,
+    versiones: Sequence[VersionPerfil],
+    runs: Sequence[Run],
+    *,
+    marcas: Iterable[Brand] = (),
+    ciudades: Iterable[str] = (),
+    afirmaciones_llm: Sequence[Afirmacion] = (),
+) -> tuple[HallazgoExactitud, list[AccionMitigacion]]:
+    """`exactitud_con_perfil` con la versión del perfil vigente en `study.creado_en`."""
+    version = vigente_en(versiones, study.creado_en)
+    if version is None:
+        raise ValueError(f"no hay perfil vigente en la fecha de la medición {study.id}")
+    return exactitud_con_perfil(
+        study,
+        brand,
+        version,
+        runs,
+        marcas=marcas,
+        ciudades=ciudades,
+        afirmaciones_llm=afirmaciones_llm,
+    )
+
+
 # --- Serie ----------------------------------------------------------------------------------------
 
 
@@ -724,37 +1020,71 @@ def construir_serie(
     mercados = [_mercado(m) for m in meds]
     puntos: list[PuntoSerie] = []
     cambios: list[CambioSerie] = []
+    configuracion: list[CambioConfiguracion] = []
     lineas: list[str] = []
     for i, (med, mercado) in enumerate(zip(meds, mercados, strict=True)):
         punto = _punto(med, mercado, replicas, semilla, nivel)
         if puntos:
             anterior = puntos[-1]
-            comp = comparabilidad(anterior, punto)
+            comunes = _claves_comunes(meds[i - 1], med)
+            comp = comparabilidad(anterior, punto, n_comunes=len(comunes))
+            par = (
+                _par_nucleo(meds[i - 1], med, comunes, replicas, semilla, nivel)
+                if comp.nucleo_comun
+                else None
+            )
             punto = punto.model_copy(
                 update={
                     "comparable_con_anterior": comp.comparable,
                     "motivos_no_comparable": comp.motivos,
-                    "avisos": [*punto.avisos, *comp.avisos, *comp.motivos_competidores],
+                    "avisos": [
+                        *punto.avisos,
+                        *comp.avisos,
+                        *comp.avisos_banco,
+                        *comp.motivos_competidores,
+                    ],
                     "competidores_comparables": comp.competidores_comparables,
+                    "nucleo_comun": par.nucleo if par is not None else None,
                 }
             )
+            if cambio_config := _cambio_configuracion(anterior, punto):
+                configuracion.append(cambio_config)
             periodo = _periodo(anterior, punto)
             if not comp.comparable:
                 lineas.append(f"{periodo}: {NO_COMPARABLE.lower()}: {' '.join(comp.motivos)}")
             else:
+                lineas += [f"{periodo}: {m}" for m in comp.avisos_banco]
                 lineas += [f"{periodo}: {m}" for m in comp.motivos_competidores]
-                del_par = _cambios(
-                    anterior,
-                    punto,
-                    meds[i - 1],
-                    med,
-                    mercados[i - 1],
-                    mercado,
-                    replicas,
-                    semilla,
-                    nivel,
-                    competidores=comp.competidores_comparables,
-                )
+                if par is not None:
+                    del_par = [
+                        c.model_copy(update={"sobre_nucleo_comun": True})
+                        for c in _cambios(
+                            par.anterior,
+                            par.actual,
+                            par.med_anterior,
+                            par.med_actual,
+                            _mercado(par.med_anterior),
+                            _mercado(par.med_actual),
+                            replicas,
+                            semilla,
+                            nivel,
+                            competidores=comp.competidores_comparables,
+                            etiqueta=_etiqueta_nucleo(len(comunes)),
+                        )
+                    ]
+                else:
+                    del_par = _cambios(
+                        anterior,
+                        punto,
+                        meds[i - 1],
+                        med,
+                        mercados[i - 1],
+                        mercado,
+                        replicas,
+                        semilla,
+                        nivel,
+                        competidores=comp.competidores_comparables,
+                    )
                 if not del_par:
                     lineas.append(f"{periodo}: {SIN_DATOS_CAMBIOS}")
                 lineas += [c.texto for c in del_par if c.significativo]
@@ -769,6 +1099,7 @@ def construir_serie(
         cambios_significativos=significativos,
         indicadores=_indicadores(puntos, meds),
         resumen=_resumen(puntos, cambios, lineas),
+        cambios_configuracion=configuracion,
     )
 
 
