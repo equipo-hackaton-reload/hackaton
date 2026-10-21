@@ -30,16 +30,22 @@ fuentes (para los indicadores de fuentes) y un `HallazgoExactitud` (para los de 
 
 ### Comparabilidad
 
-Un punto es comparable con el anterior si coinciden estas cuatro cosas:
+Un punto es comparable con el anterior si coinciden estas cinco cosas:
 
 - `version_metodologia`
 - la versión del score
-- la huella del banco de prompts
+- el juez (`PuntoSerie.juez`, ver «Juez»)
+- la huella del banco de prompts, o hay un núcleo común (ver «Núcleo común del banco»)
 - el conjunto de motores
 
 | Qué cambia | Resultado |
 |---|---|
-| Versión de la metodología, del score, banco o motores | No comparable, con un motivo por cada diferencia. No se calcula ningún cambio. |
+| Versión de la metodología, del score, juez o motores | No comparable, con un motivo por cada diferencia. No se calcula ningún cambio. |
+| Banco de prompts sin ninguna pregunta en común | No comparable («Cambia el banco de prompts (… → …).»). |
+| Banco de prompts que crece o se recorta, con preguntas comunes | Comparable **sobre el núcleo común**, con aviso. El banco completo se informa aparte, sin comparar. |
+| El juez consta en una medición y no en la otra | Comparable, con aviso. |
+| Versión del mercado (`version_mercado`), mismas marcas | Como el cambio de marcas: puesto y diferencia frente a los competidores, no comparables. |
+| Versión del perfil (`version_perfil`) | No afecta a la comparación. Solo se marca en el gráfico. |
 | Modelo de un motor (`Run.modelo`) | Comparable, con aviso: parte del cambio puede deberse al modelo. |
 | El modelo consta en una medición y no en la otra | Comparable, con aviso. |
 | Conjunto de marcas del mercado (`PuntoSerie.marcas_mercado`) | Score y aparición, comparables. Puesto y diferencia frente a los competidores, **no**: `competidores_comparables = False`, no se calculan como cambio y el motivo («Cambian los competidores del mercado: entran …; salen … (n → m marcas). …») va en `avisos` y en el resumen. |
@@ -61,6 +67,63 @@ Por eso la re-medición real debe **reutilizar el banco** de la medición anteri
 `PromptInstance`, no uno regenerado). Hoy `POST /studies/{id}/remeasure` arranca en `prompts` y
 regenera el banco; lo corrige otro paquete en el runner y el nodo de prompts (zona C). Hasta
 entonces, una serie de re-mediciones reales sale «no comparable» por el banco, que es lo honesto.
+
+### Juez
+
+El juez decide si una marca aparece, en qué posición y con qué fuerza: cambiarlo cambia la
+medida. `PuntoSerie.juez` («proveedor/modelo») lo calcula `juez_medicion`, en este orden:
+
+1. `MedicionSerie.juez`, si quien construye la serie lo declara (la API, con la configuración del
+   estudio).
+2. Las trazas del juez del estudio (`Trace.nodo` = `judge:<proveedor>`, `Trace.modelo`): por
+   ejemplo `jev/jev-1.13`; varios (un consenso) se unen con « + ». No cuentan `plan_guard:*`,
+   `run:*` ni trazas de otros estudios.
+3. Sin trazas, `Evaluation.origen`: `jev` si alguna evaluación es de Jev; si no, `humano`
+   (etiquetas del kit); si todas son `fallback`, `reglas`. Una revisión humana de algunas
+   evaluaciones no cambia el juez de la medición.
+
+Si los dos puntos tienen juez y no coincide, el par no es comparable: «Cambia el juez (a → b).».
+Si falta en uno, es comparable con aviso. No se tocó `schemas.py`: el juez se deduce de lo que
+ya se guarda o lo declara la medición.
+
+### Núcleo común del banco
+
+Si la marca abre una ciudad o un servicio, el banco crece y la huella cambia. Antes eso dejaba la
+serie sin comparar. Ahora:
+
+- **Clave de una pregunta** (`clave_pregunta`): plantilla, familia, fase, instanciación, perfil,
+  ciudad, texto, marcas nombradas y prioridad, en JSON. Es la fila de `huella_banco`, sin el id
+  de instancia (cambia en cada medición). Incluye el texto a propósito: si el LLM reescribe una
+  pregunta, deja de ser la misma.
+- **Núcleo común:** las claves presentes en los dos bancos. Si hay al menos una y lo demás es
+  comparable, el par se compara solo sobre ellas: `restringir_a_preguntas` filtra prompts,
+  ejecuciones y evaluaciones de cada medición y recalcula sus métricas con `compute_metrics`; con
+  eso se calculan score, aparición, puesto y diferencia, con los mismos métodos de siempre.
+- **Qué se ve:** `PuntoSerie.nucleo_comun` (`NucleoComun`: huella del núcleo, preguntas comunes,
+  del banco anterior y del actual, y el score de cada medición sobre el núcleo). Los cambios llevan
+  `sobre_nucleo_comun=True` y su texto dice «(núcleo común de N preguntas)». El aviso «Cambia el
+  banco de prompts (… → …). El score, la aparición y la posición se comparan sobre las N preguntas
+  comunes …» va en `avisos` y en el `resumen`.
+- **El banco ampliado se informa aparte:** `PuntoSerie.score` sigue siendo el del banco completo
+  de esa medición, pero no se compara con el anterior.
+
+### Configuración versionada (perfil y mercado)
+
+El perfil de la marca y su mercado (competidores) se editan por versiones, vigentes desde una
+fecha; nunca se sobrescriben. Cada medición guarda las suyas (`MedicionSerie.version_perfil` y
+`version_mercado` → `PuntoSerie`).
+
+- `SerieMarca.cambios_configuracion`: lista de `CambioConfiguracion` (`study_id`, `que_cambia` ⊂
+  {`perfil`, `mercado`}, `texto`) en cada punto donde cambia alguna versión respecto al anterior
+  (las dos deben constar). La web pinta una marca vertical en ese `study_id`.
+- Cambio de mercado: el puesto y la diferencia frente a los competidores no son comparables
+  (con las mismas marcas, «Cambian los competidores del mercado: cambia la versión del mercado …»).
+- Cambio de perfil: no afecta al score ni a la comparabilidad.
+- **Exactitud contra el perfil vigente:** `VersionPerfil`/`VersionMercado` (en
+  `tracking_schemas`), `vigente_en(versiones, fecha)` (la de `vigente_desde` más reciente no
+  posterior; error si dos empiezan a la vez), `exactitud_con_perfil(study, brand, version, runs)`
+  (error si la versión es posterior a la medición) y `exactitud_en_fecha(study, brand, versiones,
+  runs)`. Una afirmación correcta en marzo no pasa a ser inexacta porque el perfil cambie en junio.
 
 ### Cambios entre puntos consecutivos comparables
 
@@ -90,6 +153,7 @@ y `significativo = False`, y el texto lo dice.
 | Ningún punto | «Sin mediciones: aún no hay con qué comparar.» |
 | Par no comparable | «Del … al …: no comparable con la medición anterior: <motivos>» |
 | Par con cambio de competidores | «Del … al …: Cambian los competidores del mercado: …» |
+| Par comparado sobre el núcleo común | «Del … al …: Cambia el banco de prompts (… → …). El score, la aparición y la posición se comparan sobre las N preguntas comunes …» |
 | Par comparable sin datos para ningún cambio | «Del … al …: No hay datos para calcular cambios con la medición anterior.» |
 | Cambios significativos | Sus textos, en orden. |
 | Se calcularon cambios, ninguno significativo y nada más que decir | Exactamente «Sin cambios fuera del margen de error». |
