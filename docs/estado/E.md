@@ -12,8 +12,15 @@
   `posicionamiento_deseado` y `atributos_deseados`, literales o resumen fiel del brief y vacíos si
   el brief no los trae. `FixtureLLM` devuelve para Alborada su propuesta de valor y sus tres
   «Diferenciales», solo si aparecen tal cual en el brief recibido (si no, vacíos).
+- Conceptos para la presentación y los entregables: índice `docs/conceptos/README.md` (orden de
+  lectura y regla de oro kit sintético frente a real), `score-de-citacion.md`, `kit-vs-real.md`,
+  `rigor-y-seguimiento.md`, `capas-determinista-y-no-determinista.md`, `propuesta-geo.md`,
+  `docs/propuesta-valor.md` y `docs/glosario.md`. Términos unificados (el juez decide fuerza,
+  tipo de mención, sentimiento y apoyo en fuentes; aparición y posición, siempre las reglas; tres
+  jueces posibles y mismo juez en toda la serie, PENDIENTE en la comparabilidad). Al cambiar una
+  cifra golden o el estado de una PR, actualizar estos documentos.
 
-## En la PR #23 (`feature/E-entregable`, rebasada sobre `1798244`)
+## En develop desde la PR #23 (`feature/E-entregable`)
 - `docs/arquitectura.md` (+ `.html` y `.pdf` con `scripts/build_architecture_pdf.py`): capa de verdad
   determinista, capa determinista/no determinista (ADR 0014), rigor (25,9 [21,6–30,1]), seguimiento
   con método (ADR 0016), cuentas (ADR 0015), coste por medición estimado (≈ 11,25 € en real, 0 € en
