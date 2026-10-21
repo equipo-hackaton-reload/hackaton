@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 
 from posiq.application.diferencial import EscenarioGuardado, Rigor
 from posiq.domain.accuracy_schemas import AccionMitigacion, HallazgoExactitud
+from posiq.domain.competitor_gap_schemas import BrechaCompetidores
 from posiq.domain.quality_schemas import PlanQuality
 from posiq.domain.schemas import (
     BriefSummary,
@@ -72,8 +73,11 @@ class StudyView(BaseModel):
     # y calidad por acción (None si no hay claves de juez).
     simulacion: SimulationResult | None = None
     calidad_plan: PlanQuality | None = None
-    # Diferencial (v0.4.0): None hasta que el dominio lo calcule para este estudio.
+    # Diferencial (v0.4.0): None hasta que el nodo `diferencial` (tras `analyze`) lo calcula;
+    # `escenarios` llega con el plan. Un bloque que no se pudo calcular sigue en None.
     rigor: Rigor | None = None
+    # Competidores declarados en el brief frente a los que pone la IA (ADR 0012).
+    competidores: BrechaCompetidores | None = None
     escenarios: list[EscenarioGuardado] | None = None
     oportunidades_fuente: list[OportunidadFuente] | None = None
     exactitud: list[HallazgoExactitud] | None = None

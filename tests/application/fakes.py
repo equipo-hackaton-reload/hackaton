@@ -236,7 +236,7 @@ def brief_alborada() -> BriefSummary:
 
 def market_from_candidates(state: dict[str, Any]) -> Market:
     """Lo que haría el LLM con candidatos: proponerlos con el nombre (el id lo pone el código)."""
-    marcas = [{**b, "id": f"llm-{i}"} for i, b in enumerate(state["candidatos"])]
+    marcas = [{**b, "id": f"llm-{i}"} for i, b in enumerate(state["marcas_candidatas"])]
     return Market.model_validate({"marcas": marcas})
 
 
@@ -299,7 +299,7 @@ def kit_llm() -> FakeLLM:
         {
             "intake.v2": lambda _: brief_alborada(),
             "market.v1": market_from_candidates,
-            "plan.v1": plan_from_findings,
+            "plan.v2": plan_from_findings,
             "write.v2": proposal_draft,
         }
     )

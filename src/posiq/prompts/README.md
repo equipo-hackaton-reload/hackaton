@@ -6,7 +6,8 @@ Prompts versionados en Markdown, uno por nodo: `<nodo>.v1.md` (Zona E).
 | `intake.v2.md` | `BriefSummary` (+ `posicionamiento_deseado`, `atributos_deseados`) | `brief` |
 | `market.v1.md` | `Market` | `brief_summary`, `marcas_candidatas` |
 | `prompts.v1.md` | `PromptSet` (en este paquete) | `brief_summary`, `market`, `banco_plantillas` |
-| `plan.v1.md` | `Plan` | `brief_summary`, `metrics`, `findings` |
+| `plan.v1.md` | `Plan` | `brief_summary`, `metrics`, `findings` (ya no lo usa ningún nodo) |
+| `plan.v2.md` | `Plan` | `brief`, `metricas`, `hallazgos`, `diferencia_anterior`, `market`; en el reintento, `plan_anterior` y `violaciones` |
 | `write.v1.md` | `ProposalDraft` | `brief`, `market`, `contexto`, `metrics`, `metricas`, `diferencia_anterior`, `hallazgos`, `plan`, `errores` |
 | `write.v2.md` | `ProposalDraft` (+ `cobertura_brief`) | las de v1 + `puntos_brief`; en el reintento, `borrador_anterior` y `carencias_cobertura` |
 | `claims.v1.md` | `AfirmacionesLLM` (`domain/accuracy.py`) | `marca`, `otras_marcas`, `respuesta`, `tipos` |
@@ -18,6 +19,8 @@ instrucciones. Reglas:
   `state` y el adaptador LLM los envía como datos, nunca dentro de las instrucciones.
 - Cada prompt prohíbe inventar cifras: solo se citan las que llegan en `state`.
 - Un cambio de comportamiento crea una versión nueva (`.v2.md`); no se edita una versión publicada.
+- Las claves que manda el nodo son exactamente las de la cabecera `state` (las descritas como «Solo
+  en el reintento» pueden faltar). Lo comprueba `tests/application/test_prompt_state.py`.
 
 `load_prompt("plan")` devuelve un `PromptSpec` con la cabecera validada; `spec.version_tag`
 (`plan.v1`) es lo que se registra en `Trace.prompt_version`.

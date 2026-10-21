@@ -35,6 +35,12 @@
   `uv run pytest tests/golden/test_export.py`.
 - `.github/CODEOWNERS` con los handles reales de las cinco zonas.
 
+- `plan.v2.md` (desde zona C, `feature/C-diferencial-grafo`): misma instrucción que v1, con la
+  cabecera alineada con lo que manda el nodo (`brief`, `metricas`, `hallazgos`,
+  `diferencia_anterior`, `market` y, en el reintento, `plan_anterior` y `violaciones`). `plan.v1`
+  queda publicado sin uso. Regla nueva en `prompts/README.md`: las claves que manda el nodo son las
+  de la cabecera; lo comprueba `tests/application/test_prompt_state.py`.
+
 ## Coordinación con zona D
 - La tarea web de simulación y re-medición actualizó `CHANGELOG.md` y este estado con autorización
   explícita; no modifica exportadores, prompts ni cifras de la propuesta.

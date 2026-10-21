@@ -54,8 +54,13 @@ async def market(state: StudyState, deps: Deps) -> dict[str, Any]:
         if state["modo"] == "kit"
         else []
     )
+    # Las claves son las de la cabecera de `market.v1.md` (lo comprueba tests/application).
     propuesto, trace = await structured(
-        deps, state, Market, "market.v1", {"brief": dump(brief), "candidatos": dump(candidatos)}
+        deps,
+        state,
+        Market,
+        "market.v1",
+        {"brief_summary": dump(brief), "marcas_candidatas": dump(candidatos)},
     )
     mercado = reconcile(propuesto, candidatos)
 

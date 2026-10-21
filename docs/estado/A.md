@@ -125,8 +125,10 @@
     Santa Eulalia (+1,2) y Vistalia (+0,4). Alborada es 8.ª de 10.
   - **Contrato que haría falta (no se ha tocado):** `Finding.brand_ids: list[str] = []`, para
     enlazar el hallazgo con las marcas que nombra sin parsear el texto.
-  - Sin conectar al grafo: nota para C en `docs/estado/C.md`.
-- **Posible fallo de nombres en `market` (zona C/E, no arreglado):** `prompts/market.v1.md` dice
+  - Conectado al grafo por C (`feature/C-diferencial-grafo`): bloque `competidores` en
+    `GET /studies/{id}`; sus hallazgos no se suman a `findings`.
+- **Fallo de nombres en `market` (arreglado por C en `feature/C-diferencial-grafo`: el nodo manda
+  `brief_summary`/`marcas_candidatas` y un test compara las claves de todos los prompts):** `prompts/market.v1.md` dice
   que el estado trae `brief_summary` y `marcas_candidatas`, pero `application/nodes/market.py`
   envía `{"brief": ..., "candidatos": ...}`. `OpenAICompatLLM` manda el `state` tal cual como
   JSON en el mensaje de usuario, así que el LLM sí recibe los candidatos, aunque con otra clave.
@@ -157,7 +159,7 @@
   y Word). Todo en el ADR 0019.
 
 ## Falta
-- Integrar `informe_rigor` en el grafo y en `GET /studies/{id}` (zona C), y pintar «25,9 [21,6–30,1]»
+- (Hecho por C: `informe_rigor` en el grafo y en `GET /studies/{id}`.) Pintar «25,9 [21,6–30,1]»
   y los márgenes en la web (D) y el Word (E). Decidir (B/C) si `build_judge` usa `ConsensusJudge`
   (multiplica por N el coste del juez).
 - Que la web (D) y el Word (E) muestren la simulación. La calidad del plan solo existe con claves de juez.

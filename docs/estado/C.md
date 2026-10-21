@@ -61,38 +61,49 @@
   (`LLM_TOKENS`), juez con fallback (25 %) y PlanGuard; `estimate_study(..., remedicion=True)`
   quita intake y market (para `GET /studies/{id}/remeasure/estimate`).
 
-## Diferencial v0.4.0 (en curso)
-- Base común: el checkpointer admite `stats_schemas`, `scenario_schemas`, `source_map_schemas`,
-  `accuracy_schemas` y `application/diferencial.py`. `GET /studies/{id}` ya trae los bloques
-  `rigor`, `escenarios`, `oportunidades_fuente`, `exactitud` y `mitigaciones`, en `null` hasta que
-  llegue el dominio de cada uno (`feature/A-rigor-estadistico`, `A-escenarios`, `A-mapa-fuentes`,
-  `A-exactitud-marca`).
-- Forma del JSON para la web y el Word:
+## Diferencial v0.4.0 (conectado, `feature/C-diferencial-grafo`)
+- Nodo `diferencial` entre `analyze` y `plan` (`application/nodes/diferencial.py`), sin LLM ni
+  coste. Todo sale de `domain/`:
+  - `rigor`: `informe_rigor` + `intervalos_score_por_motor` + `aparicion_por_motor`; en una
+    re-medición, `significancia_remedicion(...).por_clave()` en `deltas`.
+  - `competidores`: `brecha_competidores(brief, market, metrics)`. Sus hallazgos NO se suman a
+    `findings` (los 7 hallazgos del golden de Alborada no cambian).
+  - `oportunidades_fuente`: `mapa_fuentes(brief.sector, [este estudio], catálogo)` +
+    `oportunidades_fuente` de la marca foco.
+  - `exactitud` y `mitigaciones`: `evaluar_exactitud` solo para la marca del brief, solo reglas
+    (la capa LLM `claims.v1` no se usa en el grafo).
+  - Cada bloque se calcula por separado: si uno lanza `ValueError`/`KeyError`, queda en null con el
+    motivo en `errores` («diferencial: … sin calcular: …») y el estudio sigue.
+- Coste en tiempo: con Alborada, ≈2,7 s en esta máquina (1,4 s el informe con 2000 réplicas,
+  0,5 s los cuatro motores, 0,8 s la exactitud; el ADR 0008 habla de ≈4 s en otra). Corre en
+  `asyncio.to_thread`: no bloquea el bucle de la API (test con latidos del bucle). Una re-medición
+  añade otro bootstrap (≈1 s).
+- `escenarios`: `build_presets` en `plan` (dentro de `plan_checks`) y, si la persona edita el plan,
+  en `review_plan`. Tres `EscenarioGuardado` (`minimo_viable`, `equilibrado`, `completo`) con el
+  completo `elegido`. `EscenarioPlan.intervalo` sigue en null (no hay IC del score proyectado en
+  el dominio).
+- Forma del JSON para la web y el Word (`GET /studies/{id}`):
   - `rigor`: `{score_global: Intervalo|null, score_por_motor: {Motor: Intervalo},
-    aparicion_por_motor: {Motor: Intervalo}, hallazgos: {finding_id: Significancia},
-    deltas: {"score_global" | "tipo:dimension:valor": Significancia}}`.
-  - `escenarios`: `[{id, elegido, escenario: EscenarioPlan}]`; solo uno elegido.
-  - `oportunidades_fuente`: `[OportunidadFuente]`; `exactitud`: `[HallazgoExactitud]` (uno por
-    marca); `mitigaciones`: `[AccionMitigacion]`.
-- Pendiente, una PR por punto: (1) rigor y `JUDGE_VOTES`, (2) escenarios, (3) mapa de fuentes,
-  (4) exactitud.
-- **Nota de A (competidores declarados, ADR 0012), por enganchar en `application/diferencial.py`:**
-  `posiq.domain.competitor_gap.brecha_competidores(brief, market, metrics) -> BrechaCompetidores`
-  (`domain/competitor_gap_schemas.py`). Es puro y se llama tras `compute_metrics`. Forma:
-  `{study_id, marca_foco_id, puesto_foco, score_foco, tasa_foco, n_marcas,
-  declarados: [CompetidorMedido], no_resueltos: [str],
-  no_declarados_por_delante: [CompetidorMedido], sorpresas: [brand_id],
-  declarados_poco_mencionados: [brand_id], umbral_ventaja_puntos, umbral_tasa,
-  hallazgos: [Finding]}`, con
-  `CompetidorMedido = {brand_id, nombre, declarado, nombre_declarado, puesto, score,
-  ventaja_puntos, tasa_espontanea, n_espontaneo}`. Propuesta: un bloque `competidores` en
-  `GET /studies/{id}`. Los `hallazgos` (`F-competidor-no-declarado`, `F-declarado-poco-visible`)
-  pueden sumarse a los de `detect_findings` antes del plan, respetando el máximo de 7 de la
-  propuesta. Hay que añadir el modelo al checkpointer.
-- **Aviso de A sobre `nodes/market.py`:** envía `{"brief", "candidatos"}`, pero
-  `prompts/market.v1.md` espera `brief_summary` y `marcas_candidatas`. Con DeepSeek, el LLM puede
-  tratar los candidatos como ausentes y dejar fuera del mercado las marcas de contexto. Detalle en
-  `docs/estado/A.md`.
+    aparicion_por_motor: {Motor: Intervalo}, hallazgos: {finding_id: SignificanciaHallazgo},
+    deltas: {"score_global" | "tipo:dimension:valor": Significancia}, replicas_bootstrap,
+    semilla_bootstrap}`. **Cambio:** `hallazgos` es ahora `SignificanciaHallazgo`
+    (`{finding_id, contraste, significancia: Significancia|null, sin_contraste: str|null}`): un
+    hallazgo sin contraste (`F-fuente-lider`) lo dice, no se lee como «no significativo».
+  - `competidores` (nuevo, aditivo): `BrechaCompetidores` (forma en `domain/competitor_gap_schemas.py`).
+  - `escenarios`: `[{id, elegido, escenario: EscenarioPlan}]`; `oportunidades_fuente`:
+    `[OportunidadFuente]`; `exactitud`: `[HallazgoExactitud]` (uno, la marca del brief);
+    `mitigaciones`: `[AccionMitigacion]`.
+  - Alborada en fixture (`tests/e2e/test_diferencial_api.py`): score 25,93 [21,6–30,15], Oftalmos
+    Centro como sorpresa, top de oportunidades wikipedia.org (Media), 0 incorrectas, 3 escenarios.
+- Re-medición comparable: `prepare_remeasure` siembra también los `prompts` del original (el nodo
+  `prompts` los reutiliza si ya están en el estado, en cualquier modo) y `medicion_anterior`
+  (`TypedDict` con métricas, prompts, ejecuciones y evaluaciones del original; un modelo con
+  modelos anidados no sobrevive al checkpointer). La huella del banco coincide.
+- Claves de los prompts: `market` manda `brief_summary` y `marcas_candidatas` (antes `brief` y
+  `candidatos`, que el prompt no declaraba); `prompts` (modo real) manda `brief_summary`, `market` y
+  `banco_plantillas` (antes faltaba el banco: el LLM no tenía plantillas); `plan` usa `plan.v2.md`,
+  cuya cabecera declara lo que el nodo ya mandaba. `tests/application/test_prompt_state.py` graba
+  todas las llamadas y lo comprueba para todos los prompts.
 
 ## Falta
 - Estudio de Alborada con DeepSeek real → `docs/ejemplos/` (bloqueado: falta `DEEPSEEK_API_KEY`).
@@ -102,6 +113,8 @@
   10,56 € y `BUDGET_EUR_MAX` es 5 €: hay que subir el tope o reducir el estudio.
 
 ## Siguiente tarea
+- Web (zona D): pintar `rigor`, `competidores`, `oportunidades_fuente`, `exactitud` y `escenarios`.
+- Elegir otro escenario desde la API (hoy siempre el completo) y que `write` lo use.
 - Endpoints de seguimiento sobre las cuentas: `GET /brands`, `GET /brands/{id}/serie`,
   `GET /studies/{id}/remeasure/estimate` y `remeasure` con confirmación de coste.
 - Ajustar `LLM_TOKENS` de `estimate.py` con las `Trace` del primer estudio real.

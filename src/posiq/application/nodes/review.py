@@ -7,7 +7,7 @@ valor del resume, así que antes de `interrupt()` no hay efectos.
   aceptar el propuesto. Queda `confirmado_por_humano=True`.
 - `plan`: el resume es un `Plan` editado o `None`/`{"aprobado": true}` para aprobar el propuesto. Un
   plan editado se vuelve a validar contra el brief (las violaciones van a `errores`) y se recalculan
-  su simulación y su calidad.
+  su simulación, sus escenarios y su calidad.
 
 `parse_*` validan el payload y los usa también la API, para rechazar un resume inválido antes de
 reanudar el grafo.
@@ -77,10 +77,11 @@ async def review_plan(state: StudyState, deps: Deps) -> dict[str, Any]:
     update: dict[str, Any] = {"plan": plan, "revision_pendiente": "none"}
     if not _aprobado(payload):
         violaciones = plan_violations(plan, state["brief"], state["findings"])
-        # Simulación y calidad describían el plan propuesto: se recalculan sobre el editado.
+        # Simulación, escenarios y calidad describían el plan propuesto: se recalculan.
         checks = await plan_checks(state, deps, plan)
         update["plan_violaciones"] = violaciones
         update["simulacion"] = checks["simulacion"]
+        update["escenarios"] = checks["escenarios"]
         update["calidad_plan"] = checks["calidad_plan"]
         update["errores"] = [f"plan editado: {v}" for v in violaciones] + checks["errores"]
         update.update(cost_update(state, checks["traces"]))
