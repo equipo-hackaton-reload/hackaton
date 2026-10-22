@@ -1,5 +1,6 @@
 """Cuerpos y respuestas de la API (contrato con la web, Zona D)."""
 
+from datetime import datetime
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
@@ -54,6 +55,26 @@ class RemeasureCreated(BaseModel):
 
     study_id: str
     remedicion_de: str
+
+
+class RemeasureRequest(BaseModel):
+    """Confirmación del coste de una re-medición. Obligatoria si la estimación es mayor que 0.
+
+    `coste_estimado_eur` es la cifra que vio la persona (`GET /studies/{id}/remeasure/estimate`);
+    si la estimación actual la supera, la API responde 409 en vez de gastar más de lo aceptado.
+    """
+
+    confirmado: Literal[True]
+    coste_estimado_eur: float = Field(ge=0)
+
+
+class BrandSummary(BaseModel):
+    """`GET /brands`: una marca del usuario con sus mediciones completadas."""
+
+    brand_id: str
+    nombre: str
+    n_mediciones: int
+    ultima_medicion: datetime | None
 
 
 class StudyView(BaseModel):
