@@ -44,9 +44,7 @@ def build_engines(
     engines = [cls(settings, marcas_a_evaluar, cache=cache, budget=budget) for cls in REAL_ENGINES]
     faltan = [e for e in engines if not e.has_key]
     for e in faltan:
-        logger.warning(
-            "motor %s desactivado: falta %s (ni en el entorno ni en .env)", e.motor, e.key_variable
-        )
+        logger.warning("motor %s desactivado: falta %s en .env", e.motor, e.key_variable)
     if len(faltan) == len(engines):
         logger.warning("modo real sin ninguna clave de motor: no hay motores que lanzar")
     return [e for e in engines if e.has_key]

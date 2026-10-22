@@ -1,13 +1,55 @@
-"""Configuración de posiq. leída de variables de entorno / `.env`. Ninguna clave va en el código."""
+"""Configuración de posiq. leída de variables de entorno / `.env`. Ninguna clave va en el código.
 
-from typing import Literal
+Las claves de proveedores (todo campo `SecretStr`: `*_API_KEY`, claves de Langfuse) se leen SOLO
+del `.env` o de los valores pasados al constructor, nunca de las variables de entorno del sistema
+operativo: una `ANTHROPIC_API_KEY` definida en el SO para otro uso no la usa posiq. El resto de
+ajustes (`LLM_PROVIDER`, `BUDGET_EUR_MAX`...) sí se leen también del entorno.
+"""
+
+from typing import Any, Literal
 
 from pydantic import SecretStr
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic.fields import FieldInfo
+from pydantic_settings import (
+    BaseSettings,
+    EnvSettingsSource,
+    PydanticBaseSettingsSource,
+    SettingsConfigDict,
+)
+
+
+def es_secreto(field: FieldInfo) -> bool:
+    """`True` si el campo es una clave (`SecretStr`): solo se lee del `.env`."""
+    return field.annotation is SecretStr
+
+
+class _EntornoSinSecretos(EnvSettingsSource):
+    """Variables de entorno del SO salvo las claves (campos `SecretStr`)."""
+
+    def get_field_value(self, field: FieldInfo, field_name: str) -> tuple[Any, str, bool]:
+        if es_secreto(field):
+            return None, field_name, False
+        return super().get_field_value(field, field_name)
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls: type[BaseSettings],
+        init_settings: PydanticBaseSettingsSource,
+        env_settings: PydanticBaseSettingsSource,
+        dotenv_settings: PydanticBaseSettingsSource,
+        file_secret_settings: PydanticBaseSettingsSource,
+    ) -> tuple[PydanticBaseSettingsSource, ...]:
+        return (
+            init_settings,
+            _EntornoSinSecretos(settings_cls),
+            dotenv_settings,
+            file_secret_settings,
+        )
 
     llm_provider: Literal["deepseek", "fixture"] = "deepseek"
 

@@ -8,8 +8,8 @@ class MissingCredentialError(RuntimeError):
 
     def __init__(self, variable: str, adaptador: str) -> None:
         super().__init__(
-            f"{adaptador}: falta {variable} (ni en el entorno ni en .env). Defínela en .env "
-            f"(ver .env.example) o como variable de entorno antes de hacer llamadas."
+            f"{adaptador}: falta {variable} en .env. Defínela en .env (ver .env.example) antes "
+            f"de hacer llamadas; las claves no se leen de las variables de entorno del sistema."
         )
         self.variable = variable
 

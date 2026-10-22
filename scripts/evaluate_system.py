@@ -216,7 +216,7 @@ def main(argv: list[str] | None = None) -> int:
         try:
             quality = build_plan_guard(Settings()).assess(plan, findings, brief)
         except MissingCredentialError as exc:
-            quality = f"falta {exc.variable} (ni en el entorno ni en .env)"
+            quality = f"falta {exc.variable} en .env"
     simulation = simulate_plan(plan, metrics, findings)
 
     markdown = render(study_id, latest_calibration(args.calibracion), coverage, quality, simulation)

@@ -81,7 +81,8 @@ falla, [`docs/plan-b.md`](docs/plan-b.md).
 
 ## Con claves: estudio real
 
-Las claves van en `.env` (está en `.gitignore`; nunca se suben). Las variables están en
+Las claves van en `.env` (está en `.gitignore`; nunca se suben) y solo se leen de ahí: posiq no
+usa las claves definidas como variables de entorno del sistema. Las variables están en
 [`.env.example`](.env.example):
 
 | Variable | Para qué |
