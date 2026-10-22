@@ -165,6 +165,16 @@
     están también en `findings`; con `fixture`, solo aquí.
 - `GET /studies/{id}/traces` incluye las trazas `web_audit` (coste 0).
 
+## Exportación con el diferencial (desde zona E, `feature/E-word-diferencial`)
+- `GET /studies/{id}/export` pasa al exportador `DatosDiferencial.del_estado(values)` (rigor,
+  competidores, oportunidades, exactitud, mitigaciones, escenarios, simulación y, si existe,
+  `auditoria_web`). Misma ruta, mismos códigos (409 sin propuesta, 503 sin LibreOffice).
+
+### Cambios de contrato para la Mitad B
+- Ninguno en el JSON. Solo cambia el contenido del Word: 13 secciones («7. Exactitud y lectura
+  técnica de la marca», «10. Escenarios y simulación del plan», «11. Seguimiento con método») y el
+  rótulo «Caso sintético del reto: datos ficticios» en portada y pie de los estudios kit.
+
 ## Falta
 - Estudio de Alborada con DeepSeek real → `docs/ejemplos/` (bloqueado: falta `DEEPSEEK_API_KEY`).
   Dos formas: completo (juez DeepSeek, ≈1–2,5 € y 20–30 min) o rápido con `JUDGE_PROVIDER=reglas`.

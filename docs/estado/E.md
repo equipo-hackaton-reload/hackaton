@@ -41,15 +41,38 @@
   queda publicado sin uso. Regla nueva en `prompts/README.md`: las claves que manda el nodo son las
   de la cabecera; lo comprueba `tests/application/test_prompt_state.py`.
 
+## Word con el diferencial (`feature/E-word-diferencial`, entregable 3)
+- `adapters/export/diferencial.py`: `DatosDiferencial` (rigor, competidores, oportunidades_fuente,
+  exactitud, mitigaciones, escenarios, simulacion, auditoria_web) con `del_estado(values)`, que
+  ignora claves ausentes o que no validan (la exportación nunca falla por un bloque). Los
+  formateadores pasan a `adapters/export/formato.py` (siguen importables desde `docx`).
+- `DocxExporter.render(..., diferencial=None)` y `PdfExporter` igual; el puerto `Exporter` no
+  cambia (parámetro opcional fuera del Protocol). Sin `diferencial`, cada bloque dice «No se
+  calculó en este estudio.».
+- `SECCIONES` pasa a 13: margen de error en «4. Diagnóstico» (score con IC, aparición por motor de
+  los 4 motores con margen ± p. p. y score por motor con IC); «Contraste estadístico» en la ficha de
+  cada hallazgo; competidores declarados frente a los de la IA y mapa de fuentes y oportunidades en
+  «5. Competencia»; «7. Exactitud y lectura técnica de la marca» (resumen, hasta 12 afirmaciones a
+  revisar sin repetir, mitigaciones; auditoría web solo si el estado trae `auditoria_web`);
+  «10. Escenarios y simulación del plan» (proyecciones con supuestos, advertencia literal del
+  dominio); «11. Seguimiento con método» sustituye a «Medición y seguimiento» (oferta del servicio,
+  línea base con IC y posición, cambios fuera del margen solo en re-mediciones, KPI y cadencia de
+  la propuesta).
+- Estudios kit: «Caso sintético del reto: datos ficticios» en portada y pie.
+- Golden de exportación sobre el plan canónico (9 acciones) y el diferencial calculado con las
+  mismas funciones que los nodos; ejemplo regenerado. Prompt `write` sin cambios (no sube versión).
+- **Para la Mitad B (docs):** `docs/revision-word.md` y `docs/arquitectura.md` hablan de 11
+  secciones y de «Medición y seguimiento»; ahora son 13 y «Seguimiento con método».
+
 ## Coordinación con zona D
 - La tarea web de simulación y re-medición actualizó `CHANGELOG.md` y este estado con autorización
   explícita; no modifica exportadores, prompts ni cifras de la propuesta.
 
 ## Falta
 - Coste real de una medición y precio de la suscripción (PENDIENTE de la primera medición real).
-- Rigor, escenarios, serie de seguimiento y exactitud en el Word cuando C los cablee en el estado.
-- Sección de simulación del plan en el Word cuando la propuesta la incluya en `schemas.py`
-  (`contract-change`).
+- Serie de seguimiento (varias mediciones) en el Word: hoy solo la línea base y los deltas
+  significativos de una re-medición.
+- PDF del ejemplo: en esta máquina no hay LibreOffice (el test de PDF se salta).
 
 ## Siguiente tarea
 - Ensayo general de la demo con la deck y el guion (`docs/deck.md`, `docs/demo/guion.md`,
