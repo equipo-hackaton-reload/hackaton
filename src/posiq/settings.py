@@ -94,6 +94,10 @@ class Settings(BaseSettings):
     # sin PlanGuard, aunque haya claves. `True` es un opt-in explícito para usar el LLM y el juez
     # de pago sobre las respuestas del kit (p. ej. para ensayar la redacción con DeepSeek).
     kit_ia_real: bool = False
+    # Modo real: tope de prompts del banco que genera el LLM (0 = sin tope). Se queda con una
+    # instancia por plantilla (P1 antes que P2) y luego completa en orden. Con 52 prompts × 4
+    # motores × 3 repeticiones el estudio estima ~10 €: por encima de `BUDGET_EUR_MAX=5`.
+    real_max_prompts: int = 0
 
     # Motores reales (ADR 0006). Modelos y precios PROVISIONALES: contrastar con la página de
     # precios oficial antes de lanzar un estudio. Tokens en USD por millón; búsqueda en USD por

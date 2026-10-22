@@ -179,6 +179,17 @@
   técnica de la marca», «10. Escenarios y simulación del plan», «11. Seguimiento con método») y el
   rótulo «Caso sintético del reto: datos ficticios» en portada y pie de los estudios kit.
 
+## Modo real en seco (`feature/C-real-en-seco`)
+- `tests/e2e/test_real_en_seco_api.py`: el modo real por la API con clientes falsos inyectados
+  (`Deps.engine_factory`, juez y PlanGuard con coste). Comprueba 24 llamadas a motores trazadas,
+  coste del estudio = suma de trazas, que `BUDGET_EUR_MAX` corta (estudio en `error`, exceso
+  acotado por `CONCURRENCIA` = 8 llamadas en vuelo) y que no se abre ningún socket externo.
+- `REAL_MAX_PROMPTS` (0 = sin tope): `nodes.prompts.recortar` deja uno por plantilla (P1 antes que
+  P2) y completa en orden. El banco completo (52 × 4 × 3) estima ~10,6 €: no cabe en 5 €.
+- `.env.example` completo con valores seguros; `docs/medicion-real.md` con los pasos de la tarde.
+- Hallazgo: un estudio real con menos de 3 hallazgos fallaba en `write` (`Proposal.hallazgos`
+  `min_length=3`). Resuelto en #55 (1 a 12 hallazgos; sin ninguno, error legible en `analyze`).
+
 ## Falta
 - Estudio de Alborada con DeepSeek real → `docs/ejemplos/` (bloqueado: falta `DEEPSEEK_API_KEY`).
   Dos formas: completo (juez DeepSeek, ≈1–2,5 € y 20–30 min) o rápido con `JUDGE_PROVIDER=reglas`.
