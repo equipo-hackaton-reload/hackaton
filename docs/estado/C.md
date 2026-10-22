@@ -61,6 +61,20 @@
   (`LLM_TOKENS`), juez con fallback (25 %) y PlanGuard; `estimate_study(..., remedicion=True)`
   quita intake y market (para `GET /studies/{id}/remeasure/estimate`).
 
+## Seguimiento (A2, `feature/C-seguimiento-api`)
+- `GET /brands` → `[{brand_id, nombre, n_mediciones, ultima_medicion}]`: marcas de los estudios
+  visibles del usuario (ADR 0015). `n_mediciones` cuenta solo los completados; una marca con un
+  estudio en curso aparece con 0 y `ultima_medicion` null. Orden: la medición más reciente primero.
+- `GET /brands/{id}/serie` → `SerieMarca` de `domain.tracking.construir_serie` (ADR 0016) con los
+  estudios completados del usuario de esa marca: muestra, mercado, exactitud y trazas salen del
+  checkpoint de cada estudio; catálogo del kit. Bootstrap fuera del bucle de eventos. 404 sin
+  mediciones completadas (o si la marca es de otro usuario).
+- `GET /studies/{id}/remeasure/estimate` → `CostEstimate` con `remedicion=True` y el número de
+  prompts del original (la re-medición reutiliza su banco).
+- `POST /studies/{id}/remeasure` acepta `{confirmado: true, coste_estimado_eur}`. Si la estimación es
+  mayor que 0, el cuerpo es obligatorio (409 sin él) y la estimación actual no puede superar la
+  confirmada (409 «ha subido»; margen de 0,005 €). En modo kit cuesta 0 y sigue sin cuerpo.
+
 ## Diferencial v0.4.0 (conectado, `feature/C-diferencial-grafo`)
 - Nodo `diferencial` entre `analyze` y `plan` (`application/nodes/diferencial.py`), sin LLM ni
   coste. Todo sale de `domain/`:
@@ -118,8 +132,6 @@
 ## Siguiente tarea
 - Web (zona D): pintar `rigor`, `competidores`, `oportunidades_fuente`, `exactitud` y `escenarios`.
 - Elegir otro escenario desde la API (hoy siempre el completo) y que `write` lo use.
-- Endpoints de seguimiento sobre las cuentas: `GET /brands`, `GET /brands/{id}/serie`,
-  `GET /studies/{id}/remeasure/estimate` y `remeasure` con confirmación de coste.
 - Ajustar `LLM_TOKENS` de `estimate.py` con las `Trace` del primer estudio real.
 - Estudio de Alborada con DeepSeek en cuanto haya `DEEPSEEK_API_KEY`.
 - Persistir `StudyRunner.fallos` para que el estado `error` sobreviva a un reinicio.

@@ -3,7 +3,10 @@
 - `POST /studies` crea el estudio y lanza el grafo en segundo plano → `{study_id}`.
 - `GET /studies/{id}` estado, revisión pendiente, coste, errores y lo producido hasta ahora.
 - `POST /studies/{id}/resume` reanuda una revisión (`competidores` o `plan`) → 202.
-- `POST /studies/{id}/remeasure` re-mide un estudio completado (mismo brief y mercado) → 201.
+- `GET /studies/{id}/remeasure/estimate` coste de re-medir (mismo banco, sin intake ni mercado).
+- `POST /studies/{id}/remeasure` re-mide un estudio completado (mismo brief y mercado) → 201. Si
+  cuesta algo, exige `{confirmado: true, coste_estimado_eur}` y 409 si la estimación lo supera.
+- `GET /brands` marcas del usuario con sus mediciones; `GET /brands/{id}/serie` su serie temporal.
 - `GET /studies/{id}/export?formato=docx|pdf` Word o PDF (409 sin propuesta; PDF sin soffice, 503).
 - `GET /studies/{id}/evaluations?ids=a,b` evidencias: evaluación con motor, prompt y respuesta.
 - `GET /studies/{id}/traces` trazas del estudio (modelo, tokens, coste por llamada).
@@ -24,15 +27,17 @@ requiere `python-multipart`).
 import io
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Annotated, Any, Literal
 
-from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Query, Request, status
+from fastapi import BackgroundTasks, Body, Depends, FastAPI, HTTPException, Query, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from pydantic import ValidationError
 
 from posiq.adapters.export import DocxExporter, PdfExporter, SofficeNotFoundError
 from posiq.adapters.repo.accounts import SqlAccountRepo
+from posiq.application import seguimiento
 from posiq.application.accounts import AccountService, Usuario
 from posiq.application.deps import db
 from posiq.application.estimate import (
@@ -42,14 +47,18 @@ from posiq.application.estimate import (
     CostEstimate,
     estimate_study,
 )
+from posiq.application.kit import load_sources
 from posiq.application.runner import RemeasureError, ResumeError, StudyRunner
 from posiq.domain.schemas import ModoEstudio, Study, Trace
+from posiq.domain.tracking_schemas import SerieMarca
 from posiq.interfaces.api.auth import CurrentUser, require_json
 from posiq.interfaces.api.auth import router as auth_router
 from posiq.interfaces.api.schemas import (
     AVISO_KIT,
+    BrandSummary,
     Evidence,
     RemeasureCreated,
+    RemeasureRequest,
     ResumeAccepted,
     ResumeBody,
     StudyCreate,
@@ -63,6 +72,8 @@ from posiq.settings import Settings
 DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 TEXT_TYPES = ("text/markdown", "text/plain", "text/x-markdown")
 LOCALHOST = r"https?://(localhost|127\.0\.0\.1)(:\d+)?"
+# Margen de redondeo al comparar la estimación actual con la confirmada (céntimos).
+TOLERANCIA_EUR = 0.005
 MARGEN_MULTIPART = 64 * 1024
 
 
@@ -314,12 +325,44 @@ def create_app(
         background.add_task(r.resume, study_id, body.payload)
         return ResumeAccepted(study_id=study_id, revision=body.revision)
 
+    async def remeasure_estimate(request: Request, r: StudyRunner, study: Study) -> CostEstimate:
+        """Coste de re-medir `study`: reutiliza su banco de prompts; sin intake ni mercado."""
+        values, _ = await r.state(study.id)
+        n_prompts = len(values.get("prompts") or []) or KIT_PROMPTS
+        return estimate_study(
+            study.modo, get_settings(request), n_prompts=n_prompts, remedicion=True
+        )
+
+    @app.get("/studies/{study_id}/remeasure/estimate")
+    async def read_remeasure_estimate(
+        request: Request, study_id: str, user: CurrentUser
+    ) -> CostEstimate:
+        r = get_runner(request)
+        return await remeasure_estimate(request, r, get_study(request, r, user, study_id))
+
     @app.post("/studies/{study_id}/remeasure", status_code=status.HTTP_201_CREATED)
     async def remeasure_study(
-        request: Request, study_id: str, background: BackgroundTasks, user: CurrentUser
+        request: Request,
+        study_id: str,
+        background: BackgroundTasks,
+        user: CurrentUser,
+        confirmacion: Annotated[RemeasureRequest | None, Body()] = None,
     ) -> RemeasureCreated:
         r = get_runner(request)
-        get_study(request, r, user, study_id)
+        original = get_study(request, r, user, study_id)
+        coste = (await remeasure_estimate(request, r, original)).coste_estimado_eur
+        if coste > 0 and confirmacion is None:
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                f"la re-medición cuesta {coste:.2f} €: confirma con "
+                '{"confirmado": true, "coste_estimado_eur": …}',
+            )
+        if confirmacion is not None and coste > confirmacion.coste_estimado_eur + TOLERANCIA_EUR:
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                f"la estimación ha subido a {coste:.2f} € (confirmaste "
+                f"{confirmacion.coste_estimado_eur:.2f} €): vuelve a confirmar",
+            )
         try:
             study = await r.prepare_remeasure(study_id)
         except RemeasureError as exc:
@@ -346,6 +389,41 @@ def create_app(
         get_study(request, r, user, study_id)
         values, _ = await r.state(study_id)
         return list(values.get("traces", []))
+
+    def visible_studies(request: Request, r: StudyRunner, user: Usuario) -> list[Study]:
+        studies = r.repo.list_studies(None)
+        visibles = set(get_accounts(request).visible_ids(user, [s.id for s in studies]))
+        return [s for s in studies if s.id in visibles]
+
+    @app.get("/brands")
+    async def list_brands(request: Request, user: CurrentUser) -> list[BrandSummary]:
+        studies = visible_studies(request, get_runner(request), user)
+        return [
+            BrandSummary(
+                brand_id=m.brand_id,
+                nombre=m.nombre,
+                n_mediciones=m.n_mediciones,
+                ultima_medicion=m.ultima_medicion,
+            )
+            for m in seguimiento.resumen_marcas(studies)
+        ]
+
+    @app.get("/brands/{brand_id}/serie")
+    async def brand_series(request: Request, brand_id: str, user: CurrentUser) -> SerieMarca:
+        """Serie con método (ADR 0016) de las mediciones completadas de la marca del usuario."""
+        r = get_runner(request)
+        propios = [s for s in visible_studies(request, r, user) if s.brand_id == brand_id]
+        catalogo = load_sources(str(Path(get_settings(request).kit_dir).resolve()))
+        meds = await seguimiento.mediciones(r, propios, catalogo)
+        try:
+            serie = await db(seguimiento.serie, brand_id, meds)
+        except ValueError as exc:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
+        if serie is None:
+            raise HTTPException(
+                status.HTTP_404_NOT_FOUND, f"no hay mediciones completadas de la marca {brand_id}"
+            )
+        return serie
 
     @app.get("/estimate")
     async def estimate(
