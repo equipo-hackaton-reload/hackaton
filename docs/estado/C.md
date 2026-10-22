@@ -61,6 +61,10 @@
   (`LLM_TOKENS`), juez con fallback (25 %) y PlanGuard; `estimate_study(..., remedicion=True)`
   quita intake y market (para `GET /studies/{id}/remeasure/estimate`).
 
+## Claves solo del `.env` (`feature/C-claves-solo-env`)
+- `Settings` ignora las claves (`SecretStr`) del entorno del SO: solo `.env` o constructor. Los
+  tests que necesiten una clave la pasan al constructor (`Settings(_env_file=None, x_api_key=...)`).
+
 ## Elegir escenario (`feature/C-elegir-escenario`)
 - `GET /studies/{id}/scenarios` (los tres preajustes del nodo `plan`, `completo` elegido);
   `POST /studies/{id}/scenarios` con una `EntradaEscenario` → 201 `{id: "P1", …}` (422 si nombra
