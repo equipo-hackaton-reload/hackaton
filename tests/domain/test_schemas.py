@@ -199,6 +199,22 @@ def test_proposal_acciones_enlazadas_a_hallazgos() -> None:
         Proposal.model_validate(sin_limitaciones)
 
 
+def test_proposal_admite_de_1_a_12_hallazgos() -> None:
+    """Una medición real pequeña da 1 o 2 hallazgos; en real se suman los técnicos de la web."""
+    from posiq.domain.schemas import MAX_HALLAZGOS_PROPUESTA, Proposal
+
+    base = _proposal(["F1"])
+    uno = base["hallazgos"][:1]  # type: ignore[index]
+    for n in (1, 2, MAX_HALLAZGOS_PROPUESTA):
+        hallazgos = [uno[0] | {"id": f"F{i}"} for i in range(1, n + 1)]
+        assert len(Proposal.model_validate(base | {"hallazgos": hallazgos}).hallazgos) == n
+    with pytest.raises(ValidationError):
+        Proposal.model_validate(base | {"hallazgos": []})
+    demasiados = [uno[0] | {"id": f"F{i}"} for i in range(1, MAX_HALLAZGOS_PROPUESTA + 2)]
+    with pytest.raises(ValidationError):
+        Proposal.model_validate(base | {"hallazgos": demasiados})
+
+
 def test_proposal_de_un_solo_estudio() -> None:
     from posiq.domain.schemas import Proposal
 

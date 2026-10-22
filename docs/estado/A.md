@@ -39,6 +39,14 @@
   - Falta: que la web lo pinte (D, forma del JSON en `docs/estado/D.md`). `posicionamiento_deseado`
     y `atributos_deseados` ya los extrae `intake.v2` (zona E), pero aún no son puntos de cobertura.
 
+## Pocos hallazgos (`feature/A-pocos-hallazgos`, `contract-change` que solo relaja)
+
+- `Proposal.hallazgos`: de 1 a `MAX_HALLAZGOS_PROPUESTA` (12). Antes 3–7: una medición real pequeña
+  rompía `write` con menos de 3, y en real los 7 de las reglas + hasta 4 `F-web-*` podían pasar de 7.
+- 0 hallazgos: `findings.exigir_hallazgos` lanza `MuestraInsuficiente` en `analyze` (tras guardar
+  métricas); el runner guarda el mensaje sin prefijo de tipo y la web lo enseña en «El estudio se ha
+  detenido». Plan, PlanGuard, escenarios, simulación, cobertura y Word no asumen ≥ 3 (probado con 1 y 2).
+
 ## Seguimiento con método: serie temporal (`feature/A-serie-temporal`, ADR 0016)
 
 - `domain/tracking_schemas.py` (contrato para C y D): `PuntoSerie`, `CambioSerie`,

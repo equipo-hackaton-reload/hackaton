@@ -1,14 +1,17 @@
 """Cada nodo por separado, con `LLM`, `Engine` y juez falsos (sin red)."""
 
 import sys
+from io import BytesIO
 from typing import Any
 
 import pytest
+from docx import Document
 from pydantic import BaseModel, SecretStr
 
 from posiq.adapters.budget import Budget, BudgetExceeded
 from posiq.adapters.engines.kit import KitEngine
 from posiq.adapters.errors import MissingCredentialError
+from posiq.adapters.export import DocxExporter
 from posiq.adapters.repo.sql import SqlStudyRepo
 from posiq.application import nodes
 from posiq.application.deps import new_study
@@ -17,6 +20,7 @@ from posiq.application.nodes.market import reconcile
 from posiq.application.nodes.review import parse_market, parse_plan
 from posiq.application.nodes.write import LIMITACION_KIT, LIMITACION_REGLAS, PREFIJO_PENDIENTES
 from posiq.application.state import StudyState, initial_state
+from posiq.domain.findings import MuestraInsuficiente
 from posiq.domain.schemas import Brand, Market, PromptInstance, Run, Trace
 from tests.application.fakes import (
     KIT_DIR,
@@ -442,6 +446,37 @@ async def test_write_overwrites_every_figure_with_the_computed_ones(repo: SqlStu
     assert LIMITACION_REGLAS not in p.contexto.limitaciones
     assert repo.get_proposal(state["study_id"]) == p
     assert repo.get_study(state["study_id"]).estado == "completado"
+
+
+@pytest.mark.parametrize("n", [1, 2])
+async def test_write_with_one_or_two_findings(repo: SqlStudyRepo, n: int) -> None:
+    """Medición real pequeña: con 1 o 2 hallazgos el plan, la propuesta y el Word salen igual."""
+    state = await analyzed_state(repo)
+    state = merge(state, {"findings": state["findings"][:n]})
+    state = merge(state, await nodes.plan(state, make_deps(kit_llm(), [], repo)))
+    assert state["plan_violaciones"] == []
+    update = await nodes.write(state, make_deps(kit_llm(), [], repo))
+
+    p = update["proposal"]
+    assert p.hallazgos == state["findings"] and len(p.hallazgos) == n
+    assert repo.get_study(state["study_id"]).estado == "completado"
+    texto = "\n".join(
+        par.text for par in Document(BytesIO(DocxExporter().render(p, formato="docx"))).paragraphs
+    )
+    assert all(f.titulo in texto for f in p.hallazgos)
+
+
+async def test_analyze_without_findings_stops_with_a_readable_error(
+    repo: SqlStudyRepo, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    analyze_mod = sys.modules["posiq.application.nodes.analyze"]  # `nodes.analyze` es la función
+    deps = make_deps(kit_llm(), [], repo)
+    state = await kit_state_until_judge(repo)
+    state = merge(state, await nodes.judge(state, deps))
+    monkeypatch.setattr(analyze_mod, "detect_findings", lambda *_: [])
+    with pytest.raises(MuestraInsuficiente, match="^Muestra insuficiente: no hay hallazgos"):
+        await nodes.analyze(state, deps)
+    assert repo.get_findings(state["study_id"]) == []
 
 
 async def test_write_declares_rule_based_evaluations(repo: SqlStudyRepo) -> None:
