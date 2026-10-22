@@ -5,7 +5,7 @@ Las categorías siguen el diccionario de datos y la metodología del kit (`data/
 """
 
 from datetime import datetime
-from typing import Literal, Self
+from typing import Final, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field, model_validator
 
@@ -635,6 +635,9 @@ class Encargo(_Model):
         return [p for p in self.cobertura if p.estado == "pendiente"]
 
 
+MAX_HALLAZGOS_PROPUESTA: Final = 12
+
+
 class Proposal(_Model):
     """Las 10 secciones del formato del entregable (doc 06), todas del mismo estudio.
 
@@ -648,7 +651,9 @@ class Proposal(_Model):
     contexto: Contexto
     diagnostico: Diagnostico
     competencia: Competencia
-    hallazgos: list[Finding] = Field(min_length=3, max_length=7)
+    # Desde 1: una medición real pequeña puede dar 1 o 2 hallazgos. Hasta 12: en modo real a los 7
+    # de `detect_findings` se suman los técnicos de la auditoría web (hasta 4).
+    hallazgos: list[Finding] = Field(min_length=1, max_length=MAX_HALLAZGOS_PROPUESTA)
     estrategia: Estrategia
     plan: Plan
     medicion: Medicion

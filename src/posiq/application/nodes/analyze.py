@@ -7,6 +7,9 @@ Los hallazgos técnicos de la auditoría web (nodo `web_audit`, ADR 0019) se sum
 `detect_findings` solo si la auditoría es `origen="real"`: así el plan puede cubrirlos con la
 palanca `tecnico`. Los de una auditoría fixture (CASO SINTÉTICO) se quedan en `hallazgos_web`,
 fuera del plan, y los 7 hallazgos del golden no cambian.
+
+Sin ningún hallazgo (medición real muy pequeña) el estudio se detiene aquí con
+`MuestraInsuficiente`: no hay plan ni propuesta que construir sin evidencia, y no se paga el LLM.
 """
 
 from pathlib import Path
@@ -15,7 +18,7 @@ from typing import Any
 from posiq.application.deps import Deps, db
 from posiq.application.kit import load_sources
 from posiq.application.state import StudyState
-from posiq.domain.findings import detect_findings
+from posiq.domain.findings import detect_findings, exigir_hallazgos
 from posiq.domain.metrics import compute_metrics, diff_metrics
 from posiq.domain.schemas import Finding
 
@@ -47,4 +50,5 @@ async def analyze(state: StudyState, deps: Deps) -> dict[str, Any]:
 
     await db(deps.repo.save_metrics, sid, metrics, delta)
     await db(deps.repo.save_findings, sid, findings)
+    exigir_hallazgos(findings, metrics.n_ejecuciones.get("total", 0))  # 0: error legible
     return {"metrics": metrics, "metrics_delta": delta, "findings": findings}

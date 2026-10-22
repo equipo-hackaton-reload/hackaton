@@ -19,6 +19,7 @@ from posiq.application.diferencial import EscenarioGuardado, MedicionAnterior
 from posiq.application.graph import StudyGraph, build_graph
 from posiq.application.nodes.review import parse_market, parse_plan
 from posiq.application.state import StudyState, initial_state
+from posiq.domain.findings import MuestraInsuficiente
 from posiq.domain.scenario_schemas import EntradaEscenario
 from posiq.domain.schemas import ModoEstudio, Study, Trace
 from posiq.ports import StudyRepo
@@ -187,7 +188,8 @@ class StudyRunner:
             await self.graphs[study.modo].ainvoke(graph_input, self.config(study.id))
         except Exception as exc:  # el grafo corre en segundo plano: el fallo se consulta por la API
             log.exception("estudio %s falló", study.id)
-            self.fallos[study.id] = f"{type(exc).__name__}: {exc}"
+            legible = isinstance(exc, MuestraInsuficiente)  # ya es un mensaje para la persona
+            self.fallos[study.id] = str(exc) if legible else f"{type(exc).__name__}: {exc}"
             await self._registrar_trazas_de_fallo(study, trazas_de_fallo(exc))
         finally:
             self.en_marcha.discard(study.id)

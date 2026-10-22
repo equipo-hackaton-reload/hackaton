@@ -328,3 +328,23 @@ def detect_findings(metrics: Metrics, brief: BriefSummary) -> list[Finding]:
     found = [(i, f) for i, rule in enumerate(RULES) for f in rule(metrics, brief)]
     found.sort(key=lambda item: (_IMPACT_ORDER[item[1].impacto], item[0]))
     return [f for _, f in found[:MAX_FINDINGS]]
+
+
+class MuestraInsuficiente(ValueError):
+    """La medición no deja ningún hallazgo con evidencia: no hay propuesta que redactar.
+
+    Una propuesta necesita al menos un hallazgo (cada uno con `evaluation_ids` reales) y cada acción
+    del plan enlaza alguno. Inventar uno sin evidencia rompería la trazabilidad, así que el estudio
+    se detiene con este mensaje legible en lugar de fallar más tarde en `plan` o en `write`.
+    """
+
+
+def exigir_hallazgos(findings: list[Finding], n_ejecuciones: int) -> None:
+    """Lanza `MuestraInsuficiente` si no hay ningún hallazgo; no hace nada en otro caso."""
+    if findings:
+        return
+    raise MuestraInsuficiente(
+        "Muestra insuficiente: no hay hallazgos con evidencia en esta medición "
+        f"({n_ejecuciones} ejecuciones). Amplía el banco de prompts, los motores o las "
+        "repeticiones y vuelve a medir; las métricas calculadas siguen disponibles."
+    )
