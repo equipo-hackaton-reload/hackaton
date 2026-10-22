@@ -1,7 +1,9 @@
 """Nodo `analyze`: métricas y hallazgos del dominio; sin LLM.
 
-Si la marca tiene una medición anterior, las métricas se marcan `comparado_con` y se calcula la
-diferencia (`diff_metrics`) para la re-medición.
+En una re-medición (`medicion_anterior`, sembrada por `prepare_remeasure`), las métricas se marcan
+`comparado_con` el estudio re-medido y se calcula la diferencia (`diff_metrics`). Un estudio nuevo
+es una línea base: no se compara con otros estudios de la misma marca, que pueden ser de otro
+usuario (ADR 0015) o de otra configuración.
 
 Los hallazgos técnicos de la auditoría web (nodo `web_audit`, ADR 0019) se suman a los de
 `detect_findings` solo si la auditoría es `origen="real"`: así el plan puede cubrirlos con la
@@ -30,8 +32,8 @@ def hallazgos_tecnicos_del_plan(state: StudyState) -> list[Finding]:
 
 async def analyze(state: StudyState, deps: Deps) -> dict[str, Any]:
     sid = state["study_id"]
-    study = await db(deps.repo.get_study, sid)
-    anterior = await db(deps.repo.latest_metrics, study.brand_id, before=study.creado_en)
+    medicion_anterior = state.get("medicion_anterior")
+    anterior = medicion_anterior["metrics"] if medicion_anterior else None
     metrics = compute_metrics(
         state["brief"],
         state["market"],

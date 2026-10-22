@@ -11,7 +11,7 @@ from posiq.application.deps import new_study
 from posiq.interfaces.api.main import create_app
 from tests.application.fakes import kit_settings
 from tests.auth_helpers import authenticate_async
-from tests.interfaces.test_api import BRIEF, build_runner, completed_study, create
+from tests.interfaces.test_api import BRIEF, CONFIRMA, build_runner, completed_study, create
 
 pytestmark = pytest.mark.anyio
 
@@ -203,7 +203,7 @@ async def test_each_user_only_sees_their_own_studies(app: Any) -> None:
         assert (await ana.get(f"/studies/{sid}/export")).status_code == 200
 
         # La re-medición hereda el propietario del original.
-        nuevo = (await ana.post(f"/studies/{sid}/remeasure")).json()["study_id"]
+        nuevo = (await ana.post(f"/studies/{sid}/remeasure", json=CONFIRMA)).json()["study_id"]
         assert {s["id"] for s in (await ana.get("/studies")).json()} == {sid, nuevo}
         assert (await luis.get(f"/studies/{nuevo}")).status_code == 404
     finally:

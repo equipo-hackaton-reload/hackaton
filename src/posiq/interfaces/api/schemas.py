@@ -6,6 +6,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 from posiq.application.diferencial import EscenarioGuardado, Rigor
+from posiq.application.tracking import ConfigEstudio, EstadoAccionGuardado
 from posiq.domain.accuracy_schemas import AccionMitigacion, HallazgoExactitud
 from posiq.domain.competitor_gap_schemas import BrechaCompetidores
 from posiq.domain.quality_schemas import PlanQuality
@@ -110,6 +111,13 @@ class StudyView(BaseModel):
     auditoria_web: AuditoriaWeb | None = None
     hallazgos_web: list[Finding] | None = None
     proposal: Proposal | None = None
+    # Seguimiento (aditivo). Caso sintético del reto: todo estudio en modo kit es ficticio.
+    datos_sinteticos: bool = False
+    # Último estado de cada acción del plan (`PATCH /studies/{id}/acciones/{action_id}`).
+    acciones_estado: dict[str, EstadoAccionGuardado] = {}
+    # Versiones del perfil y del mercado con las que se midió y, si es una re-medición, a quién
+    # re-mide. None si el estudio no se creó con el seguimiento (línea base anterior).
+    configuracion: ConfigEstudio | None = None
 
 
 class ResumeBody(BaseModel):

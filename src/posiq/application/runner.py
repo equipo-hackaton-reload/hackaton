@@ -18,7 +18,7 @@ from posiq.application.diferencial import MedicionAnterior
 from posiq.application.graph import StudyGraph, build_graph
 from posiq.application.nodes.review import parse_market, parse_plan
 from posiq.application.state import StudyState, initial_state
-from posiq.domain.schemas import ModoEstudio, Study, Trace
+from posiq.domain.schemas import BriefSummary, Market, ModoEstudio, Study, Trace
 from posiq.ports import StudyRepo
 
 log = logging.getLogger(__name__)
@@ -73,7 +73,14 @@ class StudyRunner:
     async def resume(self, study_id: str, payload: Any) -> None:
         await self._drive(self.repo.get_study(study_id), Command(resume=payload))
 
-    async def prepare_remeasure(self, original_id: str) -> Study:
+    async def prepare_remeasure(
+        self,
+        original_id: str,
+        *,
+        brief: BriefSummary | None = None,
+        market: Market | None = None,
+        reutilizar_prompts: bool = True,
+    ) -> Study:
         """Estudio nuevo de la misma marca con el brief y el mercado confirmado de `original_id`.
 
         El hilo nuevo se siembra como si ya hubiera pasado la revisión de competidores, así que
@@ -85,6 +92,11 @@ class StudyRunner:
         (`domain.tracking.huella_banco`), y las dos mediciones dejarían de ser comparables. Y la
         `medicion_anterior` (métricas, prompts, ejecuciones y evaluaciones del original), para que
         el nodo `diferencial` diga qué deltas salen del margen de error.
+
+        `brief` y `market` sustituyen a los del original: la configuración VIGENTE de la marca
+        (perfil y mercado versionados, `application.tracking`). Con `reutilizar_prompts=False`
+        (el perfil cambia servicios, ciudades o públicos en modo real) el banco se genera de nuevo
+        y la serie compara sobre el núcleo común de preguntas.
         """
         original = self.repo.get_study(original_id)
         if original.estado != "completado":
@@ -92,20 +104,21 @@ class StudyRunner:
                 f"solo se re-mide un estudio completado; {original_id} está «{original.estado}»"
             )
         values, _ = await self.state(original_id)
-        market = values.get("market")
+        market = market or values.get("market")
         if market is None or not market.confirmado_por_humano:
             raise RemeasureError(f"el estudio {original_id} no tiene el mercado confirmado")
 
+        brief = brief or values["brief"]
         study = new_study(original.modo).model_copy(
-            update={"brand_id": original.brand_id, "brief": original.brief}
+            update={"brand_id": original.brand_id, "brief": brief}
         )
         self.repo.save_study(study)
         seed: StudyState = {
             **initial_state(study, values.get("brief_texto", "")),
-            "brief": values["brief"],
+            "brief": brief,
             "market": market,
         }
-        if values.get("prompts"):
+        if reutilizar_prompts and values.get("prompts"):
             seed["prompts"] = list(values["prompts"])
         if all(k in values for k in ("metrics", "prompts", "runs", "evaluations")):
             seed["medicion_anterior"] = MedicionAnterior(
