@@ -15,6 +15,7 @@ from posiq.adapters.export import DocxExporter
 from posiq.adapters.repo.sql import SqlStudyRepo
 from posiq.application import nodes
 from posiq.application.deps import new_study
+from posiq.application.diferencial import MedicionAnterior
 from posiq.application.kit import load_kit
 from posiq.application.nodes.market import reconcile
 from posiq.application.nodes.review import parse_market, parse_plan
@@ -295,14 +296,28 @@ async def test_analyze_computes_metrics_findings_and_compares_with_previous(
     deps = make_deps(kit_llm(), [], repo)
     primero = await kit_state_until_judge(repo, n_prompts=25)
     primero = merge(primero, await nodes.judge(primero, deps))
-    update = await nodes.analyze(primero, deps)
+    update = update_primero = await nodes.analyze(primero, deps)
     assert update["metrics"].study_id == primero["study_id"]
     assert update["metrics"].comparado_con is None and update["metrics_delta"] is None
     assert update["findings"]
     assert repo.get_findings(primero["study_id"]) == update["findings"]
 
+    # Otro estudio de la misma marca sin ser re-medición: línea base, sin comparar.
+    suelto = await kit_state_until_judge(repo, n_prompts=25)
+    suelto = merge(suelto, await nodes.judge(suelto, deps))
+    assert (await nodes.analyze(suelto, deps))["metrics_delta"] is None
+
+    # Re-medición: compara con el estudio re-medido (`medicion_anterior`).
+    primero = merge(primero, update_primero)
     segundo = await kit_state_until_judge(repo, n_prompts=25)
     segundo = merge(segundo, await nodes.judge(segundo, deps))
+    segundo["medicion_anterior"] = MedicionAnterior(
+        study_id=primero["study_id"],
+        metrics=primero["metrics"],
+        prompts=primero["prompts"],
+        runs=primero["runs"],
+        evaluations=primero["evaluations"],
+    )
     update = await nodes.analyze(segundo, deps)
     assert update["metrics"].comparado_con == primero["study_id"]
     assert update["metrics_delta"].comparado_con == primero["study_id"]

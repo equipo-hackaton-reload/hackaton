@@ -4,6 +4,9 @@ Formato [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); versionado 
 
 ## [Unreleased]
 
+### Added
+- Configuración versionada por marca sobre la #49 (zona C; toca `adapters/repo`): perfil y mercado versionados por usuario y marca (`GET|PUT /brands/{id}/perfil|mercado`, `?historial=1`; la v1 sale del primer estudio; cada PUT crea una versión con `vigente_desde` y `aviso_impacto` según el ADR 0016); la re-medición confirmada de la #49 mide con la configuración VIGENTE, guarda las versiones usadas y da 409 si ya hay otra en curso del mismo estudio; `PATCH /studies/{id}/acciones/{action_id}` con historial; `GET /studies/{id}` añade `datos_sinteticos`, `acciones_estado` y `configuracion`. **Cambio:** un estudio nuevo es línea base (`analyze` solo compara con la medición que re-mide). Tablas nuevas `brand_config_version`, `study_config` y `action_status`. Cifras canónicas sin cambios.
+
 ## [0.3.0] - 2026-10-22
 
 ### Added

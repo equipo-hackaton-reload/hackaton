@@ -179,6 +179,55 @@
   técnica de la marca», «10. Escenarios y simulación del plan», «11. Seguimiento con método») y el
   rótulo «Caso sintético del reto: datos ficticios» en portada y pie de los estudios kit.
 
+## Configuración versionada por marca (`feature/C-seguimiento-config`, sobre la #49)
+- Se rebasó sobre la #49 de Walter, que **manda** en `GET /brands`, `GET /brands/{id}/serie`,
+  `GET /studies/{id}/remeasure/estimate` y la confirmación de coste de `POST /remeasure`
+  (`application/seguimiento.py`, `RemeasureRequest`, `BrandSummary` de `interfaces/api/schemas.py`).
+  Esta rama añade solo lo que faltaba encima; adaptaciones respecto a mi commit original:
+  - `/brands` y `/serie` son los de Walter: sin `datos_sinteticos`, `ultimo_score`,
+    `cambios_significativos` ni `alertas_exactitud` en `/brands`, sin `?modo=` en la serie y sin
+    `version_perfil/version_mercado` en sus puntos (pendiente: pasarle las versiones guardadas).
+  - Confirmación de la re-medición: la de Walter (kit gratis sin cuerpo; 409 si cuesta y no hay
+    confirmación o la estimación supera lo confirmado). Se quitó mi 400 y mi ±0,01 €.
+  - Mi servicio vive en `application/configuracion.py` (`TrackingService`) para no pisar
+    `application/seguimiento.py`.
+- `application/tracking.py`: modelos y reglas sin cifras (perfil ↔ brief, aviso de impacto,
+  validación del mercado). `adapters/repo/tracking.py`: tablas `brand_config_version` (perfil y
+  mercado por usuario y marca; solo se insertan), `study_config` (versiones usadas y
+  `remedicion_de`) y `action_status` (historial).
+- Configuración versionada: si la marca no tiene versiones, la v1 se crea con el brief y el
+  mercado confirmado de su primer estudio, vigente desde su fecha. Cada PUT crea v2, v3… con
+  `vigente_desde` = ahora (estrictamente posterior a la anterior).
+- Re-medición: tras la confirmación de Walter, usa el perfil y el mercado VIGENTES (brief con el
+  perfil aplicado, mercado de la última versión) y guarda las versiones en `study_config`. En modo
+  real, si el perfil cambia servicios, ciudades o públicos, el banco se genera de nuevo; si no, se
+  reutiliza. En kit se reutiliza siempre. 409 si ya hay una re-medición del mismo estudio en curso.
+- **Cambio de comportamiento:** `analyze` solo compara con `medicion_anterior` (la re-medición).
+  Antes usaba `latest_metrics` de la marca, que podía ser el estudio de otro usuario.
+- Tests: `tests/interfaces/test_seguimiento_api.py` (versiones guardadas, 409 en curso, versiones
+  de perfil y mercado, acciones, aislamiento entre usuarios) y `tests/e2e/test_seguimiento_api.py`
+  (con `FixtureJudge`: 2 puntos con 25,93 y 8.º de 10, comparables y sin cambios).
+
+## Cambios de contrato para la Mitad B (además de la #49)
+Todo con Bearer; lo ajeno, 404 (marca sin estudios visibles del usuario o estudio de otro).
+- `GET /brands/{id}/perfil` → `{version, vigente_desde, perfil}`; con `?historial=1`, la lista en
+  orden. `perfil` = `{servicios, ciudades, publicos, posicionamiento_deseado, atributos_deseados,
+  restricciones, presupuesto_anual_eur: [min, max]|null}`.
+- `PUT /brands/{id}/perfil {perfil}` → 201 `{version, vigente_desde, aviso_impacto}`; 422 si el
+  perfil no valida; 409 si otra edición se guardó a la vez.
+- `GET /brands/{id}/mercado[?historial=1]` → `{version, vigente_desde, marcas: [Brand]}`. 404 si
+  la marca aún no tiene ningún mercado confirmado.
+- `PUT /brands/{id}/mercado {marcas}` → 201 como el perfil; 422 si falta la marca del
+  seguimiento, hay ids repetidos o hay menos de 2 marcas.
+- `POST /studies/{id}/remeasure`: el contrato de la #49, más 409 si ya hay una re-medición del
+  mismo estudio sin terminar (en curso o esperando la revisión del plan).
+- `PATCH /studies/{id}/acciones/{action_id} {estado: pendiente|en_curso|hecha, nota?}` → 200
+  `{action_id, estado, nota, actualizado_en}`; 404 si la acción no está en el plan; 422 con otro
+  estado.
+- `GET /studies/{id}` añade `datos_sinteticos: bool`, `acciones_estado: {action_id: {estado, nota,
+  actualizado_en}}` y `configuracion: {version_perfil, version_mercado, remedicion_de}|null`.
+- `metrics_delta` y `metrics.comparado_con`: null en todo estudio que no sea una re-medición.
+
 ## Falta
 - Estudio de Alborada con DeepSeek real → `docs/ejemplos/` (bloqueado: falta `DEEPSEEK_API_KEY`).
   Dos formas: completo (juez DeepSeek, ≈1–2,5 € y 20–30 min) o rápido con `JUDGE_PROVIDER=reglas`.
@@ -188,6 +237,12 @@
 
 ## Siguiente tarea
 - Web (zona D): pintar `rigor`, `competidores`, `oportunidades_fuente`, `exactitud` y `escenarios`.
+- Elegir otro escenario desde la API (hoy siempre el completo) y que `write` lo use.
+- Medición programada (hoy la re-medición es manual) y `auditoria_web` en `GET /studies/{id}` (A3).
+- Pasar a la serie de la #49 las versiones de perfil y mercado guardadas en `study_config`
+  (`MedicionSerie.version_perfil/version_mercado`) para que salgan `cambios_configuracion`.
+- Persistir el bloqueo de re-medición en curso: si la API se reinicia con una re-medición a
+  medias, queda «en curso» en el repo y bloquea otra del mismo estudio.
 - Ajustar `LLM_TOKENS` de `estimate.py` con las `Trace` del primer estudio real.
 - Estudio de Alborada con DeepSeek en cuanto haya `DEEPSEEK_API_KEY`.
 - Persistir `StudyRunner.fallos` para que el estado `error` sobreviva a un reinicio.

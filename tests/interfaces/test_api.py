@@ -24,6 +24,8 @@ from tests.auth_helpers import authenticate_async
 pytestmark = pytest.mark.anyio
 
 BRIEF = "# Brief\n\n**Marca:** Clínica Alborada Visión"
+# Confirmación de la re-medición: el modo kit cuesta 0 € (ADR 0018).
+CONFIRMA = {"confirmado": True, "coste_estimado_eur": 0.0}
 
 
 def api_settings() -> Any:
@@ -174,7 +176,7 @@ async def test_remeasure_reuses_the_confirmed_market_and_compares(
     original = await completed_study(client)
     before = (await client.get(f"/studies/{original}")).json()
 
-    response = await client.post(f"/studies/{original}/remeasure")
+    response = await client.post(f"/studies/{original}/remeasure", json=CONFIRMA)
     assert response.status_code == 201, response.text
     body = response.json()
     nuevo = body["study_id"]
@@ -210,10 +212,10 @@ async def test_remeasure_reuses_the_confirmed_market_and_compares(
 
 async def test_remeasure_requires_a_completed_study(client: httpx.AsyncClient) -> None:
     sid = await create(client)
-    response = await client.post(f"/studies/{sid}/remeasure")
+    response = await client.post(f"/studies/{sid}/remeasure", json=CONFIRMA)
     assert response.status_code == 409
     assert "completado" in response.json()["detail"]
-    assert (await client.post("/studies/nope/remeasure")).status_code == 404
+    assert (await client.post("/studies/nope/remeasure", json=CONFIRMA)).status_code == 404
 
 
 async def test_first_measurement_has_no_delta(client: httpx.AsyncClient) -> None:

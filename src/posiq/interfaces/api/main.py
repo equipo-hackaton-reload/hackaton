@@ -6,9 +6,14 @@
 - `GET /studies/{id}/remeasure/estimate` coste de re-medir (mismo banco, sin intake ni mercado).
 - `POST /studies/{id}/remeasure` re-mide un estudio completado (mismo brief y mercado) → 201. Si
   cuesta algo, exige `{confirmado: true, coste_estimado_eur}` y 409 si la estimación lo supera.
+  Mide con la configuración VIGENTE de la marca y guarda las versiones usadas; 409 si ya hay una
+  re-medición en curso del mismo estudio.
 - `GET /brands` marcas del usuario con sus mediciones; `GET /brands/{id}/serie` su serie temporal.
 - `GET|POST /studies/{id}/scenarios` escenarios del plan (preajustes y del consultor).
 - `POST /studies/{id}/scenarios/{eid}/elegir` el escenario que usará la propuesta.
+- `GET|PUT /brands/{id}/perfil` y `.../mercado` (`?historial=1`): configuración versionada con
+  `vigente_desde` y `aviso_impacto` (`application/configuracion.py`).
+- `PATCH /studies/{id}/acciones/{action_id} {estado, nota?}` estado de una acción del plan.
 - `GET /studies/{id}/export?formato=docx|pdf` Word o PDF (409 sin propuesta; PDF sin soffice, 503).
 - `GET /studies/{id}/evaluations?ids=a,b` evidencias: evaluación con motor, prompt y respuesta.
 - `GET /studies/{id}/traces` trazas del estudio (modelo, tokens, coste por llamada).
@@ -44,8 +49,10 @@ from posiq.adapters.export import (
     SofficeNotFoundError,
 )
 from posiq.adapters.repo.accounts import SqlAccountRepo
+from posiq.adapters.repo.tracking import SqlTrackingRepo
 from posiq.application import seguimiento
-from posiq.application.accounts import AccountService, Usuario
+from posiq.application.accounts import AccountService, Usuario, now_utc
+from posiq.application.configuracion import BrandNotFound, RemeasureConflict, TrackingService
 from posiq.application.deps import db
 from posiq.application.diferencial import EscenarioGuardado
 from posiq.application.estimate import (
@@ -57,6 +64,16 @@ from posiq.application.estimate import (
 )
 from posiq.application.kit import load_sources
 from posiq.application.runner import RemeasureError, ResumeError, ScenarioError, StudyRunner
+from posiq.application.tracking import (
+    AccionActualizada,
+    AccionBody,
+    EstadoAccionGuardado,
+    MercadoBody,
+    PerfilBody,
+    VersionCreada,
+    VersionMercadoMarca,
+    VersionPerfilMarca,
+)
 from posiq.domain.scenario_schemas import EntradaEscenario
 from posiq.domain.schemas import ModoEstudio, Study, Trace
 from posiq.domain.tracking_schemas import SerieMarca
@@ -188,6 +205,14 @@ def accounts_for(runner: StudyRunner, settings: Settings) -> AccountService:
     return AccountService(SqlAccountRepo(engine), settings)
 
 
+def tracking_for(runner: StudyRunner) -> TrackingService:
+    """Configuración versionada y estado de acciones en la misma base que los estudios."""
+    engine = getattr(runner.repo, "engine", None)
+    if engine is None:
+        raise TypeError("el seguimiento necesita un repositorio SQL con `engine`")
+    return TrackingService(SqlTrackingRepo(engine), runner)
+
+
 def create_app(
     runner: StudyRunner | None = None,
     settings: Settings | None = None,
@@ -207,6 +232,7 @@ def create_app(
         async with runner_from_settings(app.state.settings) as built:
             app.state.runner = built
             app.state.accounts = accounts or accounts_for(built, app.state.settings)
+            app.state.tracking = tracking_for(built)
             yield
 
     app = FastAPI(title="posiq.", lifespan=lifespan)
@@ -215,6 +241,7 @@ def create_app(
     app.state.accounts = accounts
     if runner is not None and accounts is None:
         app.state.accounts = accounts_for(runner, settings or Settings())
+    app.state.tracking = tracking_for(runner) if runner is not None else None
     app.include_router(auth_router)
     app.add_middleware(
         CORSMiddleware,
@@ -246,6 +273,14 @@ def create_app(
     def get_settings(request: Request) -> Settings:
         current: Settings | None = request.app.state.settings
         return current or Settings()
+
+    def get_tracking(request: Request) -> TrackingService:
+        get_runner(request)
+        current: TrackingService = request.app.state.tracking
+        return current
+
+    def brand_404(brand_id: str) -> HTTPException:
+        return HTTPException(status.HTTP_404_NOT_FOUND, f"no existe la marca {brand_id}")
 
     @app.get("/health")
     async def health() -> dict[str, str]:
@@ -309,6 +344,9 @@ def create_app(
             auditoria_web=values.get("auditoria_web"),
             hallazgos_web=values.get("hallazgos_web"),
             proposal=values.get("proposal"),
+            datos_sinteticos=study.modo == "kit",
+            acciones_estado=await db(get_tracking(request).repo.action_statuses, study_id),
+            configuracion=await db(get_tracking(request).repo.study_config, study_id),
         )
 
     @app.post(
@@ -375,7 +413,9 @@ def create_app(
                 f"{confirmacion.coste_estimado_eur:.2f} €): vuelve a confirmar",
             )
         try:
-            study = await r.prepare_remeasure(study_id)
+            study = await get_tracking(request).remeasure(
+                user.id, visible_studies(request, r, user), original
+            )
         except RemeasureError as exc:
             raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
         # Hereda el propietario del original (o el usuario demo, si el original no tenía).
@@ -427,6 +467,25 @@ def create_app(
                 status.HTTP_404_NOT_FOUND, f"no existe el escenario {escenario_id}"
             ) from None
 
+    @app.patch("/studies/{study_id}/acciones/{action_id}")
+    async def update_action(
+        request: Request, study_id: str, action_id: str, body: AccionBody, user: CurrentUser
+    ) -> AccionActualizada:
+        r = get_runner(request)
+        get_study(request, r, user, study_id)
+        values, _ = await r.state(study_id)
+        plan = values.get("plan")
+        if plan is None or action_id not in {a.id for a in plan.acciones}:
+            raise HTTPException(
+                status.HTTP_404_NOT_FOUND, f"no existe la acción {action_id} en {study_id}"
+            )
+        guardado = EstadoAccionGuardado(
+            estado=body.estado, nota=body.nota, actualizado_en=now_utc()
+        )
+        repo = get_tracking(request).repo
+        await db(repo.add_action_status, study_id, action_id, user.id, guardado)
+        return AccionActualizada(action_id=action_id, **guardado.model_dump())
+
     @app.get("/studies/{study_id}/evaluations")
     async def read_evaluations(
         request: Request, study_id: str, user: CurrentUser, ids: str = ""
@@ -477,6 +536,72 @@ def create_app(
                 status.HTTP_404_NOT_FOUND, f"no hay mediciones completadas de la marca {brand_id}"
             )
         return serie
+
+    # --- Configuración versionada por marca (ADR 0016) ----------------------------------------
+
+    @app.get("/brands/{brand_id}/perfil", response_model=None)
+    async def brand_profile(
+        request: Request, brand_id: str, user: CurrentUser, historial: bool = False
+    ) -> VersionPerfilMarca | list[VersionPerfilMarca]:
+        try:
+            versiones = await get_tracking(request).perfiles(
+                user.id, visible_studies(request, get_runner(request), user), brand_id
+            )
+        except BrandNotFound as exc:
+            raise brand_404(brand_id) from exc
+        if historial:
+            return versiones
+        if not versiones:
+            raise HTTPException(
+                status.HTTP_404_NOT_FOUND, f"la marca {brand_id} aún no tiene perfil"
+            )
+        return versiones[-1]
+
+    @app.put("/brands/{brand_id}/perfil", status_code=status.HTTP_201_CREATED)
+    async def put_brand_profile(
+        request: Request, brand_id: str, body: PerfilBody, user: CurrentUser
+    ) -> VersionCreada:
+        try:
+            return await get_tracking(request).guardar_perfil(
+                user.id, visible_studies(request, get_runner(request), user), brand_id, body.perfil
+            )
+        except BrandNotFound as exc:
+            raise brand_404(brand_id) from exc
+        except RemeasureConflict as exc:
+            raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
+
+    @app.get("/brands/{brand_id}/mercado", response_model=None)
+    async def brand_market(
+        request: Request, brand_id: str, user: CurrentUser, historial: bool = False
+    ) -> VersionMercadoMarca | list[VersionMercadoMarca]:
+        try:
+            versiones = await get_tracking(request).mercados(
+                user.id, visible_studies(request, get_runner(request), user), brand_id
+            )
+        except BrandNotFound as exc:
+            raise brand_404(brand_id) from exc
+        if historial:
+            return versiones
+        if not versiones:
+            raise HTTPException(
+                status.HTTP_404_NOT_FOUND, f"la marca {brand_id} aún no tiene mercado confirmado"
+            )
+        return versiones[-1]
+
+    @app.put("/brands/{brand_id}/mercado", status_code=status.HTTP_201_CREATED)
+    async def put_brand_market(
+        request: Request, brand_id: str, body: MercadoBody, user: CurrentUser
+    ) -> VersionCreada:
+        try:
+            return await get_tracking(request).guardar_mercado(
+                user.id, visible_studies(request, get_runner(request), user), brand_id, body.marcas
+            )
+        except BrandNotFound as exc:
+            raise brand_404(brand_id) from exc
+        except RemeasureConflict as exc:
+            raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
 
     @app.get("/estimate")
     async def estimate(
