@@ -7,11 +7,15 @@ Trazabilidad brief → propuesta (ADR 0013): el redactor enlaza cada punto del b
 o hallazgos que lo tratan (`cobertura_brief`); `domain.brief_coverage` construye el encargo literal
 y decide qué está cubierto. Si falta algún punto que el redactor pueda enlazar, se reintenta una vez
 con las carencias; lo que siga pendiente se declara en `contexto.limitaciones`.
+
+Escenarios (ADR 0009): si el consultor eligió uno distinto de `completo`, la propuesta (y lo que
+ve el redactor) usa solo sus acciones, y la primera limitación lo declara.
 """
 
 from datetime import UTC, datetime
 from typing import Any
 
+from posiq.application import escenarios
 from posiq.application.deps import (
     Deps,
     cost_update,
@@ -141,8 +145,24 @@ def assemble_proposal(draft: ProposalDraft, state: StudyState) -> Proposal:
     )
 
 
+def con_escenario(state: StudyState) -> tuple[StudyState, str | None]:
+    """El estado con el plan recortado al escenario elegido y la nota que lo declara.
+
+    Con `completo` (el elegido por defecto) o sin escenarios, el estado no cambia: la propuesta es
+    la de siempre. El plan aprobado del estudio no se toca; solo lo que ve la propuesta.
+    """
+    guardado = escenarios.recorte(state.get("escenarios"))
+    if guardado is None:
+        return state, None
+    nota = escenarios.nota_para_la_propuesta(guardado, state["plan"])
+    recortado = escenarios.plan_del_escenario(state["plan"], guardado.escenario)
+    return {**state, "plan": recortado}, nota
+
+
 async def write(state: StudyState, deps: Deps) -> dict[str, Any]:
     sid = state["study_id"]
+    persistido = state  # el plan aprobado y las trazas siguen siendo los del estudio
+    state, nota = con_escenario(state)
     payload = {
         "brief": dump(state["brief"]),
         "market": dump(state["market"]),
@@ -169,9 +189,13 @@ async def write(state: StudyState, deps: Deps) -> dict[str, Any]:
             )
         traces.append(trace)
     proposal = assemble_proposal(borrador, state)
+    if nota is not None:
+        limitaciones = [nota, *proposal.contexto.limitaciones]
+        contexto_ = proposal.contexto.model_copy(update={"limitaciones": limitaciones})
+        proposal = proposal.model_copy(update={"contexto": contexto_})
 
     await db(deps.repo.save_proposal, sid, proposal)
     study = await db(deps.repo.get_study, sid)
     await db(deps.repo.save_study, study.model_copy(update={"estado": "completado"}))
-    await persist_traces(deps, state, traces)
-    return {"proposal": proposal, "revision_pendiente": "none", **cost_update(state, traces)}
+    await persist_traces(deps, persistido, traces)
+    return {"proposal": proposal, "revision_pendiente": "none", **cost_update(persistido, traces)}
