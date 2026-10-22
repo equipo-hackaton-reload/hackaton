@@ -4,6 +4,8 @@ Formato [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); versionado 
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-22
+
 ### Added
 - Presentación del proyecto en PDF (`docs/entregables/posiq.pdf`) para la entrega del hackathon (zona E).
 - Elegir escenario (zona C): `GET/POST /studies/{id}/scenarios` y `POST /studies/{id}/scenarios/{eid}/elegir`; con un escenario distinto de `completo`, `write` redacta la propuesta solo con sus acciones y lo declara en las limitaciones.

@@ -1,5 +1,9 @@
 # posiq.
 
+> **📄 Presentación del proyecto (PDF): [`docs/entregables/posiq.pdf`](docs/entregables/posiq.pdf)**
+>
+> **🎬 Grabación de la demo (vídeo): [`grabacion.mp4`](https://github.com/equipo-hackaton-reload/hackaton/releases/download/v0.3.0/grabacion.mp4)** (adjunta a la release v0.3.0)
+
 Posicionamiento + IQ: sistema agéntico que mide la visibilidad de una marca en asistentes de IA
 (ChatGPT, Gemini, Perplexity, Claude), la compara con competidores y genera una propuesta con plan
 de acción. Convenciones y reglas en [CLAUDE.md](CLAUDE.md) y [CONTRIBUTING.md](CONTRIBUTING.md).
