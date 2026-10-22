@@ -7,6 +7,8 @@
 - `POST /studies/{id}/remeasure` re-mide un estudio completado (mismo brief y mercado) → 201. Si
   cuesta algo, exige `{confirmado: true, coste_estimado_eur}` y 409 si la estimación lo supera.
 - `GET /brands` marcas del usuario con sus mediciones; `GET /brands/{id}/serie` su serie temporal.
+- `GET|POST /studies/{id}/scenarios` escenarios del plan (preajustes y del consultor).
+- `POST /studies/{id}/scenarios/{eid}/elegir` el escenario que usará la propuesta.
 - `GET /studies/{id}/export?formato=docx|pdf` Word o PDF (409 sin propuesta; PDF sin soffice, 503).
 - `GET /studies/{id}/evaluations?ids=a,b` evidencias: evaluación con motor, prompt y respuesta.
 - `GET /studies/{id}/traces` trazas del estudio (modelo, tokens, coste por llamada).
@@ -40,6 +42,7 @@ from posiq.adapters.repo.accounts import SqlAccountRepo
 from posiq.application import seguimiento
 from posiq.application.accounts import AccountService, Usuario
 from posiq.application.deps import db
+from posiq.application.diferencial import EscenarioGuardado
 from posiq.application.estimate import (
     KIT_MOTORES,
     KIT_PROMPTS,
@@ -48,7 +51,8 @@ from posiq.application.estimate import (
     estimate_study,
 )
 from posiq.application.kit import load_sources
-from posiq.application.runner import RemeasureError, ResumeError, StudyRunner
+from posiq.application.runner import RemeasureError, ResumeError, ScenarioError, StudyRunner
+from posiq.domain.scenario_schemas import EntradaEscenario
 from posiq.domain.schemas import ModoEstudio, Study, Trace
 from posiq.domain.tracking_schemas import SerieMarca
 from posiq.interfaces.api.auth import CurrentUser, require_json
@@ -375,6 +379,48 @@ def create_app(
         r.en_marcha.add(study.id)  # en_curso desde ya, antes de que arranque la tarea
         background.add_task(r.continue_, study)
         return RemeasureCreated(study_id=study.id, remedicion_de=study_id)
+
+    def scenario_http_error(exc: ScenarioError) -> HTTPException:
+        code = status.HTTP_409_CONFLICT if exc.conflict else status.HTTP_422_UNPROCESSABLE_CONTENT
+        return HTTPException(code, str(exc))
+
+    @app.get("/studies/{study_id}/scenarios")
+    async def list_scenarios(
+        request: Request, study_id: str, user: CurrentUser
+    ) -> list[EscenarioGuardado]:
+        r = get_runner(request)
+        get_study(request, r, user, study_id)
+        return await r.scenarios(study_id)
+
+    @app.post(
+        "/studies/{study_id}/scenarios",
+        status_code=status.HTTP_201_CREATED,
+        dependencies=[Depends(require_json)],
+    )
+    async def create_scenario(
+        request: Request, study_id: str, entrada: EntradaEscenario, user: CurrentUser
+    ) -> EscenarioGuardado:
+        r = get_runner(request)
+        get_study(request, r, user, study_id)
+        try:
+            return await r.add_scenario(study_id, entrada)
+        except ScenarioError as exc:
+            raise scenario_http_error(exc) from exc
+
+    @app.post("/studies/{study_id}/scenarios/{escenario_id}/elegir")
+    async def choose_scenario(
+        request: Request, study_id: str, escenario_id: str, user: CurrentUser
+    ) -> list[EscenarioGuardado]:
+        r = get_runner(request)
+        get_study(request, r, user, study_id)
+        try:
+            return await r.choose_scenario(study_id, escenario_id)
+        except ScenarioError as exc:
+            raise scenario_http_error(exc) from exc
+        except KeyError:
+            raise HTTPException(
+                status.HTTP_404_NOT_FOUND, f"no existe el escenario {escenario_id}"
+            ) from None
 
     @app.get("/studies/{study_id}/evaluations")
     async def read_evaluations(

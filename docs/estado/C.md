@@ -61,6 +61,19 @@
   (`LLM_TOKENS`), juez con fallback (25 %) y PlanGuard; `estimate_study(..., remedicion=True)`
   quita intake y market (para `GET /studies/{id}/remeasure/estimate`).
 
+## Elegir escenario (`feature/C-elegir-escenario`)
+- `GET /studies/{id}/scenarios` (los tres preajustes del nodo `plan`, `completo` elegido);
+  `POST /studies/{id}/scenarios` con una `EntradaEscenario` → 201 `{id: "P1", …}` (422 si nombra
+  acciones que no están en el plan, 409 sin plan o con el grafo en marcha);
+  `POST /studies/{id}/scenarios/{eid}/elegir` (404 si no existe, 409 con la propuesta redactada).
+  Los escenarios se escriben en el checkpoint sin cambiar el siguiente nodo: el plan se aprueba
+  después con normalidad.
+- `write` (`con_escenario`): con un escenario elegido distinto de `completo`, la propuesta y el
+  redactor ven solo sus acciones y la primera limitación lo declara («Propuesta con el escenario…»).
+  El plan aprobado del estudio no cambia y el presupuesto sigue siendo el del plan completo (el
+  coste declarado se cita aparte). Con `completo` la propuesta es la de siempre (golden intactos).
+- Editar el plan en la revisión recalcula los preajustes y descarta los personalizados.
+
 ## Seguimiento (A2, `feature/C-seguimiento-api`)
 - `GET /brands` → `[{brand_id, nombre, n_mediciones, ultima_medicion}]`: marcas de los estudios
   visibles del usuario (ADR 0015). `n_mediciones` cuenta solo los completados; una marca con un
@@ -161,7 +174,6 @@
 
 ## Siguiente tarea
 - Web (zona D): pintar `rigor`, `competidores`, `oportunidades_fuente`, `exactitud` y `escenarios`.
-- Elegir otro escenario desde la API (hoy siempre el completo) y que `write` lo use.
 - Ajustar `LLM_TOKENS` de `estimate.py` con las `Trace` del primer estudio real.
 - Estudio de Alborada con DeepSeek en cuanto haya `DEEPSEEK_API_KEY`.
 - Persistir `StudyRunner.fallos` para que el estado `error` sobreviva a un reinicio.

@@ -13,11 +13,13 @@ from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.types import Command
 from pydantic import ValidationError
 
+from posiq.application import escenarios
 from posiq.application.deps import Deps, db, new_study, trazas_de_fallo
-from posiq.application.diferencial import MedicionAnterior
+from posiq.application.diferencial import EscenarioGuardado, MedicionAnterior
 from posiq.application.graph import StudyGraph, build_graph
 from posiq.application.nodes.review import parse_market, parse_plan
 from posiq.application.state import StudyState, initial_state
+from posiq.domain.scenario_schemas import EntradaEscenario
 from posiq.domain.schemas import ModoEstudio, Study, Trace
 from posiq.ports import StudyRepo
 
@@ -40,6 +42,14 @@ class ResumeError(ValueError):
 
 class RemeasureError(ValueError):
     """El estudio no se puede re-medir: no está completado o le falta el mercado confirmado."""
+
+
+class ScenarioError(ValueError):
+    """El escenario no se puede guardar o elegir. `conflict` = el estudio no está en ese punto."""
+
+    def __init__(self, message: str, *, conflict: bool = False) -> None:
+        super().__init__(message)
+        self.conflict = conflict
 
 
 class StudyRunner:
@@ -123,6 +133,52 @@ class StudyRunner:
     async def continue_(self, study: Study) -> None:
         """Avanza el grafo desde su último checkpoint (estudio sembrado por `prepare_remeasure`)."""
         await self._drive(study, None)
+
+    async def scenarios(self, study_id: str) -> list[EscenarioGuardado]:
+        values, _ = await self.state(study_id)
+        return list(values.get("escenarios") or [])
+
+    async def add_scenario(self, study_id: str, entrada: EntradaEscenario) -> EscenarioGuardado:
+        """Guarda un escenario del consultor sobre el plan del estudio (las cifras, del dominio)."""
+        values = await self._with_plan(study_id)
+        guardados = list(values.get("escenarios") or [])
+        try:
+            nuevo = escenarios.personalizado(
+                guardados, values["plan"], values["findings"], values["metrics"], entrada
+            )
+        except ValueError as exc:
+            raise ScenarioError(str(exc)) from exc
+        await self._save_scenarios(study_id, [*guardados, nuevo])
+        return nuevo
+
+    async def choose_scenario(self, study_id: str, escenario_id: str) -> list[EscenarioGuardado]:
+        """Marca `escenario_id` como el que usará `write`. `KeyError` si no existe."""
+        values = await self._with_plan(study_id)
+        if values.get("proposal") is not None:
+            raise ScenarioError(
+                "la propuesta ya está redactada: elige el escenario antes de aprobar el plan",
+                conflict=True,
+            )
+        guardados = escenarios.elegir(values.get("escenarios") or [], escenario_id)
+        await self._save_scenarios(study_id, guardados)
+        return guardados
+
+    async def _with_plan(self, study_id: str) -> StudyState:
+        if study_id in self.en_marcha:
+            raise ScenarioError(
+                "el estudio está en marcha; espera a que pida una revisión", conflict=True
+            )
+        values, _ = await self.state(study_id)
+        if values.get("plan") is None:
+            raise ScenarioError("el estudio aún no tiene plan", conflict=True)
+        return values
+
+    async def _save_scenarios(self, study_id: str, guardados: list[EscenarioGuardado]) -> None:
+        """Escribe los escenarios en el checkpoint sin cambiar el siguiente nodo del grafo."""
+        study = self.repo.get_study(study_id)
+        await self.graphs[study.modo].aupdate_state(
+            self.config(study_id), {"escenarios": guardados}
+        )
 
     async def _drive(self, study: Study, graph_input: StudyState | Command[Any] | None) -> None:
         self.en_marcha.add(study.id)
