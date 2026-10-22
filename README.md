@@ -12,6 +12,37 @@ Un estudio recorre `brief → mercado → [revisión humana] → preguntas → m
 plan → [revisión humana] → propuesta`. Las cifras las calcula el código (`src/posiq/domain/`); el
 LLM solo interpreta y redacta sobre ellas. Arquitectura y decisiones en [`docs/adr/`](docs/adr/).
 
+## Estudios y fuentes externas
+
+Contexto del mercado GEO que usamos en la presentación. Son cifras de terceros, no medidas por
+posiq.; las nuestras salen del código y, en la demo, del caso sintético del reto.
+
+- **Aggarwal, P. et al. (2024). _GEO: Generative Engine Optimization_.** ACM SIGKDD 2024 (Princeton
+  e IIT Delhi). Acuña el término GEO e informa de que ciertas técnicas pueden aumentar hasta un 40 %
+  la visibilidad de una fuente en las respuestas de motores generativos.
+  [arXiv:2311.09735](https://arxiv.org/abs/2311.09735)
+- **Ahrefs (2025). _AI Overviews reduce clicks_.** Sobre 300.000 keywords, la presencia de un AI
+  Overview se asocia a un CTR un 34,5 % menor para el primer resultado (correlación, no causalidad).
+  [ahrefs.com/blog/ai-overviews-reduce-clicks](https://ahrefs.com/blog/ai-overviews-reduce-clicks)
+- **Seer Interactive (nov. 2025).** En 3.119 consultas informativas, el CTR orgánico con AI Overview
+  cae de 1,76 % a 0,61 % (−61 %). Resumen en
+  [Search Engine Land](https://searchengineland.com/google-ai-overviews-drive-61-drop-organic-paid-ctr-464212)
+- **SparkToro y Datos (2024). _Zero-click search study_.** El 58,5 % de las búsquedas de Google en
+  EE. UU. y el 59,7 % en la UE terminan sin clic.
+  [Search Engine Land](https://searchengineland.com/google-search-zero-click-study-2024-443869)
+- **Pew Research Center (2025).** En búsquedas reales de 900 adultos de EE. UU., ~18 % mostraron un
+  resumen de IA, y los usuarios hacen menos clic cuando aparece.
+  [pewresearch.org](https://www.pewresearch.org/short-reads/2025/07/22/google-users-are-less-likely-to-click-on-links-when-an-ai-summary-appears-in-the-results/)
+- **Pampín, A. (2026). _Generative Engine Optimization (GEO) – Guía completa_.** Guía práctica
+  (bots de IA en robots.txt, llms.txt, JSON-LD, presencia en fuentes externas) que usamos como
+  checklist de la auditoría técnica.
+  [albertopampin.es](https://www.albertopampin.es/blog/generative-engine-optimization-geo/)
+  Algunas cifras de esa guía no traen fuente; preferimos las de los estudios de arriba. En
+  particular, la proporción de búsquedas con AI Overview varía mucho según el estudio (≈13–18 % en
+  búsquedas reales según Pew, Semrush y Ahrefs), no «casi el 50 %».
+- **Kit del reto EPS-UFV × reload.** Metodología GEO, datos sintéticos de Alborada y criterios de
+  evaluación: [`data/kit/`](data/kit/).
+
 ## Documentación para la presentación
 
 Los conceptos explicados para el equipo y el jurado (Score de Citación, kit frente a medición real,

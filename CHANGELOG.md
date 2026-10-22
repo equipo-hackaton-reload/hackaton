@@ -4,6 +4,9 @@ Formato [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); versionado 
 
 ## [Unreleased]
 
+### Added
+- README: estudios y fuentes externas citados (paper GEO, Ahrefs, Seer, SparkToro, Pew, guía de Pampín) (zona E).
+
 ## [0.3.0] - 2026-10-22
 
 ### Added
