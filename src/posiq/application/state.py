@@ -28,6 +28,7 @@ from posiq.domain.schemas import (
 )
 from posiq.domain.simulation_schemas import SimulationResult
 from posiq.domain.source_map_schemas import OportunidadFuente
+from posiq.domain.web_audit_schemas import AuditoriaWeb
 
 RevisionPendiente = Literal["none", "competidores", "plan"]
 
@@ -60,6 +61,12 @@ class StudyState(TypedDict, total=False):
     mitigaciones: list[AccionMitigacion] | None
     # Solo en una re-medición: datos del estudio original para la significancia de los deltas.
     medicion_anterior: MedicionAnterior | None
+    # Auditoría técnica de la web (ADR 0019), del nodo `web_audit` (entre `judge` y `analyze`).
+    # None si está apagada o la marca no tiene dominio. `hallazgos_web` son sus hallazgos
+    # técnicos: `analyze` los suma a `findings` solo si la auditoría es `origen="real"`; los de una
+    # auditoría fixture (CASO SINTÉTICO) viajan aparte y no entran en el plan.
+    auditoria_web: AuditoriaWeb | None
+    hallazgos_web: list[Finding] | None
     proposal: Proposal
     traces: Annotated[list[Trace], operator.add]
     coste_acumulado_eur: float

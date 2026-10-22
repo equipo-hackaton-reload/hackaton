@@ -1,7 +1,9 @@
 """Grafo LangGraph de un estudio.
 
-    intake → market → [revisión: competidores] → prompts → run → judge → analyze → diferencial
-           → plan → [revisión: plan] → write → END
+    intake → market → [revisión: competidores] → prompts → run → judge → web_audit → analyze
+           → diferencial → plan → [revisión: plan] → write → END
+
+`web_audit` (ADR 0019) no descarga nada con `WEB_AUDIT=off` (por defecto).
 
 Las revisiones son nodos con `interrupt()`; se reanudan con `Command(resume=payload)`. El hilo del
 checkpointer es el estudio (`thread_id = study_id`), así que un estudio pausado sobrevive a un
@@ -36,6 +38,7 @@ from posiq.domain import (
     simulation_schemas,
     source_map_schemas,
     stats_schemas,
+    web_audit_schemas,
 )
 
 Node = Callable[[StudyState, Deps], Awaitable[dict[str, Any]]]
@@ -50,6 +53,7 @@ PIPELINE: list[tuple[str, Node, bool]] = [
     ("prompts", nodes.prompts, True),
     ("run", nodes.run, True),
     ("judge", nodes.judge, True),
+    ("web_audit", nodes.web_audit, True),
     ("analyze", nodes.analyze, False),
     ("diferencial", nodes.diferencial, False),
     ("plan", nodes.plan, True),
@@ -82,7 +86,8 @@ def build_graph(deps: Deps, checkpointer: BaseCheckpointSaver[Any] | None) -> St
 
 
 # Módulos cuyos modelos viajan en el estado. Los del dominio fuera de `schemas.py` (simulación,
-# calidad y diferencial) existen para no tocar el contrato; `diferencial` agrupa sus resultados.
+# calidad, diferencial y auditoría web) existen para no tocar el contrato; `diferencial` agrupa
+# sus resultados.
 STATE_MODULES = (
     schemas,
     simulation_schemas,
@@ -92,6 +97,7 @@ STATE_MODULES = (
     source_map_schemas,
     accuracy_schemas,
     competitor_gap_schemas,
+    web_audit_schemas,
     diferencial,
 )
 

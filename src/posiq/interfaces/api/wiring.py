@@ -11,11 +11,13 @@ from posiq.adapters.judge.plan_guard import build_plan_guard
 from posiq.adapters.llm.fixture import FixtureJudge, FixtureLLM
 from posiq.adapters.llm.openai_compat import OpenAICompatLLM
 from posiq.adapters.repo.sql import SqlStudyRepo
+from posiq.adapters.web import HttpxWebFetcher, crear_web_fetcher
 from posiq.application.deps import AsyncJudge, Deps, JudgeFactory, PlanGuardFactory
 from posiq.application.graph import sqlite_checkpointer
 from posiq.application.runner import StudyRunner
 from posiq.domain.schemas import Market, ModoEstudio
-from posiq.ports import LLM, Engine
+from posiq.domain.web_audit_schemas import TIMEOUT_TOTAL_RECURSO_S
+from posiq.ports import LLM, Engine, WebFetcher
 from posiq.settings import Settings
 
 
@@ -66,6 +68,16 @@ def llm_for(settings: Settings, cache: DiskCache) -> LLM:
     return OpenAICompatLLM(settings, cache=cache)
 
 
+def web_fetcher_for(modo: ModoEstudio, settings: Settings) -> WebFetcher | None:
+    """`WebFetcher` de la auditoría técnica (ADR 0019): None con `WEB_AUDIT=off`; en modo kit,
+    siempre `FixtureWebFetcher` (los dominios del kit son `.example` y nada del kit es real)."""
+    fetcher = crear_web_fetcher(settings.web_audit, modo_kit=modo == "kit")
+    if isinstance(fetcher, HttpxWebFetcher):
+        tope = min(settings.web_audit_timeout_s, TIMEOUT_TOTAL_RECURSO_S)
+        return HttpxWebFetcher(timeout_total_s=tope)
+    return fetcher
+
+
 def build_deps(settings: Settings, repo: SqlStudyRepo) -> dict[ModoEstudio, Deps]:
     """Un `Deps` por modo. El kit sin opt-in no lleva ningún adaptador de pago: `FixtureLLM`,
     `FixtureJudge` y sin PlanGuard, aunque haya claves en el entorno o en `.env`."""
@@ -91,6 +103,7 @@ def build_deps(settings: Settings, repo: SqlStudyRepo) -> dict[ModoEstudio, Deps
             plan_guard_factory=None
             if kit_sin_coste(modo, settings)
             else plan_guard_factory(settings, cache),
+            web_fetcher=web_fetcher_for(modo, settings),
         )
         for modo in modos
     }
