@@ -67,3 +67,11 @@ def test_fixture_wiring_completes_and_exports_word(tmp_path: Path, multipart: bo
             text = doc.read("word/document.xml").decode()
             assert "Alborada" in text and "sintéticos" in text
             assert "Lo que nos habéis pedido" in text
+            # El diferencial del estado llega al Word: rigor, competidores, escenarios y la
+            # oferta de seguimiento, con el rótulo del caso sintético.
+            assert "Caso sintético del reto: datos ficticios" in text
+            assert "25,9 [21,6–30,1]" in text
+            assert "Competidores declarados frente a los que pone la IA" in text
+            assert "Completo (el de esta propuesta)" in text
+            assert "Seguimiento con método" in text
+            assert "No se calculó en este estudio." not in text

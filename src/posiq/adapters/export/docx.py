@@ -13,6 +13,22 @@ from docx.shared import Mm, RGBColor
 from docxtpl import DocxTemplate, InlineImage, RichText  # type: ignore[import-untyped]
 
 from posiq.adapters.export.branding import AgencyBrandKit
+from posiq.adapters.export.diferencial import (
+    DatosDiferencial,
+    contexto_diferencial,
+    contraste_hallazgo,
+)
+from posiq.adapters.export.formato import (
+    SIN_DATOS,
+    fmt_cifra,
+    fmt_eur,
+    fmt_num,
+    fmt_pct,
+    fmt_score,
+)
+from posiq.adapters.export.formato import lista as _lista
+from posiq.adapters.export.formato import parrafos as _parrafos
+from posiq.adapters.export.formato import semanas as _semanas
 from posiq.adapters.export.template import TEMPLATE_PATH
 from posiq.domain.schemas import (
     Action,
@@ -21,13 +37,11 @@ from posiq.domain.schemas import (
     Proposal,
     PuntoBrief,
     TipoVisibilidad,
-    UnidadCifra,
     VisibilityCell,
 )
 
 MARCA_POR_DEFECTO = "posiq."
 COLOR_POR_DEFECTO = "1F3A5F"
-SIN_DATOS = "s. d."
 TITULO = "Propuesta de mejora de visibilidad en asistentes de IA"
 AVISO_SINTETICO = (
     "Datos sintéticos del kit del reto: reproducen la estructura de un estudio real, "
@@ -70,59 +84,8 @@ INTRO_ENCARGO = (
     "La cobertura la comprueba el sistema contra el plan y los hallazgos, no la redacción."
 )
 SIN_ENCARGO = "Esta propuesta no registra el encargo del brief."
+ROTULO_SINTETICO = "Caso sintético del reto: datos ficticios"
 ORIGENES = {"kit": "Kit del reto (datos grabados)", "api": "APIs de los motores"}
-
-
-# --- Formato (sin aritmética de negocio) ----------------------------------------------------------
-
-
-def fmt_num(x: float | None, decimales: int = 1) -> str:
-    """Número en formato español: `1.234,5`. None → «s. d.» (sin datos, nunca 0)."""
-    if x is None:
-        return SIN_DATOS
-    texto = f"{x:,.{decimales}f}"
-    return texto.replace(",", "\x00").replace(".", ",").replace("\x00", ".")
-
-
-def fmt_pct(x: float | None) -> str:
-    """Proporción 0-1 como porcentaje: `0.342` → `34,2 %`."""
-    return SIN_DATOS if x is None else f"{fmt_num(x * 100, 1)} %"
-
-
-def fmt_eur(x: float | None) -> str:
-    return SIN_DATOS if x is None else f"{fmt_num(x, 0)} €"
-
-
-def _sin_ceros(x: float, decimales: int) -> str:
-    return fmt_num(x, decimales).rstrip("0").rstrip(",")
-
-
-def fmt_cifra(x: float, unidad: UnidadCifra = "fraccion") -> str:
-    """Cifra de un hallazgo según su `unidad`: `0.15` → `15,0 %`, `40.53` → `40,53 puntos`."""
-    if unidad == "fraccion":
-        return fmt_pct(x)
-    if unidad == "eur":
-        return fmt_eur(x)
-    if unidad == "recuento":
-        return fmt_num(x, 0)
-    texto = _sin_ceros(x, 2)
-    return f"{texto} punto" if texto == "1" else f"{texto} puntos"
-
-
-def fmt_score(x: float | None) -> str:
-    return fmt_num(x, 1)
-
-
-def _parrafos(texto: str) -> list[str]:
-    return [p.strip() for p in texto.split("\n") if p.strip()]
-
-
-def _lista(items: list[str], sep: str = ", ") -> str:
-    return sep.join(items) if items else "—"
-
-
-def _semanas(n: int) -> str:
-    return f"{n} semana" if n == 1 else f"{n} semanas"
 
 
 # --- Contexto -------------------------------------------------------------------------------------
@@ -316,7 +279,10 @@ def _encargo(e: Encargo | None) -> dict[str, Any]:
 
 
 def build_context(
-    proposal: Proposal, tpl: DocxTemplate, marca_agencia: AgencyBrandKit | None = None
+    proposal: Proposal,
+    tpl: DocxTemplate,
+    marca_agencia: AgencyBrandKit | None = None,
+    diferencial: DatosDiferencial | None = None,
 ) -> dict[str, Any]:
     p = proposal
     c = p.contexto
@@ -331,8 +297,11 @@ def build_context(
     pie = (marca_agencia.pie_de_pagina if marca_agencia else "") or (
         f"{agencia} · Propuesta para {c.marca}"
     )
+    if c.datos_sinteticos:
+        pie = f"{pie} · {ROTULO_SINTETICO}"
     fecha = c.fecha.strftime("%d/%m/%Y")
     return {
+        **contexto_diferencial(p, diferencial),
         "cabecera": RichText(agencia, color=color, bold=True, size=20),
         "pie": pie,
         "logo": logo,
@@ -340,6 +309,7 @@ def build_context(
         "marca": c.marca,
         "sector": c.sector,
         "fecha": fecha,
+        "rotulo_sintetico": ROTULO_SINTETICO if c.datos_sinteticos else "",
         "aviso_sintetico": AVISO_SINTETICO if c.datos_sinteticos else "",
         "resumen": _parrafos(p.resumen_ejecutivo),
         "encargo": _encargo(p.encargo),
@@ -366,6 +336,7 @@ def build_context(
                 "impacto": f.impacto,
                 "confianza": fmt_pct(f.confianza),
                 "n_evidencias": str(len(f.evaluation_ids)),
+                "contraste": contraste_hallazgo(diferencial, f.id),
             }
             for f in p.hallazgos
         ],
@@ -430,11 +401,14 @@ class DocxExporter:
         *,
         formato: Literal["docx", "pdf"],
         marca_agencia: AgencyBrandKit | None = None,
+        diferencial: DatosDiferencial | None = None,
     ) -> bytes:
+        """`diferencial` (opcional, fuera del puerto `Exporter`): las cifras del estado del
+        estudio que no viven en la `Proposal` (rigor, competidores, escenarios...)."""
         if formato != "docx":
             raise ValueError("DocxExporter solo genera docx; para PDF usa PdfExporter")
         tpl = DocxTemplate(str(self.template_path))
-        tpl.render(build_context(proposal, tpl, marca_agencia), autoescape=True)
+        tpl.render(build_context(proposal, tpl, marca_agencia, diferencial), autoescape=True)
         color = RGBColor.from_string(
             marca_agencia.color_hex if marca_agencia else COLOR_POR_DEFECTO
         )

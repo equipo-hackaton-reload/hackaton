@@ -37,7 +37,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from pydantic import ValidationError
 
-from posiq.adapters.export import DocxExporter, PdfExporter, SofficeNotFoundError
+from posiq.adapters.export import (
+    DatosDiferencial,
+    DocxExporter,
+    PdfExporter,
+    SofficeNotFoundError,
+)
 from posiq.adapters.repo.accounts import SqlAccountRepo
 from posiq.application import seguimiento
 from posiq.application.accounts import AccountService, Usuario
@@ -503,11 +508,11 @@ def create_app(
         proposal = values.get("proposal")
         if proposal is None:
             raise HTTPException(status.HTTP_409_CONFLICT, "la propuesta aún no está completada")
-        from posiq.ports import Exporter
-
-        exporter: Exporter = DocxExporter() if formato == "docx" else PdfExporter()
+        exporter = DocxExporter() if formato == "docx" else PdfExporter()
+        # Rigor, competidores, escenarios...: cifras del estado que no viven en la `Proposal`.
+        diferencial = DatosDiferencial.del_estado(values)
         try:
-            data = await db(exporter.render, proposal, formato=formato)
+            data = await db(exporter.render, proposal, formato=formato, diferencial=diferencial)
         except SofficeNotFoundError as exc:
             raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(exc)) from exc
         return Response(

@@ -2,7 +2,11 @@
 
 La plantilla solo coloca valores ya formateados por `docx.build_context`: no hace aritmética.
 Las diez secciones del formato del entregable (doc 06) más «Lo que nos habéis pedido» (2.ª): el
-encargo literal del brief y dónde se trata cada punto (ADR 0013). Se regenera con
+encargo literal del brief y dónde se trata cada punto (ADR 0013), «Exactitud y lectura técnica»
+(7.ª) y «Escenarios y simulación» (10.ª). «Medición y seguimiento» pasa a ser la oferta del
+servicio: «Seguimiento con método» (11.ª). El rigor (intervalos) va en el diagnóstico y en cada
+hallazgo; competidores declarados frente a los de la IA y oportunidades de fuente, en la
+competencia. La auditoría técnica de la web solo aparece si el estudio la trae. Se regenera con
 `uv run python scripts/build_docx_template.py`.
 """
 
@@ -22,11 +26,13 @@ SECCIONES: tuple[str, ...] = (
     "4. Diagnóstico de visibilidad",
     "5. Análisis de la competencia",
     "6. Hallazgos clave",
-    "7. Estrategia recomendada",
-    "8. Plan de acción por fases",
-    "9. Medición y seguimiento",
-    "10. Riesgos y supuestos",
-    "11. Hoja de ruta y presupuesto",
+    "7. Exactitud y lectura técnica de la marca",
+    "8. Estrategia recomendada",
+    "9. Plan de acción por fases",
+    "10. Escenarios y simulación del plan",
+    "11. Seguimiento con método",
+    "12. Riesgos y supuestos",
+    "13. Hoja de ruta y presupuesto",
 )
 
 
@@ -75,6 +81,18 @@ def _ficha(doc: DocumentObject, filas: list[tuple[str, str]]) -> None:
     doc.add_paragraph()
 
 
+def _si_hay(doc: DocumentObject, bloque: str) -> None:
+    """Abre un bloque que solo se pinta si el estudio lo calculó (`<bloque>.hay`)."""
+    _tag(doc, f"if {bloque}.hay")
+
+
+def _si_no_hay(doc: DocumentObject, bloque: str) -> None:
+    """Cierra el bloque: si no se calculó, el documento lo dice (`<bloque>.aviso`)."""
+    _tag(doc, "else")
+    _p(doc, f"{{{{ {bloque}.aviso }}}}")
+    _tag(doc, "endif")
+
+
 def _cabecera_y_pie(doc: DocumentObject) -> None:
     section = doc.sections[0]
     section.orientation = WD_ORIENT.PORTRAIT
@@ -86,8 +104,9 @@ def _portada(doc: DocumentObject) -> None:
     _p(doc, "{{ logo }}")
     doc.add_heading("{{ titulo }}", level=0)
     _p(doc, "{{ marca }} · {{ sector }} · {{ fecha }}")
-    _tag(doc, "if aviso_sintetico")
-    _p(doc, "{{ aviso_sintetico }}", "Intense Quote")
+    _tag(doc, "if rotulo_sintetico")
+    _p(doc, "{{ rotulo_sintetico }}", "Intense Quote")
+    _p(doc, "{{ aviso_sintetico }}")
     _tag(doc, "endif")
 
 
@@ -150,6 +169,30 @@ def _diagnostico(doc: DocumentObject) -> None:
         "diag.fuentes",
         ["dominio", "tipo", "calidad", "apariciones"],
     )
+    _rigor(doc)
+
+
+def _rigor(doc: DocumentObject) -> None:
+    doc.add_heading("Margen de error de las cifras", level=2)
+    _si_hay(doc, "rigor")
+    _p(doc, "{{ rigor.intro }}")
+    _ficha(
+        doc,
+        [
+            ("Score de Citación [IC 95 %]", "{{ rigor.score }}"),
+            ("Margen", "{{ rigor.margen }}"),
+            ("Evaluaciones", "{{ rigor.n }}"),
+        ],
+    )
+    doc.add_heading("Aparición espontánea por motor, con su margen", level=3)
+    _tabla(
+        doc,
+        ["Motor", "Aparición [IC 95 %]", "Margen", "Respuestas", "Score del motor [IC 95 %]"],
+        "rigor.motores",
+        ["motor", "aparicion", "margen", "n", "score"],
+    )
+    _p(doc, "{{ rigor.metodo }}")
+    _si_no_hay(doc, "rigor")
 
 
 def _competencia(doc: DocumentObject) -> None:
@@ -169,6 +212,40 @@ def _competencia(doc: DocumentObject) -> None:
         "comp.brecha",
         ["dominio", "tipo", "con_lider", "con_marca", "brecha", "lider_sin_marca"],
     )
+    cabeceras = [
+        "Marca",
+        "Posición",
+        "Score",
+        "Ventaja sobre la marca",
+        "Visib. espontánea",
+        "Nota",
+    ]
+    campos = ["marca", "puesto", "score", "ventaja", "tasa", "nota"]
+    doc.add_heading("Competidores declarados frente a los que pone la IA", level=2)
+    _si_hay(doc, "rivales")
+    _p(doc, "{{ rivales.intro }}")
+    _p(doc, "{{ rivales.foco }}")
+    doc.add_heading("Los que declara el brief", level=3)
+    _tabla(doc, cabeceras, "rivales.declarados", campos)
+    doc.add_heading("Los que la IA pone por delante y el brief no declara", level=3)
+    _tabla(doc, cabeceras, "rivales.por_delante", campos)
+    _p(doc, "{{ rivales.umbral }}")
+    _vinetas(doc, "rivales.notas")
+    _si_no_hay(doc, "rivales")
+    doc.add_heading("Mapa de fuentes y oportunidades", level=2)
+    _si_hay(doc, "fuentes_op")
+    _p(doc, "{{ fuentes_op.intro }}")
+    _tabla(
+        doc,
+        ["Fuente", "Tipo", "Cuota del sector", "Con la marca", "Con competidores", "Brecha"]
+        + ["Prioridad"],
+        "fuentes_op.filas",
+        ["fuente", "tipo", "cuota", "marca", "competidores", "brecha", "prioridad"],
+    )
+    _tag(doc, "if fuentes_op.resto")
+    _p(doc, "{{ fuentes_op.resto }}")
+    _tag(doc, "endif")
+    _si_no_hay(doc, "fuentes_op")
 
 
 def _hallazgos(doc: DocumentObject) -> None:
@@ -185,13 +262,14 @@ def _hallazgos(doc: DocumentObject) -> None:
             ("Impacto", "{{ h.impacto }}"),
             ("Confianza", "{{ h.confianza }}"),
             ("Evaluaciones que lo respaldan", "{{ h.n_evidencias }}"),
+            ("Contraste estadístico", "{{ h.contraste }}"),
         ],
     )
     _tag(doc, "endfor")
 
 
 def _plan(doc: DocumentObject) -> None:
-    doc.add_heading(SECCIONES[7], level=1)
+    doc.add_heading(SECCIONES[8], level=1)
     _ficha(
         doc,
         [
@@ -222,6 +300,123 @@ def _plan(doc: DocumentObject) -> None:
     )
     _tag(doc, "endfor")
     _tag(doc, "endfor")
+
+
+def _exactitud(doc: DocumentObject) -> None:
+    doc.add_heading(SECCIONES[6], level=1)
+    doc.add_heading("Lo que dicen los motores de la marca", level=2)
+    _si_hay(doc, "exactitud")
+    _p(doc, "{{ exactitud.intro }}")
+    _tabla(doc, ["Afirmaciones", "Número"], "exactitud.resumen", ["campo", "valor"])
+    doc.add_heading("Afirmaciones a revisar", level=3)
+    _tabla(
+        doc,
+        ["Motor", "Lo que dice el motor", "Estado", "Motivo"],
+        "exactitud.revisar",
+        ["motor", "texto", "estado", "motivo"],
+    )
+    _tag(doc, "if exactitud.resto")
+    _p(doc, "{{ exactitud.resto }}")
+    _tag(doc, "endif")
+    doc.add_heading("Mitigaciones en origen", level=3)
+    _tag(doc, "if exactitud.mitigaciones")
+    _tabla(
+        doc,
+        ["Id", "Acción", "Fuente que lo publica", "Afirmaciones"],
+        "exactitud.mitigaciones",
+        ["id", "descripcion", "fuente", "afirmaciones"],
+    )
+    _tag(doc, "else")
+    _p(doc, "{{ exactitud.sin_mitigaciones }}")
+    _tag(doc, "endif")
+    _si_no_hay(doc, "exactitud")
+    # La auditoría técnica solo existe si el estudio la trae: sin ella no hay ni título.
+    _tag(doc, "if auditoria.hay")
+    doc.add_heading("Auditoría técnica de la web: {{ auditoria.dominio }}", level=2)
+    _p(doc, "{{ auditoria.intro }}")
+    _tag(doc, "if auditoria.aviso")
+    _p(doc, "{{ auditoria.aviso }}", "Intense Quote")
+    _tag(doc, "endif")
+    _ficha(
+        doc,
+        [
+            ("Preparación para los motores", "{{ auditoria.puntuacion }}"),
+            ("Fecha de la auditoría", "{{ auditoria.fecha }}"),
+        ],
+    )
+    _tabla(
+        doc,
+        ["Bloque", "Puntuación", "Correctas", "Fallan"],
+        "auditoria.bloques",
+        ["bloque", "puntuacion", "ok", "falla"],
+    )
+    doc.add_heading("Comprobaciones que fallan", level=3)
+    _tabla(
+        doc,
+        ["Comprobación", "Detalle", "Motores afectados", "Evidencia"],
+        "auditoria.fallos",
+        ["titulo", "detalle", "motores", "evidencia"],
+    )
+    doc.add_heading("Acceso de los bots de IA", level=3)
+    _tabla(doc, ["Bot", "Motor", "Permitido"], "auditoria.bots", ["bot", "motor", "permitido"])
+    _tag(doc, "endif")
+
+
+def _escenarios(doc: DocumentObject) -> None:
+    doc.add_heading(SECCIONES[9], level=1)
+    _si_hay(doc, "escenarios")
+    _p(doc, "{{ escenarios.intro }}")
+    _tag(doc, "if escenarios.hay_escenarios")
+    doc.add_heading("Escenarios del plan", level=2)
+    _tabla(
+        doc,
+        ["Escenario", "Acciones", "Aplazadas", "Hallazgos sin cubrir", "Esfuerzo"]
+        + ["Score proyectado [mín.–máx.]"],
+        "escenarios.escenarios",
+        ["nombre", "mantenidas", "aplazadas", "sin_cubrir", "esfuerzo", "score"],
+    )
+    _tag(doc, "endif")
+    _tag(doc, "if escenarios.hay_simulacion")
+    doc.add_heading("Simulación del plan completo por fases", level=2)
+    _p(doc, "Score de Citación actual: {{ escenarios.actual }}.")
+    _tabla(
+        doc,
+        ["Al terminar", "Score proyectado [mín.–máx.]", "Visibilidad espontánea [mín.–máx.]"],
+        "escenarios.fases",
+        ["fase", "score", "tasa"],
+    )
+    doc.add_heading("Supuestos", level=3)
+    _vinetas(doc, "escenarios.supuestos")
+    _p(doc, "{{ escenarios.advertencia }}", "Intense Quote")
+    _p(doc, "Modelo de simulación: {{ escenarios.modelo }}.")
+    _tag(doc, "endif")
+    _si_no_hay(doc, "escenarios")
+
+
+def _seguimiento(doc: DocumentObject) -> None:
+    doc.add_heading(SECCIONES[10], level=1)
+    _p(doc, "{{ seguimiento.intro }}")
+    _tag(doc, "for m in seguimiento.metodo")
+    doc.add_heading("{{ m.titulo }}", level=3)
+    _p(doc, "{{ m.texto }}")
+    _tag(doc, "endfor")
+    doc.add_heading("Línea base de este estudio", level=2)
+    _tabla(doc, ["Indicador", "Valor"], "seguimiento.linea_base", ["campo", "valor"])
+    _tag(doc, "if seguimiento.hay_remedicion")
+    doc.add_heading("Cambios fuera del margen frente a la medición anterior", level=2)
+    _tabla(
+        doc,
+        ["Indicador", "Cambio", "IC 95 % del cambio"],
+        "seguimiento.deltas",
+        ["indicador", "cambio", "ic"],
+    )
+    _tag(doc, "endif")
+    doc.add_heading("Indicadores y cadencia de esta propuesta", level=2)
+    _vinetas(doc, "medicion.kpis")
+    _ficha(
+        doc,
+        [("Metodología", "{{ medicion.metodologia }}"), ("Cadencia", "{{ medicion.cadencia }}")],
+    )
 
 
 def build_template(path: Path = TEMPLATE_PATH) -> Path:
@@ -257,8 +452,9 @@ def build_template(path: Path = TEMPLATE_PATH) -> Path:
     _diagnostico(doc)
     _competencia(doc)
     _hallazgos(doc)
+    _exactitud(doc)
 
-    doc.add_heading(SECCIONES[6], level=1)
+    doc.add_heading(SECCIONES[7], level=1)
     _texto(doc, "estrategia.texto")
     doc.add_heading("Objetivos", level=2)
     _tabla(
@@ -271,19 +467,13 @@ def build_template(path: Path = TEMPLATE_PATH) -> Path:
     _vinetas(doc, "estrategia.prioridades")
 
     _plan(doc)
+    _escenarios(doc)
+    _seguimiento(doc)
 
-    doc.add_heading(SECCIONES[8], level=1)
-    doc.add_heading("KPIs", level=2)
-    _vinetas(doc, "medicion.kpis")
-    _ficha(
-        doc,
-        [("Metodología", "{{ medicion.metodologia }}"), ("Cadencia", "{{ medicion.cadencia }}")],
-    )
-
-    doc.add_heading(SECCIONES[9], level=1)
+    doc.add_heading(SECCIONES[11], level=1)
     _tabla(doc, ["Riesgo", "Mitigación"], "riesgos", ["riesgo", "mitigacion"])
 
-    doc.add_heading(SECCIONES[10], level=1)
+    doc.add_heading(SECCIONES[12], level=1)
     doc.add_heading("Hitos", level=2)
     _tabla(doc, ["Semana", "Hito"], "hoja.hitos", ["semana", "descripcion"])
     doc.add_heading("Responsabilidades", level=2)
