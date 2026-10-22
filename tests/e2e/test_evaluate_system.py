@@ -7,6 +7,8 @@ from types import ModuleType
 
 import pytest
 
+from posiq.settings import Settings
+
 ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -23,8 +25,8 @@ def script() -> ModuleType:
 
 @pytest.fixture(autouse=True)
 def sin_claves(monkeypatch: pytest.MonkeyPatch) -> None:
-    for var in ("TYPESAFE_API_KEY", "DEEPSEEK_API_KEY"):
-        monkeypatch.setenv(var, "")
+    # Las claves solo se leen del `.env`: sin `.env`, no hay claves aunque estén en el entorno.
+    monkeypatch.setitem(Settings.model_config, "env_file", None)
 
 
 def test_evaluacion_con_fixtures(script: ModuleType, tmp_path: Path) -> None:
@@ -37,7 +39,7 @@ def test_evaluacion_con_fixtures(script: ModuleType, tmp_path: Path) -> None:
     assert "**PENDIENTE**" in text
     assert "Hallazgos con `evaluation_ids` válidos: 7/7 (100 %)" in text
     assert "Acciones con `finding_ids` válidos: 9/9 (100 %)" in text
-    assert "falta DEEPSEEK_API_KEY (ni en el entorno ni en .env)" in text
+    assert "falta DEEPSEEK_API_KEY en .env" in text
     assert "| Fase 3 · Optimización y medición |" in text and "no una predicción" in text
 
 

@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Literal
 
 from posiq.adapters.export.branding import AgencyBrandKit
+from posiq.adapters.export.diferencial import DatosDiferencial
 from posiq.adapters.export.docx import DocxExporter
 from posiq.domain.schemas import Proposal
 
@@ -42,8 +43,11 @@ class PdfExporter:
         *,
         formato: Literal["docx", "pdf"],
         marca_agencia: AgencyBrandKit | None = None,
+        diferencial: DatosDiferencial | None = None,
     ) -> bytes:
-        contenido = self.docx.render(proposal, formato="docx", marca_agencia=marca_agencia)
+        contenido = self.docx.render(
+            proposal, formato="docx", marca_agencia=marca_agencia, diferencial=diferencial
+        )
         return contenido if formato == "docx" else self.convert(contenido)
 
     def convert(self, docx: bytes) -> bytes:

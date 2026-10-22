@@ -61,6 +61,23 @@
   (`LLM_TOKENS`), juez con fallback (25 %) y PlanGuard; `estimate_study(..., remedicion=True)`
   quita intake y market (para `GET /studies/{id}/remeasure/estimate`).
 
+## Claves solo del `.env` (`feature/C-claves-solo-env`)
+- `Settings` ignora las claves (`SecretStr`) del entorno del SO: solo `.env` o constructor. Los
+  tests que necesiten una clave la pasan al constructor (`Settings(_env_file=None, x_api_key=...)`).
+
+## Elegir escenario (`feature/C-elegir-escenario`)
+- `GET /studies/{id}/scenarios` (los tres preajustes del nodo `plan`, `completo` elegido);
+  `POST /studies/{id}/scenarios` con una `EntradaEscenario` → 201 `{id: "P1", …}` (422 si nombra
+  acciones que no están en el plan, 409 sin plan o con el grafo en marcha);
+  `POST /studies/{id}/scenarios/{eid}/elegir` (404 si no existe, 409 con la propuesta redactada).
+  Los escenarios se escriben en el checkpoint sin cambiar el siguiente nodo: el plan se aprueba
+  después con normalidad.
+- `write` (`con_escenario`): con un escenario elegido distinto de `completo`, la propuesta y el
+  redactor ven solo sus acciones y la primera limitación lo declara («Propuesta con el escenario…»).
+  El plan aprobado del estudio no cambia y el presupuesto sigue siendo el del plan completo (el
+  coste declarado se cita aparte). Con `completo` la propuesta es la de siempre (golden intactos).
+- Editar el plan en la revisión recalcula los preajustes y descarta los personalizados.
+
 ## Seguimiento (A2, `feature/C-seguimiento-api`)
 - `GET /brands` → `[{brand_id, nombre, n_mediciones, ultima_medicion}]`: marcas de los estudios
   visibles del usuario (ADR 0015). `n_mediciones` cuenta solo los completados; una marca con un
@@ -151,6 +168,16 @@
   - `hallazgos_web: Finding[] | null`: los hallazgos técnicos (`F-web-*`). Con `origen="real"`
     están también en `findings`; con `fixture`, solo aquí.
 - `GET /studies/{id}/traces` incluye las trazas `web_audit` (coste 0).
+
+## Exportación con el diferencial (desde zona E, `feature/E-word-diferencial`)
+- `GET /studies/{id}/export` pasa al exportador `DatosDiferencial.del_estado(values)` (rigor,
+  competidores, oportunidades, exactitud, mitigaciones, escenarios, simulación y, si existe,
+  `auditoria_web`). Misma ruta, mismos códigos (409 sin propuesta, 503 sin LibreOffice).
+
+### Cambios de contrato para la Mitad B
+- Ninguno en el JSON. Solo cambia el contenido del Word: 13 secciones («7. Exactitud y lectura
+  técnica de la marca», «10. Escenarios y simulación del plan», «11. Seguimiento con método») y el
+  rótulo «Caso sintético del reto: datos ficticios» en portada y pie de los estudios kit.
 
 ## Configuración versionada por marca (`feature/C-seguimiento-config`, sobre la #49)
 - Se rebasó sobre la #49 de Walter, que **manda** en `GET /brands`, `GET /brands/{id}/serie`,
