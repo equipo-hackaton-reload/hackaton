@@ -297,6 +297,8 @@ def create_app(
             oportunidades_fuente=values.get("oportunidades_fuente"),
             exactitud=values.get("exactitud"),
             mitigaciones=values.get("mitigaciones"),
+            auditoria_web=values.get("auditoria_web"),
+            hallazgos_web=values.get("hallazgos_web"),
             proposal=values.get("proposal"),
         )
 

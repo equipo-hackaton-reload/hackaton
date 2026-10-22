@@ -99,6 +99,14 @@ class Settings(BaseSettings):
     # Tamaño máximo del brief subido (bytes); por encima, 413.
     brief_max_bytes: int = 200_000
 
+    # Auditoría técnica GEO de la web de la marca (ADR 0019). `off` por defecto: sin descargas.
+    # `fixture`: `FixtureWebFetcher` (CASO SINTÉTICO, sin red; sus hallazgos no entran en el plan).
+    # `real`: descarga el dominio propio de la marca; en modo kit se degrada a `fixture`.
+    # `web_audit_timeout_s`: tope TOTAL por recurso del fetcher real; como mucho
+    # `TIMEOUT_TOTAL_RECURSO_S` (10 s): un valor mayor se recorta.
+    web_audit: Literal["off", "fixture", "real"] = "off"
+    web_audit_timeout_s: float = 10.0
+
 
 def usd_per_m_to_eur(tokens: int, usd_per_m: float, usd_eur: float) -> float:
     """Coste en EUR de `tokens` a `usd_per_m` dólares por millón."""

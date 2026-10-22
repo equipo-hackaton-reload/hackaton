@@ -58,6 +58,8 @@ def test_cifras_canonicas_intactas(view: dict[str, Any]) -> None:
     )
     assert len(view["findings"]) == 7
     assert not [e for e in view["errores"] if e.startswith("diferencial")]
+    # Auditoría técnica de la web apagada por defecto (ADR 0019): ni descargas ni trazas.
+    assert view["auditoria_web"] is None and view["hallazgos_web"] is None
 
 
 def test_rigor_score_con_su_intervalo(view: dict[str, Any]) -> None:

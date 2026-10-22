@@ -9,6 +9,7 @@ from posiq.application.nodes.plan import plan
 from posiq.application.nodes.prompts import prompts
 from posiq.application.nodes.review import review_competidores, review_plan
 from posiq.application.nodes.run import run
+from posiq.application.nodes.web_audit import web_audit
 from posiq.application.nodes.write import write
 
 __all__ = [
@@ -22,5 +23,6 @@ __all__ = [
     "review_competidores",
     "review_plan",
     "run",
+    "web_audit",
     "write",
 ]

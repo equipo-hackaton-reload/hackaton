@@ -24,6 +24,7 @@ from posiq.domain.schemas import (
 )
 from posiq.domain.simulation_schemas import SimulationResult
 from posiq.domain.source_map_schemas import OportunidadFuente
+from posiq.domain.web_audit_schemas import AuditoriaWeb
 
 EstadoApi = Literal[
     "en_curso",
@@ -103,6 +104,11 @@ class StudyView(BaseModel):
     oportunidades_fuente: list[OportunidadFuente] | None = None
     exactitud: list[HallazgoExactitud] | None = None
     mitigaciones: list[AccionMitigacion] | None = None
+    # Auditoría técnica de la web (ADR 0019): None si está apagada (`WEB_AUDIT=off`, por defecto)
+    # o la marca no tiene dominio. Con `origen="fixture"` es un ejemplo (CASO SINTÉTICO) y sus
+    # `hallazgos_web` NO están en `findings` ni en el plan; con `origen="real"` sí.
+    auditoria_web: AuditoriaWeb | None = None
+    hallazgos_web: list[Finding] | None = None
     proposal: Proposal | None = None
 
 

@@ -122,6 +122,36 @@
   cuya cabecera declara lo que el nodo ya mandaba. `tests/application/test_prompt_state.py` graba
   todas las llamadas y lo comprueba para todos los prompts.
 
+## Auditoría técnica web (ADR 0019, `feature/C-web-audit-nodo`)
+- Nodo `web_audit` (`application/nodes/web_audit.py`) entre `judge` y `analyze`, `external=True`
+  (reintentos del grafo; el fetcher no lanza). Con `Deps.web_fetcher=None` o marca sin
+  `dominio`: `auditoria_web=None`, sin descargas ni trazas.
+- Descargas: los 12 `RECURSOS` en paralelo (un hilo cada una), después las `Sitemap:` de
+  robots.txt que cumplen `url_permitida` (sin repetir el `/sitemap.xml` fijo) y hasta 3 páginas
+  (`paginas_sitemap`). `analizar_web` + `hallazgos_web` + `vincular_hallazgos` (todo `domain/`).
+- Trazas: una por descarga, `nodo="web_audit"`, `modelo="http:<fetcher.name>"`,
+  `prompt_version="web_audit.v1"`, 0 tokens, coste 0, `duracion_ms` de la respuesta.
+- `origen`: `fixture` con `FixtureWebFetcher` y SIEMPRE en modo kit (regla de oro), `real` solo en
+  modo real con el fetcher httpx. `analyze` suma `hallazgos_web` a `findings` solo si es `real`
+  (el plan puede usar la palanca `tecnico`); en fixture quedan aparte y los 7 hallazgos / 9
+  acciones de Alborada no cambian (`tests/e2e/test_web_audit_api.py`).
+- Configuración: `WEB_AUDIT=off|fixture|real` (`off` por defecto; en kit `real` → fixture, vía
+  `adapters.web.crear_web_fetcher`) y `WEB_AUDIT_TIMEOUT_S` (tope por recurso del fetcher real,
+  recortado a 10 s). El encargo hablaba de `web_audit_enabled`; se sigue el ADR 0019 (`Literal`).
+- Checkpointer: admite los modelos de `web_audit_schemas` (ida y vuelta probada).
+- `GET /estimate` no cambia (coste 0).
+
+### Cambios de contrato para la Mitad B
+- `GET /studies/{id}` añade (aditivo, null si la auditoría está apagada o no hay dominio):
+  - `auditoria_web: AuditoriaWeb | null` (forma en `domain/web_audit_schemas.py`: `dominio`,
+    `origen` `real|fixture`, `fetcher`, `puntuacion`, `bloques[{bloque, puntuacion, ...}]`,
+    `comprobaciones[{id, bloque, estado, detalle, evidencia, recurso, motores_afectados}]`,
+    `accesos_bots[{bot, motor, permitido, regla}]`, `recursos`, `finding_ids`...). Con
+    `origen="fixture"`, rótulo «Ejemplo (caso sintético)».
+  - `hallazgos_web: Finding[] | null`: los hallazgos técnicos (`F-web-*`). Con `origen="real"`
+    están también en `findings`; con `fixture`, solo aquí.
+- `GET /studies/{id}/traces` incluye las trazas `web_audit` (coste 0).
+
 ## Falta
 - Estudio de Alborada con DeepSeek real → `docs/ejemplos/` (bloqueado: falta `DEEPSEEK_API_KEY`).
   Dos formas: completo (juez DeepSeek, ≈1–2,5 € y 20–30 min) o rápido con `JUDGE_PROVIDER=reglas`.

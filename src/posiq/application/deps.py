@@ -27,7 +27,7 @@ from posiq.domain.schemas import (
     Trace,
 )
 from posiq.domain.scoring import SCORE_VERSION
-from posiq.ports import LLM, Engine, StudyRepo
+from posiq.ports import LLM, Engine, StudyRepo, WebFetcher
 from posiq.settings import Settings
 
 VERSION_METODOLOGIA = "reload-geo-2026"
@@ -75,6 +75,8 @@ class Deps:
     settings: Settings
     engine_factory: Callable[[list[str], Budget], list[Engine]] | None = None
     plan_guard_factory: PlanGuardFactory | None = None
+    # Auditoría técnica de la web (ADR 0019). None: auditoría apagada (`WEB_AUDIT=off`).
+    web_fetcher: WebFetcher | None = None
 
 
 def study_budget(deps: Deps, state: StudyState) -> Budget:
